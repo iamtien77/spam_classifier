@@ -1,0 +1,71 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C/C++ build artifacts (nếu có)
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments (Môi trường ảo)
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# IDEs & Code Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Hệ điều hành (OS generated files)
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Logs & profiling
+*.log
+logs/
+
+# Dữ liệu (Bỏ qua file dữ liệu lớn, chỉ giữ lại .gitkeep để duy trì cấu trúc thư mục)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Models & Trọng số huấn luyện (file nhị phân lớn)
+*.joblib
+*.pkl
+*.pickle
+results/saved_models/*
+!results/saved_models/.gitkeep
+
+# Kết quả chạy thực nghiệm (figures, metrics sinh ra khi train)
+results/figures/*
+!results/figures/.gitkeep
+results/metrics/*
+!results/metrics/.gitkeep
