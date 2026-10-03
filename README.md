@@ -183,9 +183,13 @@ spam_classifier/
 ├── data/                           # Thư mục lưu trữ dữ liệu (không chứa code)
 │   ├── raw/                        # Dữ liệu gốc (spambase.data, emails raw...)
 │   └── processed/                  # Dữ liệu đã làm sạch, xử lý sẵn sàng train
-├── notebooks/                      # Thử nghiệm tương tác & báo cáo EDA
-│   ├── 01_eda.ipynb                # Khám phá dữ liệu (EDA)
-│   └── 02_model_experiments.ipynb  # Thí nghiệm huấn luyện mô hình
+├── notebooks/                      # Thử nghiệm tương tác & báo cáo theo từng giai đoạn
+│   ├── 01_eda.ipynb                # Khám phá & trực quan hoá dữ liệu (EDA)
+│   ├── 02_preprocessing_and_features.ipynb # Tiền xử lý & kỹ thuật đặc trưng
+│   ├── 03_model_baseline_and_training.ipynb # Huấn luyện 3 mô hình cơ bản (LR, SVM, NB)
+│   ├── 04_tuning_and_ensemble.ipynb # Tinh chỉnh GridSearchCV & Ensemble
+│   ├── 05_error_analysis_and_deployment.ipynb # Phân tích lỗi & demo dự đoán
+│   └── README.md                   # Hướng dẫn chi tiết thứ tự chạy notebooks
 ├── src/                            # Toàn bộ mã nguồn chính của dự án
 │   ├── __init__.py
 │   ├── config.py                   # Cấu hình đường dẫn, hyperparams, feature names
@@ -219,7 +223,9 @@ spam_classifier/
 │   └── saved_models/               # Model weights đã huấn luyện (.joblib)
 └── tests/                          # Kiểm thử tự động (Unit tests)
     ├── __init__.py
-    ├── test_data.py                # Tests cho module data
-    ├── test_models.py              # Tests cho module models
-    └── test_evaluation.py          # Tests cho module evaluation
+    ├── test_data.py                # Tests cho module data (loader, split, scale)
+    ├── test_features.py            # Tests cho module features (PCA, interactions)
+    ├── test_models.py              # Tests cho module models (classifiers, tuning, ensemble)
+    ├── test_evaluation.py          # Tests cho module evaluation (metrics, analysis)
+    └── test_deployment.py          # Tests cho module deployment (predictor)
 ```
