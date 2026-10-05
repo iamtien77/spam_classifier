@@ -52,8 +52,7 @@ desktop.ini
 logs/
 
 # Dữ liệu (Bỏ qua file dữ liệu lớn, chỉ giữ lại .gitkeep để duy trì cấu trúc thư mục)
-data/raw/*
-!data/raw/.gitkeep
+
 data/processed/*
 !data/processed/.gitkeep
 
