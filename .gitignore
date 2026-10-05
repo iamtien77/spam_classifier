@@ -69,3 +69,6 @@ results/figures/*
 !results/figures/.gitkeep
 results/metrics/*
 !results/metrics/.gitkeep
+
+# Tài liệu và báo cáo cá nhân (Docs, PDF, Word, Notebook gốc lớn)
+docs/

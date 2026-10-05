@@ -1,231 +1,136 @@
-# 📧 Spam Email Classifier
+# 📧 Spam Email Classifier (From-Scratch NLP Pipeline)
 
 ## 1. Mô tả bài toán
 
-Cho một tập dữ liệu email, xây dựng mô hình Machine Learning để **phân loại tự động** mỗi email là **"spam"** hay **"not spam"** (ham).
+Xây dựng hệ sinh thái Machine Learning hoàn chỉnh để **phân loại tự động email/tin nhắn** là **"spam"** (thư rác) hay **"ham"** (thư hợp lệ).
 
-Đây là bài toán **phân loại nhị phân (binary classification)** — một trong những bài toán kinh điển của ML, có ứng dụng thực tế rộng rãi trong lọc email, phát hiện gian lận, và phân tích cảm xúc.
+Hệ thống được thiết kế theo triết lý **"From Scratch Compliance"** (tự cài đặt các thuật toán cốt lõi từ đầu) dựa trên nghiên cứu và thực nghiệm trong [Classification_email_spam.ipynb](file:///e:/Hoc_May_Tren_truong/spam_classifier/Classification_email_spam.ipynb).
 
 ### Dữ liệu đầu vào
-- **Dataset**: UCI Spambase Dataset (4601 emails, 57 features, 1 label)
-- Mỗi email được biểu diễn bằng vector đặc trưng gồm:
-  - **Word frequency** (48 features): Tần suất xuất hiện các từ khóa đặc trưng (make, address, free, business, ...)
-  - **Character frequency** (6 features): Tần suất ký tự đặc biệt (`;`, `(`, `[`, `!`, `$`, `#`)
-  - **Capital run length** (3 features): Thống kê về chuỗi ký tự viết hoa liên tiếp (average, longest, total)
+- **Tập dữ liệu**: `spam.csv` (chứa các mẫu email/SMS thực tế với 2 trường cốt lõi: `label` ['ham', 'spam'] và `text`).
+- **Đặc trưng bài toán**: Dữ liệu văn bản phi cấu trúc (unstructured text) và có tính chất **mất cân bằng lớp cao (Imbalanced Data)**: ~86.6% Ham và ~13.4% Spam.
 
-### Đầu ra mong muốn
-- Nhãn phân loại: `1 = spam`, `0 = not spam`
-- Xác suất dự đoán (probability)
-- Bảng so sánh hiệu suất giữa các mô hình
-- Biểu đồ trực quan (ROC, Confusion Matrix, Feature Importance)
-
----
-
-## 2. Xác định yêu cầu
-
-### Yêu cầu chức năng
-| # | Yêu cầu | Mô tả |
-|---|---------|-------|
-| F1 | Tải dữ liệu | Tải Spambase dataset từ UCI hoặc file local |
-| F2 | Tiền xử lý | Chia train/test, chuẩn hóa, chọn features quan trọng |
-| F3 | Feature Engineering | Tạo features mới (tương tác, tỷ lệ), giảm chiều PCA |
-| F4 | Huấn luyện mô hình | Train 3 mô hình: Logistic Regression, SVM, Naive Bayes |
-| F5 | Đánh giá | Tính Accuracy, Precision, Recall, F1-score, AUC-ROC |
-| F6 | Hyperparameter Tuning | Tối ưu tham số bằng GridSearchCV |
-| F7 | Ensemble | Random Forest, Gradient Boosting, Voting Classifier |
-| F8 | Phân tích lỗi | Xác định và phân tích các mẫu bị phân loại sai |
-| F9 | Trực quan hóa | EDA, Confusion Matrix, ROC Curve, biểu đồ so sánh |
-| F10 | Deployment | Lưu model, demo phân loại email mới |
-
-### Yêu cầu phi chức năng
-- Code có cấu trúc module rõ ràng, dễ bảo trì
-- Logging theo dõi quá trình chạy
-- Kết quả (biểu đồ, bảng) được lưu ra thư mục `results/`
-- Có file `requirements.txt` để tái tạo môi trường
+### Mục tiêu kỹ thuật & Nghiệp vụ cốt lõi
+1. **Ràng buộc nghiệp vụ**: Đảm bảo **Recall >= 0.85** (bắt trúng tối thiểu 85% email spam để bảo vệ hộp thư người dùng) trong khi vẫn kiểm soát tối đa tỷ lệ báo động giả False Positive.
+2. **Triết lý From-Scratch**: Tự cài đặt các thành phần NLP, tiền xử lý, mô hình hóa và đánh giá:
+   - `TfidfVectorizerScratch`: Vector hóa TF-IDF hỗ trợ word/char n-grams.
+   - `MaxAbsScalerScratch`: Chuẩn hóa độ lớn cực đại bảo toàn tính thưa (sparsity) của ma trận.
+   - `ComplementNaiveBayes`: Naive Bayes phần bù chuyên trị dữ liệu văn bản mất cân bằng lớp.
+   - `LinearSVMFromScratch`: SVM tuyến tính tối ưu bằng SGD/Pegasos với hàm mất mát Hinge Loss và Class Weighting.
+   - `ThresholdOptimizerScratch`: Tự động dò tìm ngưỡng quyết định tối ưu trên tập Validation với chỉ số F-beta (beta=2.0).
+   - `SpamModelEvaluator`: Tự tính Confusion Matrix, ROC-AUC (quy tắc hình thang), MCC, Cohen's Kappa.
+3. **Cổng kiểm chứng đặc trưng SHAP (SHAP Feature Selection)**: Dò quét Top-K đặc trưng quan trọng nhất để tinh giản không gian chiều.
 
 ---
 
-## 3. Phân tích nhiệm vụ từng module
+## 2. Luồng thực thi tổng thể (End-to-End Workflow)
 
-### 3.1. `config.py` — Cấu hình project
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| Đường dẫn dữ liệu | URL dataset UCI, đường dẫn file local, thư mục output |
-| Tên features | Danh sách 57 tên feature của Spambase |
-| Tham số chung | `test_size=0.2`, `random_state=42`, `cv_folds=5` |
-| Hyperparameter grids | Dict tham số cho GridSearchCV (LR, SVM, NB) |
-
-### 3.2. `data/loader.py` — Tải và khám phá dữ liệu
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `load_data()` | Tải Spambase từ UCI (hoặc fallback file local), gán tên cột, trả về DataFrame |
-| `explore_data(df)` | In shape, kiểu dữ liệu, tỷ lệ spam/ham, missing values, thống kê mô tả |
-
-### 3.3. `data/preprocessing.py` — Tiền xử lý dữ liệu
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `split_data(df)` | Tách features (X) và label (y), chia train/test theo stratified sampling |
-| `scale_features(X_train, X_test)` | Chuẩn hóa bằng StandardScaler (fit trên train, transform trên test) |
-| `select_features(X_train, X_test, y_train)` | Chọn K features tốt nhất bằng SelectKBest + ANOVA F-test |
-
-### 3.4. `data/feature_engineering.py` — Tạo features mới
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `create_interaction_features(df)` | Tạo features tương tác: tích word_freq × char_freq |
-| `create_ratio_features(df)` | Tạo features tỷ lệ: capital_run_length / tổng số từ |
-| `apply_pca(X_train, X_test, n)` | Giảm chiều bằng PCA, giữ lại n thành phần chính |
-| `compare_feature_sets(X_orig, X_eng, y)` | So sánh hiệu quả bộ features gốc vs. features mới bằng cross-validation |
-
-### 3.5. `models/classifiers.py` — 3 mô hình phân loại chính
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `get_models()` | Trả về dict `{name: model}` cho Logistic Regression, SVM, Gaussian Naive Bayes |
-| `train_and_evaluate(models, X_train, X_test, y_train, y_test)` | Huấn luyện từng model, tính metrics (accuracy, precision, recall, F1, cross-val score) |
-
-### 3.6. `models/tuning.py` — Tối ưu Hyperparameter
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `tune_logistic_regression(X, y)` | GridSearchCV cho LR: `C`, `penalty`, `solver` |
-| `tune_svm(X, y)` | GridSearchCV cho SVM: `C`, `kernel`, `gamma` |
-| `tune_naive_bayes(X, y)` | GridSearchCV cho NB: `var_smoothing` |
-| `tune_all(X, y)` | Gọi cả 3 hàm trên, trả về dict `{name: best_estimator}` |
-
-### 3.7. `models/ensemble.py` — Phương pháp Ensemble
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `train_random_forest(X, y)` | Huấn luyện Random Forest Classifier |
-| `train_gradient_boosting(X, y)` | Huấn luyện Gradient Boosting Classifier |
-| `train_voting_classifier(estimators, X, y)` | Soft Voting kết hợp 3 mô hình đã tuned |
-
-### 3.8. `models/persistence.py` — Lưu/tải model
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `save_model(model, scaler, path)` | Serialize model + scaler bằng joblib |
-| `load_model(path)` | Deserialize model đã lưu |
-| `save_pipeline(pipeline, path)` | Lưu toàn bộ pipeline (scaler → selector → model) |
-| `load_pipeline(path)` | Tải pipeline đã lưu |
-
-### 3.9. `evaluation/metrics.py` — Tính toán metrics
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `compute_metrics(y_test, y_pred, y_proba)` | Tính accuracy, precision, recall, F1, AUC-ROC |
-| `print_classification_reports(results, y_test)` | In classification report (sklearn) cho từng model |
-| `build_summary_table(all_results)` | Tạo DataFrame tổng hợp tất cả model, sắp xếp theo F1 |
-
-### 3.10. `evaluation/visualization.py` — Trực quan hóa
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `plot_eda(df)` | Biểu đồ EDA: phân bố nhãn, histogram top features, correlation heatmap |
-| `plot_confusion_matrices(results, y_test)` | Confusion Matrix heatmap cho từng model |
-| `plot_roc_curves(results, y_test)` | ROC Curve so sánh tất cả model trên cùng 1 biểu đồ |
-| `plot_precision_recall_curves(results, y_test)` | Precision-Recall Curve |
-| `plot_feature_importance(model, names)` | Bar chart Feature Importance (Random Forest) |
-| `plot_model_comparison(summary_df)` | Biểu đồ cột grouped so sánh metrics tất cả model |
-
-### 3.11. `evaluation/error_analysis.py` — Phân tích lỗi
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `analyze_misclassified(X_test, y_test, y_pred, names)` | Tìm mẫu sai, thống kê False Positive vs False Negative |
-| `plot_misclassified_distribution(errors_df)` | Biểu đồ phân bố giá trị features của mẫu sai vs đúng |
-| `compare_error_patterns(results, X_test, y_test)` | So sánh pattern lỗi giữa các model (mẫu nào cùng sai?) |
-
-### 3.12. `deployment/predictor.py` — Triển khai
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `classify_email(features, model, scaler)` | Nhận vector features → trả về SPAM/NOT SPAM + xác suất |
-| `demo_prediction(model, scaler, X_test, y_test)` | Lấy ngẫu nhiên 1 mẫu test, phân loại và in kết quả |
-
-### 3.13. `utils/logger.py` — Logging và tiện ích
-| Nhiệm vụ | Chi tiết |
-|-----------|----------|
-| `setup_logger(name, log_file)` | Tạo logger ghi ra console + file |
-| `log_step(step_name)` | Decorator đo thời gian chạy từng bước |
-| `print_section_header(title)` | In header đẹp phân cách các section |
-
-### 3.14. `main.py` — Entry point
-| Bước | Gọi module | Mô tả |
-|------|-----------|-------|
-| 1 | `data.loader` | Tải + khám phá dữ liệu |
-| 2 | `evaluation.visualization` | EDA biểu đồ |
-| 3 | `data.preprocessing` | Split, scale, select features |
-| 4 | `data.feature_engineering` | Tạo features mới |
-| 5 | `models.classifiers` | Huấn luyện 3 mô hình cơ bản |
-| 6 | `evaluation.metrics` | Đánh giá metrics |
-| 7 | `models.tuning` | Tối ưu hyperparameter |
-| 8 | `models.ensemble` | Ensemble methods |
-| 9 | `evaluation.error_analysis` | Phân tích lỗi |
-| 10 | `evaluation.visualization` | Biểu đồ so sánh tổng hợp |
-| 11 | `models.persistence` | Lưu model tốt nhất |
-| 12 | `deployment.predictor` | Demo phân loại email mới |
+```
+[spam.csv] ──> [Early Stratified Split (80/10/10)]
+                       │
+       ┌───────────────┼───────────────┐
+       ▼               ▼               ▼
+   [Train DF]       [Val DF]       [Test DF]
+       │               │               │
+       ├───────────────┴───────────────┤
+       ▼
+ [Data Cleaning & Text Preprocessing (Unicode NFKD, Regex tokens, Quantile capping)]
+       │
+       ▼
+ [Hybrid Feature Engineering (Word TF-IDF + Char TF-IDF + Keywords + Scaled Numerics)]
+       │
+       ▼
+ [SHAP Feature Selection (Sweep Top-K: 300 -> 2500 on Validation)]
+       │
+       ▼
+ [Model Training & Optuna Tuning (Complement Naive Bayes vs Linear SVM)]
+       │
+       ▼
+ [Threshold Optimization (Recall Target >= 0.85 & Max F-beta on Validation)]
+       │
+       ▼
+ [Final Test Evaluation & In-depth Error Analysis (FP / FN samples audit)]
+       │
+       ▼
+ [Pipeline Packaging (Joblib) & Deployment Inference Service]
+```
 
 ---
 
-## 4. Công nghệ sử dụng
-
-| Thư viện | Mục đích |
-|----------|----------|
-| `pandas` | Xử lý dữ liệu dạng bảng |
-| `numpy` | Tính toán số học |
-| `scikit-learn` | Mô hình ML, tiền xử lý, đánh giá |
-| `matplotlib` | Vẽ biểu đồ cơ bản |
-| `seaborn` | Biểu đồ thống kê nâng cao |
-| `joblib` | Lưu/tải model |
-
----
-
-## 5. Cấu trúc thư mục
+## 3. Cấu trúc thư mục dự án
 
 ```
 spam_classifier/
-├── main.py                         # Entry point, điều phối toàn bộ workflow
-├── requirements.txt                # Thư viện dependencies
-├── README.md                       # Tài liệu phân tích và hướng dẫn dự án
-├── data/                           # Thư mục lưu trữ dữ liệu (không chứa code)
-│   ├── raw/                        # Dữ liệu gốc (spambase.data, emails raw...)
-│   └── processed/                  # Dữ liệu đã làm sạch, xử lý sẵn sàng train
-├── notebooks/                      # Thử nghiệm tương tác & báo cáo theo từng giai đoạn
-│   ├── 01_eda.ipynb                # Khám phá & trực quan hoá dữ liệu (EDA)
-│   ├── 02_preprocessing_and_features.ipynb # Tiền xử lý & kỹ thuật đặc trưng
-│   ├── 03_model_baseline_and_training.ipynb # Huấn luyện 3 mô hình cơ bản (LR, SVM, NB)
-│   ├── 04_tuning_and_ensemble.ipynb # Tinh chỉnh GridSearchCV & Ensemble
-│   ├── 05_error_analysis_and_deployment.ipynb # Phân tích lỗi & demo dự đoán
-│   └── README.md                   # Hướng dẫn chi tiết thứ tự chạy notebooks
-├── src/                            # Toàn bộ mã nguồn chính của dự án
+├── main.py                         # Entry point điều phối 13 bước của toàn bộ workflow
+├── requirements.txt                # Thư viện dependencies (numpy, pandas, scipy, shap, optuna, joblib, matplotlib)
+├── README.md                       # Tài liệu thiết kế hệ thống và ánh xạ logic
+├── Classification_email_spam.ipynb # Notebook thực nghiệm gốc (From-Scratch logic)
+├── data/                           # Dữ liệu lưu trữ
+│   ├── raw/                        # Chứa spam.csv gốc
+│   └── processed/                  # Dữ liệu sạch và các tập split
+├── notebooks/                      # Notebooks báo cáo thực nghiệm
+│   ├── 01_eda.ipynb                # Khám phá dữ liệu & n-grams
+│   ├── 02_preprocessing_and_features.ipynb # Xây dựng ma trận đặc trưng lai
+│   ├── 03_model_baseline_and_training.ipynb # Huấn luyện CNB và Linear SVM
+│   ├── 04_tuning_and_ensemble.ipynb # Tinh chỉnh Optuna & Threshold tuning
+│   └── 05_error_analysis_and_deployment.ipynb # Phân tích lỗi & Inference
+├── src/                            # Mã nguồn module hóa
 │   ├── __init__.py
-│   ├── config.py                   # Cấu hình đường dẫn, hyperparams, feature names
-│   ├── data/                       # Module tải và tiền xử lý dữ liệu
+│   ├── config.py                   # Cấu hình siêu tham số, regex keywords, dataclass SpamExperimentConfig
+│   ├── data/                       # Module dữ liệu
 │   │   ├── __init__.py
-│   │   ├── loader.py               # Tải và khám phá dữ liệu
-│   │   └── preprocessing.py        # Tiền xử lý (clean, split, scale, select)
+│   │   ├── loader.py               # Nạp dữ liệu thô, fallback encoding, khám phá schema
+│   │   └── preprocessing.py        # Chia phân tầng 80/10/10 sớm, làm sạch, SpamTextProcessor
 │   ├── features/                   # Module đặc trưng
 │   │   ├── __init__.py
-│   │   └── feature_engineering.py  # Tạo features mới (tương tác, tỷ lệ, PCA)
-│   ├── models/                     # Module thuật toán Machine Learning
+│   │   └── feature_engineering.py  # TfidfVectorizerScratch, MaxAbsScalerScratch, HybridBuilder, SHAP Top-K
+│   ├── models/                     # Module mô hình Machine Learning
 │   │   ├── __init__.py
-│   │   ├── classifiers.py          # 3 mô hình cơ bản: LR, SVM, NB
-│   │   ├── ensemble.py             # Random Forest, Gradient Boosting, Voting
-│   │   ├── tuning.py               # GridSearchCV hyperparameter tuning
-│   │   └── persistence.py          # Lưu/tải model (.joblib)
-│   ├── evaluation/                 # Module đánh giá hiệu năng
+│   │   ├── classifiers.py          # ComplementNaiveBayes & LinearSVMFromScratch (From Scratch)
+│   │   ├── ensemble.py             # SpamVotingEnsemble kết hợp CNB + SVM
+│   │   ├── tuning.py               # ThresholdOptimizerScratch, Optuna tuning, ModelSelectionWorkflow
+│   │   └── persistence.py          # Lưu/tải toàn bộ pipeline artifact (.joblib)
+│   ├── evaluation/                 # Module đánh giá & trực quan hóa
 │   │   ├── __init__.py
-│   │   ├── metrics.py              # Accuracy, Precision, Recall, F1, AUC
-│   │   ├── visualization.py        # Biểu đồ EDA, ROC, Confusion Matrix
-│   │   └── error_analysis.py       # Phân tích mẫu bị phân loại sai
-│   ├── deployment/                 # Module dự đoán thực tế
+│   │   ├── metrics.py              # SpamModelEvaluator (Confusion matrix, F-beta, MCC, Trapezoid ROC-AUC)
+│   │   ├── visualization.py        # EDA, Heatmap CM, ROC/PR curves, Threshold Diagnostic, SHAP plot
+│   │   └── error_analysis.py       # Trích xuất và mổ xẻ mẫu False Positive & False Negative
+│   ├── deployment/                 # Module triển khai thực tế
 │   │   ├── __init__.py
-│   │   └── predictor.py            # Phân loại email mới từ vector/text
+│   │   └── predictor.py            # SpamInferenceService dự đoán trực tiếp email mới
 │   └── utils/                      # Tiện ích bổ trợ
 │       ├── __init__.py
-│       └── logger.py               # Logging và đo thời gian
-├── results/                        # Lưu trữ kết quả đầu ra
-│   ├── figures/                    # Biểu đồ (.png)
-│   ├── metrics/                    # Bảng tổng hợp số liệu (.csv)
-│   └── saved_models/               # Model weights đã huấn luyện (.joblib)
+│       └── logger.py               # Logger ghi console/file, decorator đo thời gian thực thi
+├── results/                        # Lưu trữ kết quả đầu ra tự động
+│   ├── figures/                    # Biểu đồ xuất ra (.png)
+│   ├── metrics/                    # Bảng số liệu và file phân tích lỗi (.csv)
+│   └── saved_models/               # Pipeline bundle đã huấn luyện (.joblib)
 └── tests/                          # Kiểm thử tự động (Unit tests)
     ├── __init__.py
-    ├── test_data.py                # Tests cho module data (loader, split, scale)
-    ├── test_features.py            # Tests cho module features (PCA, interactions)
-    ├── test_models.py              # Tests cho module models (classifiers, tuning, ensemble)
-    ├── test_evaluation.py          # Tests cho module evaluation (metrics, analysis)
-    └── test_deployment.py          # Tests cho module deployment (predictor)
+    ├── test_data.py
+    ├── test_features.py
+    ├── test_models.py
+    ├── test_evaluation.py
+    └── test_deployment.py
 ```
+
+---
+
+## 4. Chi tiết ánh xạ từng Module với logic trong Notebook
+
+| Module trong cấu trúc | Class / Hàm chính | Ánh xạ mục trong Notebook | Vai trò & Logic thực hiện |
+|-----------------------|-------------------|---------------------------|----------------------------|
+| [src/config.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/config.py) | `SpamExperimentConfig` | Mục 1.2, Cell 9 | Lưu trữ cấu hình N-grams, regex `KEYWORD_PATTERNS`, `RECALL_TARGET = 0.85`, tham số Optuna. |
+| [src/data/loader.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/data/loader.py) | `load_raw_data()`, `explore_raw_data()` | Mục 2.1, Cell 17-19 | Đọc `spam.csv`, fallback encoding UTF-8/Latin-1, lọc 2 cột `label` & `text`, thống kê mất cân bằng nhãn. |
+| [src/data/preprocessing.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/data/preprocessing.py) | `stratified_split_dataframe()`, `clean_email_split()`, `SpamTextProcessor` | Mục 2.2, 3.1, 3.2, Cell 21, 32, 39 | Phân tầng 80/10/10 sớm; lọc rác; chuẩn hóa văn bản NFKD, token hóa `<URL>`, `<NUMBER>`, `<CURRENCY>`, cắt đuôi phân vị. |
+| [src/features/feature_engineering.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/features/feature_engineering.py) | `TfidfVectorizerScratch`, `MaxAbsScalerScratch`, `HybridFeatureBuilderScratch`, `ShapTopKSelectionWorkflow` | Mục 6.1 - 6.4, 7.1 - 7.5, Cell 55, 59, 61, 69, 74 | Vectorizer TF-IDF tự viết; Scaler tự viết; ghép nối ma trận thưa Word + Char + Keywords + Numerics; quét Top-K đặc trưng bằng SHAP. |
+| [src/models/classifiers.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/classifiers.py) | `ComplementNaiveBayes`, `LinearSVMFromScratch` | Mục 6.4.1, 8.5, Cell 64, 85 | CNB giải bài toán mất cân bằng nhãn văn bản; Linear SVM huấn luyện bằng SGD với Hinge Loss và Class Weights. |
+| [src/models/tuning.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/tuning.py) | `ThresholdOptimizerScratch`, `tune_complement_nb_optuna()`, `ModelSelectionWorkflow` | Mục 8.1 - 8.5, Cell 83, 85 | Quét 200 ngưỡng để tối đa hóa F-beta thỏa Recall >= 0.85; tối ưu siêu tham số Optuna; chọn mô hình vô địch. |
+| [src/models/ensemble.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/ensemble.py) | `SpamVotingEnsemble` | Kiến trúc mở rộng | Kết hợp Soft Voting giữa Complement Naive Bayes và Linear SVM. |
+| [src/models/persistence.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/persistence.py) | `save_spam_pipeline()`, `load_spam_pipeline()` | Kiến trúc triển khai | Đóng gói toàn bộ bundle (model, vectorizers, scaler, shap mask, threshold) thành 1 file `.joblib`. |
+| [src/evaluation/metrics.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/metrics.py) | `SpamModelEvaluator` | Mục 1.2, 9.8, 10.1 - 10.5 | Tính Confusion Matrix, Precision, Recall, Specificity, F1, F-beta (2.0), MCC, Trapezoidal ROC-AUC. |
+| [src/evaluation/visualization.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/visualization.py) | `plot_confusion_matrix_heatmap()`, `plot_roc_and_pr_curves()`, `plot_threshold_diagnostic()` | Mục 7.4, 9.1, 10.1, 10.2 | Trực quan hóa Heatmap ma trận nhầm lẫn, ROC/PR curves có chấm ngưỡng tối ưu, biểu đồ quét ngưỡng. |
+| [src/evaluation/error_analysis.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/error_analysis.py) | `extract_misclassified_samples()`, `profile_error_patterns()` | Mục 10.1.4, Cell 106 | Trích xuất và mổ xẻ mẫu False Positive (Ham báo nhầm) và False Negative (Spam lọt lưới). |
+| [src/deployment/predictor.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/deployment/predictor.py) | `SpamInferenceService` | Mục 1.2, 11.1, Cell 120, 121 | Dịch vụ tiếp nhận email thô mới, tự động chạy toàn bộ tiền xử lý và trả về nhãn + xác suất + tín hiệu kích hoạt. |
+| [src/utils/logger.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/utils/logger.py) | `setup_logger()`, `log_step()` | Mục 1.1 | Ghi nhật ký thực thi đồng thời ra Terminal và file `logs/pipeline.log`, đo thời gian từng bước. |
+| [main.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/main.py) | `run_pipeline()` | Tổng thể quy trình | Entry point kết nối tuần tự 13 giai đoạn từ nạp dữ liệu đến đánh giá và suy luận demo. |
