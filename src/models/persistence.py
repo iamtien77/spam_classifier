@@ -1,49 +1,49 @@
 """
-persistence.py - Lưu trữ và phục hồi toàn bộ Pipeline phân loại email
-Dựa trên kiến trúc triển khai từ Classification_email_spam.ipynb
-================================================================
-Module này chịu trách nhiệm:
-1. Đóng gói toàn bộ các cấu phần học được trong quá trình huấn luyện:
-   - Model weights (Complement Naive Bayes hoặc Linear SVM)
-   - Bộ vector hóa TF-IDF từ và ký tự (Word & Char Vocabularies)
-   - Bộ chuẩn hóa số học (MaxAbsScalerScratch)
-   - Mặt nạ chỉ số đặc trưng đã chọn lọc (SHAP Selected Features Mask)
-   - Ngưỡng quyết định tối ưu đã chọn (Best Threshold)
-   - Cấu hình thí nghiệm (SpamExperimentConfig)
-2. Lưu và nạp nhanh qua thư viện joblib để phục vụ suy luận (Inference/API).
+persistence.py - Lưu trữ và tải Pipeline mô hình hoàn chỉnh
+Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - Workflow Bước 4: Deployment)
+================================================================================================
+Module này đảm nhiệm:
+1. Đóng gói toàn bộ Artifacts của hệ thống thành một file duy nhất (.joblib):
+   - Mô hình phân loại tối ưu đã huấn luyện (Trained Classifier)
+   - Bộ tiền xử lý văn bản (SpamTextProcessor)
+   - Bộ vector hóa đặc trưng (HybridFeatureBuilder / TF-IDF Vectorizers)
+   - Bộ chuẩn hóa số học (MaxAbsScaler)
+   - Ngưỡng quyết định tối ưu đã chọn (Best Decision Threshold)
+   - Metadata cấu hình và danh sách đặc trưng
+2. Cung cấp hàm nạp lại pipeline an toàn phục vụ ứng dụng suy luận thời gian thực (Inference Service).
 """
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import joblib
 
 
-def save_spam_pipeline(pipeline_bundle: Dict[str, Any], filepath: Path) -> None:
+def save_spam_pipeline(
+    pipeline_bundle: Dict[str, Any],
+    save_path: Optional[Path] = None,
+) -> Path:
     """
-    LOGIC LƯU TOÀN BỘ PIPELINE THÀNH MỘT ARTIFACT DUY NHẤT:
-    -------------------------------------------------------
-    # Bước 1: Kiểm tra các trường bắt buộc trong pipeline_bundle:
-    #         - 'model': Mô hình đã huấn luyện
-    #         - 'word_vectorizer': Bộ TF-IDF từ vựng
-    #         - 'char_vectorizer': Bộ TF-IDF ký tự
-    #         - 'numeric_scaler': Bộ MaxAbsScaler
-    #         - 'selected_features_mask': Mặt nạ đặc trưng SHAP
-    #         - 'best_threshold': Ngưỡng phân loại tối ưu
-    #         - 'config': Cấu hình thí nghiệm
-    # Bước 2: Tạo thư mục cha nếu chưa tồn tại (filepath.parent.mkdir(parents=True, exist_ok=True)).
-    # Bước 3: Dùng joblib.dump() lưu bundle xuống file định dạng .joblib với độ nén tối ưu (compress=3).
-    # Bước 4: Ghi log thông báo đường dẫn lưu trữ thành công và dung lượng file.
+    LOGIC ĐÓNG GÓI VÀ LƯU TRỮ PIPELINE ARTIFACT:
+    --------------------------------------------
+    # Bước 1: Nếu save_path không được cung cấp, sử dụng đường dẫn mặc định results/saved_models/spam_pipeline.joblib.
+    # Bước 2: Tự động khởi tạo thư mục cha (save_path.parent.mkdir(parents=True, exist_ok=True)).
+    # Bước 3: Kiểm tra tính đầy đủ của pipeline_bundle (phải chứa model, preprocessor, vectorizer, threshold).
+    # Bước 4: Gọi joblib.dump(pipeline_bundle, save_path, compress=3) để nén và lưu trữ an toàn.
+    # Bước 5: Trả về đường dẫn Path của file vừa lưu.
     """
     pass
 
 
-def load_spam_pipeline(filepath: Path) -> Dict[str, Any]:
+def load_spam_pipeline(
+    model_path: Optional[Path] = None,
+) -> Dict[str, Any]:
     """
-    LOGIC NẠP LẠI TOÀN BỘ PIPELINE SẴN SÀNG INFERENCE:
-    -------------------------------------------------
-    # Bước 1: Kiểm tra sự tồn tại của file tại filepath.
-    # Bước 2: Dùng joblib.load() giải nén bundle vào bộ nhớ.
-    # Bước 3: Kiểm tra tính toàn vẹn của các thành phần trong bundle.
-    # Bước 4: Trả về dictionary chứa đầy đủ các đối tượng sẵn sàng đưa vào SpamInferenceService.
+    LOGIC TẢI VÀ KHÔI PHỤC PIPELINE TỪ ĐĨA CỨNG:
+    -------------------------------------------
+    # Bước 1: Nếu model_path không được truyền vào, tìm kiếm ở các vị trí mặc định tiềm năng.
+    # Bước 2: Kiểm tra sự tồn tại của file model_path (raise FileNotFoundError nếu không tìm thấy).
+    # Bước 3: Nạp đối tượng pipeline_bundle bằng joblib.load(model_path).
+    # Bước 4: Xác thực các thành phần cốt lõi bên trong bundle để đảm bảo tính toàn vẹn.
+    # Bước 5: Trả về Dictionary chứa toàn bộ đối tượng pipeline sẵn sàng cho tác vụ dự đoán.
     """
     pass

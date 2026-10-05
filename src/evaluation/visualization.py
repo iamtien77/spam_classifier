@@ -1,61 +1,51 @@
 """
-visualization.py - Trực quan hóa dữ liệu, hiệu năng mô hình và giải thích đặc trưng
-Dựa trên logic từ Classification_email_spam.ipynb (Mục 2.3, 3.2, 7.4, 9.1, 10.1, 10.2)
-======================================================================================
-Module này chịu trách nhiệm:
-1. Trực quan hóa EDA ban đầu: Phân bố nhãn, biểu đồ độ dài văn bản, Top N-grams của Ham vs Spam.
-2. Trực quan hóa ma trận nhầm lẫn (Confusion Matrix Heatmap) dạng thô và chuẩn hóa %.
-3. Vẽ đường cong ROC Curve và Precision-Recall Curve có đánh dấu ngưỡng tối ưu.
-4. Biểu đồ quét ngưỡng (Threshold Sweep Plot) phản ánh tương quan đánh đổi giữa Precision và Recall.
-5. Biểu đồ đường quét Top K đặc trưng SHAP (SHAP Top-K Sweep Plot).
+visualization.py - Trực quan hóa dữ liệu và biểu đồ đánh giá mô hình
+Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails)
+===================================================================
+Module này đảm nhiệm việc xuất bản các biểu đồ trực quan chất lượng cao vào results/figures/:
+1. Khám phá dữ liệu (EDA): Phân bố nhãn Ham/Spam, biểu đồ phân phối độ dài văn bản email.
+2. Ma trận nhầm lẫn (Confusion Matrix Heatmap): Hiển thị số lượng mẫu và tỷ lệ chuẩn hóa %.
+3. Đường cong đánh giá (ROC Curve & Precision-Recall Curve) có đánh dấu điểm ngưỡng tối ưu.
+4. Biểu đồ so sánh đa chiều hiệu năng giữa 3 mô hình cốt lõi (Logistic Regression, SVM, Naive Bayes) và Ensemble.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 
-def plot_eda_summary(df: pd.DataFrame, save_path: Optional[Path] = None) -> None:
-    """
-    LOGIC TRỰC QUAN HÓA KHÁM PHÁ DỮ LIỆU BAN ĐẦU:
-    ---------------------------------------------
-    # Bước 1: Vẽ biểu đồ tròn / biểu đồ cột thể hiện tỷ lệ mất cân bằng giữa Ham và Spam.
-    # Bước 2: Vẽ biểu đồ phân bố (Histogram / KDE) so sánh độ dài ký tự và số từ giữa email Ham và Spam.
-    # Bước 3: Lưu hình ảnh độ phân giải cao (dpi=300) vào thư mục results/figures/ nếu có save_path.
-    """
-    pass
-
-
-def plot_top_ngrams_comparison(
-    top_ham_words: List[Tuple[str, int]],
-    top_spam_words: List[Tuple[str, int]],
+def plot_eda_summary(
+    df: pd.DataFrame,
     save_path: Optional[Path] = None,
 ) -> None:
     """
-    LOGIC VẼ BIỂU ĐỒ SO SÁNH TỪ KHÓA ĐẶC TRƯNG GIỮA HAM VÀ SPAM:
-    ------------------------------------------------------------
-    # Bước 1: Vẽ biểu đồ thanh ngang (Horizontal Bar Chart) cho Top 15 từ khóa xuất hiện nhiều nhất ở lớp Spam.
-    # Bước 2: Vẽ biểu đồ song song cho Top 15 từ khóa của lớp Ham để làm nổi bật sự khác biệt ngữ nghĩa.
-    # Bước 3: Lưu hình ảnh vào results/figures/.
+    LOGIC TRỰC QUAN HÓA KHÁM PHÁ DỮ LIỆU BAN ĐẦU (EDA):
+    ---------------------------------------------------
+    # Bước 1: Tạo đồ thị 2 subplot:
+    #         - Subplot 1: Biểu đồ cột (Bar chart) và biểu đồ tròn thể hiện tỷ lệ % phân bố giữa Ham và Spam.
+    #         - Subplot 2: Biểu đồ phân phối độ dài văn bản (Histogram/KDE) so sánh sự khác biệt giữa Ham và Spam.
+    # Bước 2: Tùy chỉnh màu sắc trực quan, gắn tiêu đề và chú thích rõ ràng.
+    # Bước 3: Lưu hình ảnh độ phân giải cao vào save_path (dpi=300) nếu có yêu cầu.
     """
     pass
 
 
 def plot_confusion_matrix_heatmap(
     cm: np.ndarray,
-    class_names: List[str] = ["Ham", "Spam"],
-    normalize: bool = True,
+    model_name: str = "Classifier",
     save_path: Optional[Path] = None,
 ) -> None:
     """
-    LOGIC VẼ HEATMAP MA TRẬN NHẦM LẪN:
-    ----------------------------------
-    # Bước 1: Tính ma trận tỷ lệ phần trăm chuẩn hóa theo dòng (row-normalized) nếu normalize=True.
-    # Bước 2: Dùng heatmap hiển thị trực quan các ô TN, FP, FN, TP kèm số lượng mẫu và tỷ lệ %.
-    # Bước 3: Tô màu cảnh báo riêng cho ô False Positive (Ham bị đánh nhầm) và False Negative (Spam lọt lưới).
-    # Bước 4: Lưu hình ảnh.
+    LOGIC VẼ HEATMAP MA TRẬN NHẦM LẪN (CONFUSION MATRIX HEATMAP):
+    -------------------------------------------------------------
+    # Bước 1: Khởi tạo figure và axes matplotlib.
+    # Bước 2: Tính tỷ lệ phần trăm chuẩn hóa theo từng hàng (cm_normalized = cm / cm.sum(axis=1)).
+    # Bước 3: Vẽ ma trận dạng Heatmap bằng seaborn hoặc imshow:
+    #         Hiển thị đồng thời cả số lượng tuyệt đối và phần trăm trong từng ô (ví dụ: 'TN: 4320 (98.5%)').
+    # Bước 4: Gắn nhãn trục X: 'Predicted Label' [Ham, Spam], trục Y: 'Actual Label' [Ham, Spam].
+    # Bước 5: Thêm tiêu đề 'Confusion Matrix - {model_name}' và lưu vào save_path.
     """
     pass
 
@@ -64,43 +54,38 @@ def plot_roc_and_pr_curves(
     y_true: np.ndarray,
     y_scores: np.ndarray,
     best_threshold: Optional[float] = None,
+    model_name: str = "Classifier",
     save_path: Optional[Path] = None,
 ) -> None:
     """
-    LOGIC VẼ BỘ ĐÔI ĐƯỜNG CONG ROC VÀ PRECISION-RECALL:
-    --------------------------------------------------
-    # Bước 1: Tạo subplot gồm 2 đồ thị nằm ngang:
-    #         - Đồ thị 1: ROC Curve (FPR vs TPR) kèm đường chéo tham chiếu ngẫu nhiên (AUC = 0.5).
-    #         - Đồ thị 2: Precision-Recall Curve kèm đường baseline tỷ lệ spam gốc.
-    # Bước 2: Nếu có best_threshold, chấm điểm nổi bật (highlight dot) vị trí ngưỡng được chọn trên đường cong.
-    # Bước 3: Ghi chú diện tích AUC và điểm F-beta tương ứng lên tiêu đề đồ thị.
-    # Bước 4: Lưu hình ảnh.
+    LOGIC VẼ ĐỒ THỊ ĐÔI ROC CURVE VÀ PRECISION-RECALL CURVE:
+    --------------------------------------------------------
+    # Bước 1: Tạo figure 2 đồ thị con nằm ngang (1 hàng 2 cột).
+    # Bước 2: Đồ thị 1 - ROC Curve:
+    #         - Vẽ đường cong FPR vs TPR.
+    #         - Vẽ đường tham chiếu ngẫu nhiên đường chéo nét đứt (Chance line y = x).
+    #         - Đánh dấu chấm tròn tại vị trí của best_threshold.
+    #         - Hiển thị giá trị diện tích dưới đường cong (ROC-AUC).
+    # Bước 3: Đồ thị 2 - Precision-Recall Curve:
+    #         - Vẽ đường cong Recall vs Precision.
+    #         - Đánh dấu chấm tròn tại vị trí của best_threshold.
+    #         - Hiển thị Average Precision (AP).
+    # Bước 4: Lưu hình ảnh đồ thị đôi vào save_path.
     """
     pass
 
 
-def plot_threshold_diagnostic(threshold_df: pd.DataFrame, save_path: Optional[Path] = None) -> None:
+def plot_models_comparison_bar(
+    comparison_df: pd.DataFrame,
+    save_path: Optional[Path] = None,
+) -> None:
     """
-    LOGIC VẼ ĐƯỜNG CONG CHẨN ĐOÁN NGƯỠNG PHÂN LOẠI (THRESHOLD SWEEP):
-    ---------------------------------------------------------------
-    # Bước 1: Trục hoành biểu thị các giá trị ngưỡng phân loại từ 0.0 đến 1.0.
-    # Bước 2: Vẽ đồng thời 3 đường chỉ số:
-    #         - Đường màu xanh: Precision
-    #         - Đường màu cam: Recall
-    #         - Đường màu tím: F-beta (beta=2.0)
-    # Bước 3: Vẽ đường gióng đứng nét đứt tại ngưỡng tối ưu đã chọn thỏa mãn Recall >= 0.85.
-    # Bước 4: Lưu hình ảnh vào results/figures/.
-    """
-    pass
-
-
-def plot_shap_top_k_sweep(sweep_df: pd.DataFrame, save_path: Optional[Path] = None) -> None:
-    """
-    LOGIC VẼ BIỂU ĐỒ QUÉT TOP K ĐẶC TRƯNG SHAP:
-    ------------------------------------------
-    # Bước 1: Trục hoành là số lượng đặc trưng Top K được chọn (từ 300 đến 2500).
-    # Bước 2: Trục tung là hiệu năng mô hình (Validation F-beta score và Recall).
-    # Bước 3: Giúp người nghiên cứu trực quan hóa điểm bão hòa (Elbow Point) của số lượng đặc trưng.
-    # Bước 4: Lưu hình ảnh.
+    LOGIC VẼ BIỂU ĐỒ CỘT SO SÁNH HIỆU NĂNG GIỮA CÁC MÔ HÌNH THEO ĐỀ BÀI:
+    ---------------------------------------------------------------------
+    # Bước 1: Chọn các chỉ số chính: Accuracy, Precision, Recall, F1-Score.
+    # Bước 2: Vẽ biểu đồ cột nhóm (Grouped Bar Chart) so sánh giữa:
+    #         Logistic Regression vs Support Vector Machines vs Naive Bayes vs Ensemble.
+    # Bước 3: Ghi chú rõ ràng giá trị số trên đỉnh từng cột.
+    # Bước 4: Lưu hình ảnh vào save_path.
     """
     pass

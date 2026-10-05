@@ -1,136 +1,166 @@
-# 📧 Spam Email Classifier (From-Scratch NLP Pipeline)
+# 📧 Spam Email Classification System (ML Project Architecture)
 
-## 1. Mô tả bài toán
-
-Xây dựng hệ sinh thái Machine Learning hoàn chỉnh để **phân loại tự động email/tin nhắn** là **"spam"** (thư rác) hay **"ham"** (thư hợp lệ).
-
-Hệ thống được thiết kế theo triết lý **"From Scratch Compliance"** (tự cài đặt các thuật toán cốt lõi từ đầu) dựa trên nghiên cứu và thực nghiệm trong [Classification_email_spam.ipynb](file:///e:/Hoc_May_Tren_truong/spam_classifier/Classification_email_spam.ipynb).
-
-### Dữ liệu đầu vào
-- **Tập dữ liệu**: `spam.csv` (chứa các mẫu email/SMS thực tế với 2 trường cốt lõi: `label` ['ham', 'spam'] và `text`).
-- **Đặc trưng bài toán**: Dữ liệu văn bản phi cấu trúc (unstructured text) và có tính chất **mất cân bằng lớp cao (Imbalanced Data)**: ~86.6% Ham và ~13.4% Spam.
-
-### Mục tiêu kỹ thuật & Nghiệp vụ cốt lõi
-1. **Ràng buộc nghiệp vụ**: Đảm bảo **Recall >= 0.85** (bắt trúng tối thiểu 85% email spam để bảo vệ hộp thư người dùng) trong khi vẫn kiểm soát tối đa tỷ lệ báo động giả False Positive.
-2. **Triết lý From-Scratch**: Tự cài đặt các thành phần NLP, tiền xử lý, mô hình hóa và đánh giá:
-   - `TfidfVectorizerScratch`: Vector hóa TF-IDF hỗ trợ word/char n-grams.
-   - `MaxAbsScalerScratch`: Chuẩn hóa độ lớn cực đại bảo toàn tính thưa (sparsity) của ma trận.
-   - `ComplementNaiveBayes`: Naive Bayes phần bù chuyên trị dữ liệu văn bản mất cân bằng lớp.
-   - `LinearSVMFromScratch`: SVM tuyến tính tối ưu bằng SGD/Pegasos với hàm mất mát Hinge Loss và Class Weighting.
-   - `ThresholdOptimizerScratch`: Tự động dò tìm ngưỡng quyết định tối ưu trên tập Validation với chỉ số F-beta (beta=2.0).
-   - `SpamModelEvaluator`: Tự tính Confusion Matrix, ROC-AUC (quy tắc hình thang), MCC, Cohen's Kappa.
-3. **Cổng kiểm chứng đặc trưng SHAP (SHAP Feature Selection)**: Dò quét Top-K đặc trưng quan trọng nhất để tinh giản không gian chiều.
+Dự án Machine Learning phân loại tự động email/tin nhắn rác (**Spam**) và email hợp lệ (**Not Spam / Ham**), được thiết kế và chuẩn hóa 100% theo đặc tả yêu cầu của đề bài **"Practice 1: Classifying Spam Emails"**.
 
 ---
 
-## 2. Luồng thực thi tổng thể (End-to-End Workflow)
+## 1. Mô tả bài toán & Dữ liệu (Problem & Data)
+
+### 1.1. Bài toán (Problem)
+- **Mục tiêu**: Cho một tập dữ liệu các email, xác định xem mỗi email là **"spam"** hay **"not spam" (ham)**.
+- **Bản chất**: Bài toán học máy có giám sát (Supervised Learning) dạng **Phân loại nhị phân (Binary Classification)**.
+
+### 1.2. Biểu diễn đặc trưng dữ liệu (Feature Representation)
+Mỗi email được mô hình hóa thành một vector đặc trưng số học:
+- **Tần suất từ vựng (Word Frequency)**: Số lần xuất hiện của các từ khóa nhạy cảm spam (`free`, `win`, `prize`, `claim`, `urgent`, `call`, `cash`, `offer`, v.v.).
+- **Tần suất ký tự (Character Frequency)**: Tần suất của các ký tự đặc biệt mang tính kích động (dấu chấm than `!`, ký hiệu tiền tệ `$`, `£`, chuỗi chữ số liên tiếp).
+- **Thông tin cấu trúc & văn bản**:
+  - Dòng tiêu đề (Subject line) & Phần thân email (Email body).
+  - Tỷ lệ chữ cái in hoa (Uppercase ratio), chiều dài email (Length / Word count).
+  - Sự hiện diện của liên kết web (URL links) và số điện thoại.
+
+---
+
+## 2. Phương pháp tiếp cận phân loại (Classification Approach)
+
+Hệ thống tích hợp đầy đủ **3 mô hình phân loại cốt lõi** theo đúng đề bài quy định:
+
+| # | Mô hình phân loại | Nguyên lý toán học & Đặc trưng |
+|---|-------------------|---------------------------------|
+| **1** | **Logistic Regression** | Mô hình hóa xác suất một email là spam bằng hàm Logistic/Sigmoid: $P(y=1\|x) = \frac{1}{1 + e^{-(w^T x + b)}}$. Tối ưu hóa bằng Gradient Descent với hàm mất mát Binary Cross-Entropy và điều chuẩn L2. |
+| **2** | **Support Vector Machines (SVM)** | Tìm siêu phẳng lề cực đại (Maximum Margin Hyperplane) phân tách giữa Spam và Ham trong không gian đặc trưng nhiều chiều. Huấn luyện bằng SGD với hàm mất mát Hinge Loss. |
+| **3** | **Naive Bayes** | Mô hình xác suất dựa trên định lý Bayes ($P(c\|x) \propto P(c) \prod P(x_i\|c)$) với giả định các đặc trưng độc lập có điều kiện. Triển khai cả Multinomial NB và Complement NB (chuyên trị tập dữ liệu văn bản mất cân bằng nhãn). |
+
+### Các cân nhắc mở rộng (Additional Considerations):
+- **Kỹ thuật trích xuất đặc trưng (Feature Engineering)**: Thử nghiệm kết hợp các nhóm đặc trưng (Word TF-IDF, Char N-grams, Keywords, Numeric stats).
+- **Tinh chỉnh siêu tham số (Hyperparameter Tuning)**: Tối ưu hóa hệ số điều chuẩn $C$, tốc độ học $learning\_rate$, hệ số làm mịn Laplace $\alpha$.
+- **Phương pháp kết hợp mô hình (Ensemble Methods)**: Kết hợp biểu quyết (SpamVotingEnsemble) giữa Logistic Regression, SVM và Naive Bayes, kết hợp Random Forest / Boosting để tăng độ khái quát và chống overfitting.
+- **Tối ưu hóa ngưỡng phân loại (Threshold Tuning)**: Dò quét ngưỡng xác suất trên Validation set nhằm đảm bảo yêu cầu nghiệp vụ thực tế ($\text{Recall} \ge 0.85$).
+
+---
+
+## 3. Quy trình thực thi chuẩn (Workflow)
 
 ```
-[spam.csv] ──> [Early Stratified Split (80/10/10)]
-                       │
-       ┌───────────────┼───────────────┐
-       ▼               ▼               ▼
-   [Train DF]       [Val DF]       [Test DF]
-       │               │               │
-       ├───────────────┴───────────────┤
-       ▼
- [Data Cleaning & Text Preprocessing (Unicode NFKD, Regex tokens, Quantile capping)]
+[spam.csv Raw Data]
        │
-       ▼
- [Hybrid Feature Engineering (Word TF-IDF + Char TF-IDF + Keywords + Scaled Numerics)]
+       ▼ (Workflow Bước 1: Data Preprocessing)
+[Data Cleaning: Xóa stop words, punctuation, HTML tags/URLs]
        │
-       ▼
- [SHAP Feature Selection (Sweep Top-K: 300 -> 2500 on Validation)]
+       ▼ (Early Stratified Split: Train 80% - Val 10% - Test 10%)
+[Trích xuất đặc trưng: Word TF-IDF + Char Freq ('!', '$') + Keywords + Numerics]
        │
-       ▼
- [Model Training & Optuna Tuning (Complement Naive Bayes vs Linear SVM)]
+       ▼ (Workflow Bước 2: Model Training)
+[Huấn luyện 3 Mô hình: Logistic Regression, SVM, Naive Bayes]
        │
-       ▼
- [Threshold Optimization (Recall Target >= 0.85 & Max F-beta on Validation)]
+       ▼ (Additional Considerations: Tuning & Ensemble)
+[Hyperparameter Tuning (Grid Search) + Voting Ensemble + Threshold Tuning]
        │
-       ▼
- [Final Test Evaluation & In-depth Error Analysis (FP / FN samples audit)]
+       ▼ (Workflow Bước 3: Model Evaluation)
+[Đánh giá đa chiều trên Test: Accuracy, Precision, Recall, F1-Score, ROC-AUC]
        │
-       ▼
- [Pipeline Packaging (Joblib) & Deployment Inference Service]
+       ▼ (Workflow Bước 4: Model Deployment)
+[Đóng gói Pipeline (.joblib) & Triển khai Inference Service dự đoán email mới]
 ```
 
 ---
 
-## 3. Cấu trúc thư mục dự án
+## 4. Cấu trúc thư mục dự án (Project Structure)
 
 ```
 spam_classifier/
-├── main.py                         # Entry point điều phối 13 bước của toàn bộ workflow
-├── requirements.txt                # Thư viện dependencies (numpy, pandas, scipy, shap, optuna, joblib, matplotlib)
-├── README.md                       # Tài liệu thiết kế hệ thống và ánh xạ logic
-├── Classification_email_spam.ipynb # Notebook thực nghiệm gốc (From-Scratch logic)
-├── data/                           # Dữ liệu lưu trữ
-│   ├── raw/                        # Chứa spam.csv gốc
+├── main.py                         # Entry point điều phối toàn diện 4 giai đoạn của workflow
+├── requirements.txt                # Thư viện phụ thuộc (pandas, numpy, scikit-learn, matplotlib, seaborn, joblib)
+├── README.md                       # Tài liệu thiết kế hệ thống và ánh xạ yêu cầu đề bài
+├── data/                           # Lưu trữ dữ liệu
+│   ├── raw/                        # spam.csv gốc
 │   └── processed/                  # Dữ liệu sạch và các tập split
-├── notebooks/                      # Notebooks báo cáo thực nghiệm
-│   ├── 01_eda.ipynb                # Khám phá dữ liệu & n-grams
-│   ├── 02_preprocessing_and_features.ipynb # Xây dựng ma trận đặc trưng lai
-│   ├── 03_model_baseline_and_training.ipynb # Huấn luyện CNB và Linear SVM
-│   ├── 04_tuning_and_ensemble.ipynb # Tinh chỉnh Optuna & Threshold tuning
-│   └── 05_error_analysis_and_deployment.ipynb # Phân tích lỗi & Inference
+├── docs/                           # Tài liệu đề bài và hướng dẫn
+│   ├── ML project_ Classifying Spam Emails.pdf # Đề bài gốc của môn học
+│   └── Classification_email_spam.ipynb         # Notebook thực nghiệm mẫu tham khảo
+├── notebooks/                      # Bộ 5 Jupyter Notebooks nghiên cứu thực nghiệm
+│   ├── 01_eda.ipynb                # Khám phá dữ liệu, phân bố Spam/Ham, thống kê đặc trưng
+│   ├── 02_preprocessing_and_features.ipynb # Làm sạch, TF-IDF, trích xuất đặc trưng lai
+│   ├── 03_model_baseline_and_training.ipynb # Huấn luyện 3 mô hình (LR, SVM, Naive Bayes)
+│   ├── 04_tuning_and_ensemble.ipynb # Tinh chỉnh siêu tham số, Ensemble, tối ưu ngưỡng
+│   └── 05_error_analysis_and_deployment.ipynb # Phân tích lỗi (FP/FN), lưu model và demo suy luận
 ├── src/                            # Mã nguồn module hóa
 │   ├── __init__.py
-│   ├── config.py                   # Cấu hình siêu tham số, regex keywords, dataclass SpamExperimentConfig
-│   ├── data/                       # Module dữ liệu
+│   ├── config.py                   # Cấu hình trung tâm (Đường dẫn, siêu tham số, regex, dataclass)
+│   ├── data/                       # Module xử lý dữ liệu
 │   │   ├── __init__.py
-│   │   ├── loader.py               # Nạp dữ liệu thô, fallback encoding, khám phá schema
-│   │   └── preprocessing.py        # Chia phân tầng 80/10/10 sớm, làm sạch, SpamTextProcessor
-│   ├── features/                   # Module đặc trưng
+│   │   ├── loader.py               # Nạp spam.csv, fallback encoding, khám phá schema
+│   │   └── preprocessing.py        # Làm sạch stop words/punctuation/HTML, chia phân tầng 80/10/10
+│   ├── features/                   # Module trích xuất đặc trưng
 │   │   ├── __init__.py
-│   │   └── feature_engineering.py  # TfidfVectorizerScratch, MaxAbsScalerScratch, HybridBuilder, SHAP Top-K
-│   ├── models/                     # Module mô hình Machine Learning
+│   │   └── feature_engineering.py  # TF-IDF Vectorizer, Scaler, Keyword & Numeric extractor, Hybrid Builder
+│   ├── models/                     # Module thuật toán Machine Learning
 │   │   ├── __init__.py
-│   │   ├── classifiers.py          # ComplementNaiveBayes & LinearSVMFromScratch (From Scratch)
-│   │   ├── ensemble.py             # SpamVotingEnsemble kết hợp CNB + SVM
-│   │   ├── tuning.py               # ThresholdOptimizerScratch, Optuna tuning, ModelSelectionWorkflow
-│   │   └── persistence.py          # Lưu/tải toàn bộ pipeline artifact (.joblib)
-│   ├── evaluation/                 # Module đánh giá & trực quan hóa
+│   │   ├── classifiers.py          # 3 mô hình: Logistic Regression, Linear SVM, Naive Bayes
+│   │   ├── ensemble.py             # SpamVotingEnsemble, Random Forest / Boosting
+│   │   ├── tuning.py               # Grid Search tuning, ThresholdOptimizer, ModelSelection
+│   │   └── persistence.py          # Đóng gói và nạp toàn bộ pipeline (.joblib)
+│   ├── evaluation/                 # Module đánh giá hiệu năng
 │   │   ├── __init__.py
-│   │   ├── metrics.py              # SpamModelEvaluator (Confusion matrix, F-beta, MCC, Trapezoid ROC-AUC)
-│   │   ├── visualization.py        # EDA, Heatmap CM, ROC/PR curves, Threshold Diagnostic, SHAP plot
-│   │   └── error_analysis.py       # Trích xuất và mổ xẻ mẫu False Positive & False Negative
+│   │   ├── metrics.py              # Đầy đủ metrics: Accuracy, Precision, Recall, F1, Confusion Matrix, ROC-AUC
+│   │   ├── visualization.py        # Heatmap Confusion Matrix, đồ thị đôi ROC & PR, EDA plots
+│   │   └── error_analysis.py       # Bóc tách mẫu phân loại sai: False Positives và False Negatives
 │   ├── deployment/                 # Module triển khai thực tế
 │   │   ├── __init__.py
 │   │   └── predictor.py            # SpamInferenceService dự đoán trực tiếp email mới
 │   └── utils/                      # Tiện ích bổ trợ
 │       ├── __init__.py
-│       └── logger.py               # Logger ghi console/file, decorator đo thời gian thực thi
-├── results/                        # Lưu trữ kết quả đầu ra tự động
-│   ├── figures/                    # Biểu đồ xuất ra (.png)
+│       └── logger.py               # Logger ghi console & file nhật ký, decorator đo thời gian
+├── results/                        # Thư mục lưu kết quả tự động
+│   ├── figures/                    # Biểu đồ xuất bản (.png)
 │   ├── metrics/                    # Bảng số liệu và file phân tích lỗi (.csv)
-│   └── saved_models/               # Pipeline bundle đã huấn luyện (.joblib)
-└── tests/                          # Kiểm thử tự động (Unit tests)
+│   └── saved_models/               # Pipeline bundle đã đóng gói (.joblib)
+└── tests/                          # Bộ kiểm thử tự động (Unit Tests)
     ├── __init__.py
-    ├── test_data.py
-    ├── test_features.py
-    ├── test_models.py
-    ├── test_evaluation.py
-    └── test_deployment.py
+    ├── test_data.py                # Kiểm thử nạp và phân tầng dữ liệu
+    ├── test_features.py            # Kiểm thử TF-IDF và ghép nối đặc trưng
+    ├── test_models.py              # Kiểm thử 3 mô hình (LR, SVM, Naive Bayes) và Ensemble
+    ├── test_evaluation.py          # Kiểm thử Confusion Matrix, F1, ROC-AUC
+    └── test_deployment.py          # Kiểm thử dịch vụ dự đoán email đơn lẻ & hàng loạt
 ```
 
 ---
 
-## 4. Chi tiết ánh xạ từng Module với logic trong Notebook
+## 5. Ánh xạ chi tiết giữa Yêu cầu đề bài và Module triển khai
 
-| Module trong cấu trúc | Class / Hàm chính | Ánh xạ mục trong Notebook | Vai trò & Logic thực hiện |
-|-----------------------|-------------------|---------------------------|----------------------------|
-| [src/config.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/config.py) | `SpamExperimentConfig` | Mục 1.2, Cell 9 | Lưu trữ cấu hình N-grams, regex `KEYWORD_PATTERNS`, `RECALL_TARGET = 0.85`, tham số Optuna. |
-| [src/data/loader.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/data/loader.py) | `load_raw_data()`, `explore_raw_data()` | Mục 2.1, Cell 17-19 | Đọc `spam.csv`, fallback encoding UTF-8/Latin-1, lọc 2 cột `label` & `text`, thống kê mất cân bằng nhãn. |
-| [src/data/preprocessing.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/data/preprocessing.py) | `stratified_split_dataframe()`, `clean_email_split()`, `SpamTextProcessor` | Mục 2.2, 3.1, 3.2, Cell 21, 32, 39 | Phân tầng 80/10/10 sớm; lọc rác; chuẩn hóa văn bản NFKD, token hóa `<URL>`, `<NUMBER>`, `<CURRENCY>`, cắt đuôi phân vị. |
-| [src/features/feature_engineering.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/features/feature_engineering.py) | `TfidfVectorizerScratch`, `MaxAbsScalerScratch`, `HybridFeatureBuilderScratch`, `ShapTopKSelectionWorkflow` | Mục 6.1 - 6.4, 7.1 - 7.5, Cell 55, 59, 61, 69, 74 | Vectorizer TF-IDF tự viết; Scaler tự viết; ghép nối ma trận thưa Word + Char + Keywords + Numerics; quét Top-K đặc trưng bằng SHAP. |
-| [src/models/classifiers.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/classifiers.py) | `ComplementNaiveBayes`, `LinearSVMFromScratch` | Mục 6.4.1, 8.5, Cell 64, 85 | CNB giải bài toán mất cân bằng nhãn văn bản; Linear SVM huấn luyện bằng SGD với Hinge Loss và Class Weights. |
-| [src/models/tuning.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/tuning.py) | `ThresholdOptimizerScratch`, `tune_complement_nb_optuna()`, `ModelSelectionWorkflow` | Mục 8.1 - 8.5, Cell 83, 85 | Quét 200 ngưỡng để tối đa hóa F-beta thỏa Recall >= 0.85; tối ưu siêu tham số Optuna; chọn mô hình vô địch. |
-| [src/models/ensemble.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/ensemble.py) | `SpamVotingEnsemble` | Kiến trúc mở rộng | Kết hợp Soft Voting giữa Complement Naive Bayes và Linear SVM. |
-| [src/models/persistence.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/models/persistence.py) | `save_spam_pipeline()`, `load_spam_pipeline()` | Kiến trúc triển khai | Đóng gói toàn bộ bundle (model, vectorizers, scaler, shap mask, threshold) thành 1 file `.joblib`. |
-| [src/evaluation/metrics.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/metrics.py) | `SpamModelEvaluator` | Mục 1.2, 9.8, 10.1 - 10.5 | Tính Confusion Matrix, Precision, Recall, Specificity, F1, F-beta (2.0), MCC, Trapezoidal ROC-AUC. |
-| [src/evaluation/visualization.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/visualization.py) | `plot_confusion_matrix_heatmap()`, `plot_roc_and_pr_curves()`, `plot_threshold_diagnostic()` | Mục 7.4, 9.1, 10.1, 10.2 | Trực quan hóa Heatmap ma trận nhầm lẫn, ROC/PR curves có chấm ngưỡng tối ưu, biểu đồ quét ngưỡng. |
-| [src/evaluation/error_analysis.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/evaluation/error_analysis.py) | `extract_misclassified_samples()`, `profile_error_patterns()` | Mục 10.1.4, Cell 106 | Trích xuất và mổ xẻ mẫu False Positive (Ham báo nhầm) và False Negative (Spam lọt lưới). |
-| [src/deployment/predictor.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/deployment/predictor.py) | `SpamInferenceService` | Mục 1.2, 11.1, Cell 120, 121 | Dịch vụ tiếp nhận email thô mới, tự động chạy toàn bộ tiền xử lý và trả về nhãn + xác suất + tín hiệu kích hoạt. |
-| [src/utils/logger.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/src/utils/logger.py) | `setup_logger()`, `log_step()` | Mục 1.1 | Ghi nhật ký thực thi đồng thời ra Terminal và file `logs/pipeline.log`, đo thời gian từng bước. |
-| [main.py](file:///e:/Hoc_May_Tren_truong/spam_classifier/main.py) | `run_pipeline()` | Tổng thể quy trình | Entry point kết nối tuần tự 13 giai đoạn từ nạp dữ liệu đến đánh giá và suy luận demo. |
+| Yêu cầu trong Đề bài PDF | Giai đoạn Workflow | Module triển khai chính | Mô tả logic thực hiện |
+|---|---|---|---|
+| **Clean data (stop words, punctuation, HTML)** | Workflow 1: Preprocessing | `src/data/preprocessing.py` | `clean_text_basic()`, `SpamTextProcessor`: chuẩn hóa Unicode, loại bỏ stop words, dấu câu, thẻ HTML, token hóa URL/MONEY/NUMBER. |
+| **Convert text to numerical features (TF-IDF)** | Workflow 1: Preprocessing | `src/features/feature_engineering.py` | `TfidfVectorizerScratch`: tính toán sublinear TF, smooth IDF, chuẩn hóa vector L2 norm. |
+| **Word & Character Frequency features** | Feature Representation | `src/features/feature_engineering.py` | `SpamSignalFeatureExtractor`: đếm tần suất từ khóa nhạy cảm, ký tự đặc biệt (`!`, `$`), chữ in hoa, độ dài. |
+| **Split dataset into train and test sets** | Workflow 1: Preprocessing | `src/data/preprocessing.py` | `stratified_split_dataframe()`: chia phân tầng 80% Train, 10% Validation, 10% Test độc lập. |
+| **Logistic Regression** | Workflow 2: Model Training | `src/models/classifiers.py` | `LogisticRegressionFromScratch`: hàm Sigmoid, Binary Cross-Entropy Loss, Gradient Descent, class weights. |
+| **Support Vector Machines (SVM)** | Workflow 2: Model Training | `src/models/classifiers.py` | `LinearSVMFromScratch`: siêu phẳng lề cực đại, Hinge Loss, Pegasos SGD, class weights. |
+| **Naive Bayes** | Workflow 2: Model Training | `src/models/classifiers.py` | `NaiveBayesClassifier`: định lý Bayes, làm mịn Laplace, hỗ trợ Multinomial NB và Complement NB. |
+| **Accuracy, Precision, Recall, F1-score** | Workflow 3: Model Evaluation | `src/evaluation/metrics.py` | `SpamModelEvaluator`: tính đầy đủ 4 chỉ số cốt lõi, ma trận nhầm lẫn 2x2, ROC-AUC tích phân hình thang. |
+| **Model Deployment** | Workflow 4: Deployment | `src/deployment/predictor.py` | `SpamInferenceService`: tiếp nhận email thô mới, tự động chạy toàn bộ pipeline và trả về nhãn + xác suất + tín hiệu rủi ro. |
+| **Feature Engineering combinations** | Additional Considerations | `src/features/feature_engineering.py` | `experiment_feature_combinations()`: thử nghiệm các tổ hợp đặc trưng (Word, Char, Keywords, Numerics). |
+| **Hyperparameter Tuning** | Additional Considerations | `src/models/tuning.py` | `tune_model_hyperparameters()`: tối ưu hóa siêu tham số $C$, $learning\_rate$, $\alpha$ trên tập Validation. |
+| **Ensemble Methods** | Additional Considerations | `src/models/ensemble.py` | `SpamVotingEnsemble`: Soft/Hard Voting kết hợp 3 mô hình, Random Forest / Boosting. |
+
+---
+
+## 6. Hướng dẫn sử dụng & Khởi chạy
+
+### Cài đặt môi trường
+```bash
+pip install -r requirements.txt
+```
+
+### Chạy toàn bộ luồng quy trình điều phối
+```bash
+python main.py
+```
+
+### Khởi động và thực hiện các bước trên Jupyter Notebook
+Khởi chạy notebook và thực thi tuần tự từ `01` đến `05`:
+1. `notebooks/01_eda.ipynb`
+2. `notebooks/02_preprocessing_and_features.ipynb`
+3. `notebooks/03_model_baseline_and_training.ipynb`
+4. `notebooks/04_tuning_and_ensemble.ipynb`
+5. `notebooks/05_error_analysis_and_deployment.ipynb`

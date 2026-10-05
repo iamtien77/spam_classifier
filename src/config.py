@@ -1,21 +1,23 @@
 """
 config.py - Cấu hình trung tâm cho dự án Spam Email Classifier
-Dựa trên logic từ Classification_email_spam.ipynb
-==============================================================
-Module này định nghĩa toàn bộ siêu tham số, đường dẫn, từ khóa regex,
-và dataclass SpamExperimentConfig điều phối tham số huấn luyện & trích xuất đặc trưng.
+Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails)
+===================================================================
+Đề bài yêu cầu:
+- 3 mô hình cốt lõi: Logistic Regression, Support Vector Machines (SVM), Naive Bayes
+- Workflow: Tiền xử lý, Trích xuất đặc trưng (TF-IDF, word freq, char freq),
+            Huấn luyện mô hình, Đánh giá (Accuracy, Precision, Recall, F1), Triển khai.
+- Mở rộng: Feature Engineering, Hyperparameter Tuning, Ensemble Methods.
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 # ==============================================================================
 # 1. ĐƯỜNG DẪN DỰ ÁN & DỮ LIỆU (PATHS & DIRECTORIES)
 # ==============================================================================
 
-# Thư mục gốc dự án
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Thư mục dữ liệu
@@ -23,7 +25,7 @@ DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
-# File dữ liệu text thô (spam.csv gồm 2 cột chính: label ['ham', 'spam'] và text)
+# File dữ liệu
 RAW_DATA_FILE = RAW_DATA_DIR / "spam.csv"
 CLEAN_DATA_FILE = PROCESSED_DATA_DIR / "spam_clean.csv"
 
@@ -44,39 +46,34 @@ def ensure_directories() -> None:
 
 
 # ==============================================================================
-# 2. THAM SỐ CHUNG & TẬP CHIA (DATA SPLIT CONFIG)
+# 2. THAM SỐ PHÂN CHIA DỮ LIỆU (DATA SPLIT CONFIG)
 # ==============================================================================
 
 RANDOM_STATE: int = 42
 
-# Tỷ lệ phân chia tập dữ liệu (Stratified Split 80/10/10)
+# Tỷ lệ phân chia tập dữ liệu: Train (80%) - Validation (10%) - Test (10%)
 TRAIN_RATIO: float = 0.80
 VAL_RATIO: float = 0.10
 TEST_RATIO: float = 0.10
 
 # Nhãn phân loại
 LABEL_MAP = {"ham": 0, "spam": 1}
-TARGET_NAMES = ["Ham", "Spam"]
+TARGET_NAMES = ["Not Spam (Ham)", "Spam"]
 
 
 # ==============================================================================
-# 3. CẤU HÌNH TRÍCH XUẤT ĐẶC TRƯNG VĂN BẢN (NLP & N-GRAMS)
+# 3. CẤU HÌNH TRÍCH XUẤT ĐẶC TRƯNG VĂN BẢN (FEATURE ENGINEERING)
 # ==============================================================================
 
 TEXT_COLUMN_FOR_MODEL: str = "model_text"
-TEXT_FEATURE_MODE: str = "log_count"   # Chế độ biến đổi ma trận đếm: 'count', 'binary', 'log_count'
+TEXT_FEATURE_MODE: str = "log_count"   # 'count', 'binary', 'log_count'
 MIN_DF: int = 2
-MAX_UNIGRAM_FEATURES: int = 4000
+MAX_UNIGRAM_FEATURES: int = 3000
 MAX_BIGRAM_FEATURES: int = 800
-MAX_CHAR_FEATURES: int = 800
+MAX_CHAR_FEATURES: int = 500
 CHAR_NGRAM_RANGE: Tuple[int, int] = (3, 5)
 
-
-# ==============================================================================
-# 4. TỪ KHÓA ĐẶC TRƯNG SPAM & TÍN HIỆU SỐ HỌC (KEYWORDS & NUMERIC SIGNALS)
-# ==============================================================================
-
-# Regex nhận diện các từ khóa/cụm từ báo hiệu spam phổ biến
+# Từ khóa nhận diện tín hiệu spam phổ biến
 KEYWORD_PATTERNS: Dict[str, str] = {
     "kw_free": r"\bfree\b",
     "kw_win": r"\b(?:win|winner|won|winning)\b",
@@ -86,61 +83,62 @@ KEYWORD_PATTERNS: Dict[str, str] = {
     "kw_call": r"\b(?:call|txt|phone|ring)\b",
     "kw_cash": r"\b(?:cash|money|dollar|\$|pound|credit)\b",
     "kw_guarantee": r"\b(?:guarantee|guaranteed)\b",
+    "kw_offer": r"\b(?:offer|discount|promo|deal)\b",
+    "kw_click": r"\b(?:click|link|visit|website)\b",
 }
 
-# Cấu hình các đặc trưng thống kê số học trích xuất từ nội dung email
-NUMERIC_FEATURE_CONFIG: List[str] = [
-    "num_length",              # Chiều dài văn bản
-    "num_word_count",          # Tổng số từ
-    "num_uppercase_ratio",     # Tỷ lệ chữ cái in hoa
-    "num_exclamation_count",   # Số lượng dấu chấm than (!)
-    "num_question_count",      # Số lượng dấu chấm hỏi (?)
-    "num_digit_count",         # Số lượng ký tự số
-    "num_url_count",           # Số lượng liên kết URL (http/https/www)
-    "num_phone_count",         # Số lượng số điện thoại / chuỗi số dài
+# Cấu hình các đặc trưng thống kê số học (character frequency, lengths, etc.)
+NUMERIC_FEATURE_CONFIG: List[Tuple[str, str]] = [
+    ("has_url", "binary"),
+    ("has_number", "binary"),
+    ("digit_count", "log_minmax"),
+    ("special_char_count", "log_minmax"),
+    ("exclamation_count", "log_minmax"),
+    ("dollar_count", "log_minmax"),
+    ("uppercase_ratio", "minmax"),
+    ("model_length", "log_minmax"),
 ]
 
 
 # ==============================================================================
-# 5. MỤC TIÊU NGHIỆP VỤ & TỐI ƯU NGƯỠNG (BUSINESS RECALL & THRESHOLD TUNING)
+# 4. THIẾT LẬP MỤC TIÊU ĐÁNH GIÁ & NGƯỠNG (EVALUATION & THRESHOLD)
 # ==============================================================================
 
-# Ràng buộc nghiệp vụ: Bắt tối thiểu 85% email spam (Recall >= 0.85) để bảo vệ người dùng
 RECALL_TARGET: float = 0.85
-
-# Hệ số Beta trong F-beta Score (Beta=2.0 coi trọng Recall gấp đôi so với Precision)
 FBETA_BETA: float = 2.0
-
-# Lưới quét ngưỡng phân loại (200 điểm từ 0.005 đến 1.0)
 THRESHOLD_GRID_POINTS: int = 200
 
 
 # ==============================================================================
-# 6. THAM SỐ QUÉT CHỌN ĐẶC TRƯNG BẰNG SHAP (FEATURE SELECTION)
+# 5. CẤU HÌNH CÁC MÔ HÌNH YÊU CẦU THEO ĐỀ BÀI (LOGISTIC REGRESSION, SVM, NAIVE BAYES)
 # ==============================================================================
 
-SHAP_PRESELECT_TARGET: int = 3000
-SHAP_TOP_K_CANDIDATES: List[int] = [300, 500, 800, 1200, 1600, 2000, 2500]
+DEFAULT_MODEL_PARAMS: Dict[str, Dict[str, Any]] = {
+    "logistic_regression": {
+        "C": 1.0,
+        "max_iter": 300,
+        "class_weight": "balanced",
+        "random_state": RANDOM_STATE,
+    },
+    "svm": {
+        "C": 1.0,
+        "max_iter": 300,
+        "class_weight": "balanced",
+        "random_state": RANDOM_STATE,
+    },
+    "naive_bayes": {
+        "alpha": 1.0,
+    },
+}
 
 
 # ==============================================================================
-# 7. THAM SỐ TỐI ƯU SIÊU THAM SỐ VỚI OPTUNA (HYPERPARAMETER TUNING)
-# ==============================================================================
-
-NB_OPTUNA_TRIALS: int = 15      # Số lần thử nghiệm tối ưu cho Complement Naive Bayes
-SVM_OPTUNA_TRIALS: int = 8      # Số lần thử nghiệm tối ưu cho Linear SVM
-
-
-# ==============================================================================
-# 8. EXPERIMENT CONFIG DATACLASS (ĐIỀU PHỐI TẬP TRUNG TOÀN BỘ WORKFLOW)
+# 6. EXPERIMENT CONFIG DATACLASS
 # ==============================================================================
 
 @dataclass
 class SpamExperimentConfig:
-    """
-    Dataclass lưu trữ và điều phối toàn bộ tham số cấu hình cho pipeline:
-    từ tiền xử lý, n-gram, signal patterns, cho tới hyperparameter tuning.
-    """
+    """Dataclass điều phối cấu hình thí nghiệm bài toán phân loại email spam."""
     random_state: int = RANDOM_STATE
     text_column_for_model: str = TEXT_COLUMN_FOR_MODEL
     text_feature_mode: str = TEXT_FEATURE_MODE
@@ -151,15 +149,44 @@ class SpamExperimentConfig:
     char_ngram_range: Tuple[int, int] = CHAR_NGRAM_RANGE
     recall_target: float = RECALL_TARGET
     keyword_patterns: Dict[str, str] = field(default_factory=lambda: KEYWORD_PATTERNS.copy())
-    numeric_feature_config: List[str] = field(default_factory=lambda: list(NUMERIC_FEATURE_CONFIG))
-    default_tuning_params: Dict = field(default_factory=dict)
+    numeric_feature_config: List[Tuple[str, str]] = field(default_factory=lambda: list(NUMERIC_FEATURE_CONFIG))
+    default_tuning_params: Dict[str, Any] = field(default_factory=dict)
 
-    def completed_params(self, params: Dict = None) -> Dict:
-        """
-        Gộp các tham số cấu hình tùy chỉnh vào tham số mặc định của thí nghiệm:
-        - alpha: hệ số làm mịn Laplace/Lidstone cho Naive Bayes
-        - threshold: ngưỡng quyết định nhị phân
-        - use_bigram, use_char_ngram, use_keyword_features, use_numeric_features: bật/tắt nhóm đặc trưng
-        - cap_quantile: giới hạn độ dài từ ngữ (mặc định 0.99)
-        """
-        pass
+    def completed_params(self, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Hợp nhất cấu hình tùy chỉnh vào tham số mặc định."""
+        completed = dict(self.default_tuning_params)
+        if params:
+            completed.update(params)
+
+        completed.setdefault("alpha", 1.0)
+        completed.setdefault("threshold", 0.5)
+        completed.setdefault("min_df", self.min_df)
+        completed.setdefault("max_unigram_features", self.max_unigram_features)
+        completed.setdefault("use_bigram", True)
+        completed.setdefault("max_bigram_features", self.max_bigram_features)
+        completed.setdefault("use_char_ngram", True)
+        completed.setdefault("max_char_features", self.max_char_features)
+        completed.setdefault("text_feature_mode", self.text_feature_mode)
+        completed.setdefault("use_keyword_features", True)
+        completed.setdefault("keyword_group_weight", 1.0)
+        completed.setdefault("use_numeric_features", True)
+        completed.setdefault("numeric_group_weight", 1.0)
+        completed.setdefault("use_length_cap", True)
+        completed.setdefault("cap_quantile", 0.99)
+
+        completed["max_unigram_features"] = int(completed["max_unigram_features"])
+        completed["min_df"] = int(completed["min_df"])
+        completed["use_bigram"] = bool(completed["use_bigram"])
+        completed["use_char_ngram"] = bool(completed.get("use_char_ngram", False))
+        completed["use_keyword_features"] = bool(completed["use_keyword_features"])
+        completed["use_numeric_features"] = bool(completed["use_numeric_features"])
+        completed["use_length_cap"] = bool(completed["use_length_cap"])
+        completed["max_bigram_features"] = int(completed["max_bigram_features"]) if completed["use_bigram"] else 0
+        completed["max_char_features"] = int(completed["max_char_features"]) if completed["use_char_ngram"] else 0
+        completed["keyword_group_weight"] = float(completed["keyword_group_weight"]) if completed["use_keyword_features"] else 0.0
+        completed["numeric_group_weight"] = float(completed["numeric_group_weight"]) if completed["use_numeric_features"] else 0.0
+        completed["cap_quantile"] = float(completed["cap_quantile"]) if completed["use_length_cap"] and completed["cap_quantile"] is not None else None
+        completed["alpha"] = float(completed["alpha"])
+        completed["threshold"] = float(completed["threshold"])
+        completed["text_feature_mode"] = str(completed["text_feature_mode"])
+        return completed

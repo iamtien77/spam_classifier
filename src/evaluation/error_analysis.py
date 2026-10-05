@@ -1,73 +1,56 @@
 """
-error_analysis.py - Phân tích lỗi sai chuyên sâu (Error Analysis)
-Dựa trên logic từ Classification_email_spam.ipynb (Mục 10.1.4)
-=============================================================
-Module này chịu trách nhiệm:
-1. Lọc và bóc tách hai loại sai lầm điển hình của mô hình:
-   - False Positives (FP): Email hợp lệ (Ham) nhưng bị gán nhãn nhầm là Spam (Báo động giả - Nguy cơ mất thư quan trọng).
-   - False Negatives (FN): Email Spam nhưng bị bỏ sót thành Ham (Lọt lưới thư rác).
-2. Phân tích định tính và định lượng nguyên nhân gây lỗi:
-   - Độ dài văn bản, sự xuất hiện của các từ khóa gây hiểu lầm, hoặc các định dạng lách luật.
-3. Xuất bảng tổng hợp mẫu lỗi ra file phục vụ việc cải tiến tiền xử lý và đặc trưng.
+error_analysis.py - Phân tích chuyên sâu các mẫu phân loại sai (Error Analysis)
+Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails)
+================================================================================
+Module này đảm nhiệm việc mổ xẻ nguyên nhân sai lệch của mô hình:
+1. False Positive (Báo động giả / Chặn nhầm): Email hợp lệ (Ham) bị đoán nhầm thành Spam.
+   - Đây là lỗi nghiêm trọng nhất trong thực tế vì người dùng có thể bị mất thông báo công việc quan trọng.
+2. False Negative (Bỏ sót / Lọt lưới): Email rác (Spam) bị đoán nhầm thành email hợp lệ (Ham).
+3. Thống kê đặc trưng gây nhiễu: Từ khóa nhạy cảm xuất hiện nhầm, cấu trúc viết hoa, link URLs.
+4. Xuất kết quả phân tích ra file CSV tại results/metrics/misclassified_samples.csv.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-import pandas as pd
+from typing import Any, Dict, List, Optional
 import numpy as np
+import pandas as pd
 
 
 def extract_misclassified_samples(
     test_df: pd.DataFrame,
     y_true: np.ndarray,
     y_pred: np.ndarray,
-    y_scores: np.ndarray,
+    y_prob: Optional[np.ndarray] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    LOGIC TRÍCH XUẤT CÁC MẪU BỊ PHÂN LOẠI SAI TRÊN TẬP TEST:
-    --------------------------------------------------------
-    # Bước 1: Tạo DataFrame tổng hợp gồm:
-    #         - text: Nội dung email gốc
-    #         - y_true: Nhãn thực tế (0: Ham, 1: Spam)
-    #         - y_pred: Nhãn dự đoán từ mô hình (0 hoặc 1)
-    #         - spam_score: Xác suất / điểm số Spam dự đoán
-    # Bước 2: Lọc tập False Positives (FP): (y_true == 0) & (y_pred == 1).
-    #         Sắp xếp giảm dần theo spam_score (những email hợp lệ nhưng bị mô hình tự tin phán nhầm là Spam).
-    # Bước 3: Lọc tập False Negatives (FN): (y_true == 1) & (y_pred == 0).
-    #         Sắp xếp tăng dần theo spam_score (những email spam tinh vi nhất lừa được mô hình).
+    LOGIC TRÍCH XUẤT CÁC MẪU DỰ ĐOÁN SAI:
+    -------------------------------------
+    # Bước 1: Tạo bản sao DataFrame kiểm tra kèm theo các cột nhãn thực tế, nhãn dự đoán và xác suất.
+    # Bước 2: Lọc tập False Positives (FP):
+    #         fp_df = df[(y_true == 0) & (y_pred == 1)].
+    # Bước 3: Lọc tập False Negatives (FN):
+    #         fn_df = df[(y_true == 1) & (y_pred == 0)].
     # Bước 4: Trả về cặp DataFrame (fp_df, fn_df).
     """
     pass
 
 
 def profile_error_patterns(
-    error_df: pd.DataFrame,
-    error_type: str = "False Positive",
-) -> Dict[str, any]:
-    """
-    LOGIC PHÂN TÍCH ĐẶC TÍNH CỦA MẪU LỖI:
-    -------------------------------------
-    # Bước 1: Thống kê độ dài văn bản trung bình và trung vị của các mẫu lỗi so với toàn bộ tập dữ liệu.
-    # Bước 2: Đếm tần suất xuất hiện của các từ khóa kích hoạt spam giả định bên trong các mẫu lỗi.
-    # Bước 3: Xác định xem lỗi xuất phát từ yếu tố nào:
-    #         - Chứa nhiều số điện thoại / link web hợp lệ?
-    #         - Văn bản quá ngắn thiếu ngữ cảnh?
-    #         - Email chứa nhiều chữ hoa do người gửi nhấn mạnh?
-    # Bước 4: Trả về báo cáo tóm tắt đặc trưng lỗi.
-    """
-    pass
-
-
-def export_error_report(
     fp_df: pd.DataFrame,
     fn_df: pd.DataFrame,
-    output_dir: Path,
-) -> None:
+    save_csv_path: Optional[Path] = None,
+) -> pd.DataFrame:
     """
-    LOGIC XUẤT BÁO CÁO MẪU LỖI RA FILE CSV:
-    --------------------------------------
-    # Bước 1: Định dạng lại các cột để người dùng dễ đọc và kiểm toán (Audit).
-    # Bước 2: Lưu fp_samples.csv và fn_samples.csv vào thư mục results/metrics/.
-    # Bước 3: Ghi log hoàn thành để phục vụ quá trình debug và cải tiến mô hình trong tương lai.
+    LOGIC THỐNG KÊ VÀ LẬP HỒ SƠ NGUYÊN NHÂN LỖI SAI:
+    -------------------------------------------------
+    # Bước 1: Phân tích nhóm False Positives (Ham bị chặn nhầm):
+    #         - Độ dài văn bản trung bình, số lượng chữ in hoa, có chứa từ khóa 'free', 'win', 'call' hay không.
+    #         - Xác định các từ ngữ dễ gây nhầm lẫn khiến mô hình kích hoạt nhầm.
+    # Bước 2: Phân tích nhóm False Negatives (Spam lọt lưới):
+    #         - Kiểm tra các thủ thuật lách spam của người gửi (ví dụ: dùng tiếng lóng, viết cố tình sai chính tả,
+    #           nội dung quá ngắn không đủ đặc trưng từ vựng).
+    # Bước 3: Tổng hợp danh sách tất cả các email dự đoán sai kèm lý do nghi ngờ vào một DataFrame duy nhất.
+    # Bước 4: Nếu có save_csv_path: lưu kết quả ra file CSV để phục vụ báo cáo đồ án.
+    # Bước 5: Trả về DataFrame phân tích lỗi sai chi tiết.
     """
     pass

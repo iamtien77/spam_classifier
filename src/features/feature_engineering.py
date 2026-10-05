@@ -1,246 +1,260 @@
 """
-feature_engineering.py - Xây dựng và chọn lọc không gian đặc trưng lai (Hybrid Features)
-Dựa trên logic từ Classification_email_spam.ipynb (Mục 6.1, 6.2, 6.3, 6.4, 7.1 - 7.5)
-========================================================================================
-Module này chịu trách nhiệm:
-1. TfidfVectorizerScratch: Bộ vector hóa TF-IDF tự cài đặt từ đầu (From Scratch).
-2. MaxAbsScalerScratch: Bộ chuẩn hóa độ lớn cực đại tự cài đặt, bảo toàn độ thưa (sparsity) cho ma trận.
-3. SpamSignalFeatureExtractor: Trích xuất tín hiệu từ khóa spam (regex) và đặc trưng thống kê số học.
-4. HybridFeatureBuilderScratch: Ghép nối (sparse hstack) đa luồng đặc trưng:
-   [Word N-grams (TF-IDF) + Char N-grams + Keyword Signals + Scaled Numeric Features].
-5. ShapTopKSelectionWorkflow & ManualFeatureSelectorScratch: Lựa chọn đặc trưng tối ưu qua SHAP/Chi-Square.
+feature_engineering.py - Trích xuất đặc trưng & xây dựng không gian ma trận lai
+Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - Feature Engineering)
+=========================================================================================
+Module này đảm nhiệm:
+1. Tự cài đặt Vectorizer TF-IDF (TfidfVectorizerScratch):
+   - Tính tần suất từ (Term Frequency - TF) dạng log hoặc raw
+   - Tính tần suất nghịch đảo tài liệu (Inverse Document Frequency - IDF) có làm mịn smooth_idf
+   - Chuẩn hóa L2 norm để kiểm soát độ dài văn bản
+2. Tự cài đặt Bộ chuẩn hóa MaxAbsScalerScratch:
+   - Chia cho giá trị tuyệt đối lớn nhất của từng cột đặc trưng
+   - Bảo toàn 100% tính thưa (sparsity) của ma trận đặc trưng
+3. Bộ trích xuất tín hiệu Spam (SpamSignalFeatureExtractor):
+   - Tần suất các từ khóa nhạy cảm spam (free, win, prize, urgent, cash, call, offer, v.v.)
+   - Tần suất ký tự đặc biệt (character frequency: exclamation '!', dollar '$', v.v.)
+   - Tỷ lệ chữ in hoa, độ dài văn bản, sự hiện diện của URL và số điện thoại
+4. Bộ ghép nối ma trận lai (HybridFeatureBuilderScratch):
+   - Kết hợp [Word TF-IDF + Char TF-IDF + Keyword Indicators + Scaled Numeric Signals]
+     thành ma trận thưa scipy.sparse.csr_matrix duy nhất.
+5. Thử nghiệm các tổ hợp đặc trưng (Feature Combinations) theo yêu cầu nâng cao của đề bài.
 """
 
-from typing import Dict, List, Optional, Tuple, Union
+from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
+from scipy import sparse
 from scipy.sparse import csr_matrix, hstack as sparse_hstack
 
 
 class TfidfVectorizerScratch:
     """
-    LOGIC BỘ VECTOR HÓA TF-IDF TỰ XÂY DỰNG TỪ ĐẦU (FROM SCRATCH):
-    ------------------------------------------------------------
-    Mục tiêu: Chuyển đổi chuỗi văn bản thành ma trận thưa TF-IDF mà không phụ thuộc thư viện ngoài.
+    BỘ VECTOR HÓA TF-IDF TỰ XÂY DỰNG TỪ ĐẦU (FROM SCRATCH):
+    -------------------------------------------------------
+    Biến đổi tập văn bản email thành ma trận số học dựa trên tần suất từ và tầm quan trọng toàn cục.
     """
 
     def __init__(
         self,
-        ngram_range: Tuple[int, int] = (1, 1),
         min_df: int = 2,
         max_features: Optional[int] = None,
         sublinear_tf: bool = True,
-        analyzer: str = "word",
+        smooth_idf: bool = True,
+        norm: str = "l2",
     ):
-        """Khởi tạo cấu hình n-gram, ngưỡng tần số tài liệu min_df, số đặc trưng tối đa."""
-        self.ngram_range = ngram_range
+        """Khởi tạo các siêu tham số cho bộ TF-IDF."""
         self.min_df = min_df
         self.max_features = max_features
         self.sublinear_tf = sublinear_tf
-        self.analyzer = analyzer
+        self.smooth_idf = smooth_idf
+        self.norm = norm
         self.vocabulary_: Dict[str, int] = {}
         self.idf_diag_: Optional[np.ndarray] = None
 
-    def fit(self, texts: List[str]) -> "TfidfVectorizerScratch":
+    def fit(self, raw_documents: Union[List[str], pd.Series]) -> "TfidfVectorizerScratch":
         """
         LOGIC HUẤN LUYỆN BỘ TỪ ĐIỂN VÀ TÍNH TRỌNG SỐ IDF:
-        ------------------------------------------------
-        # Bước 1: Duyệt qua tất cả văn bản trong tập Train, tách n-gram (word hoặc char).
-        # Bước 2: Đếm tần số xuất hiện trong tài liệu (Document Frequency - DF) cho từng n-gram.
-        # Bước 3: Lọc bỏ các từ có DF < min_df.
-        # Bước 4: Nếu có max_features, chọn lọc top N từ có tần số DF cao nhất.
-        # Bước 5: Gán chỉ số index cố định cho từng từ vào self.vocabulary_.
-        # Bước 6: Tính vector trọng số IDF với công thức mượt (smooth IDF):
-        #         IDF(t) = log((1 + N_docs) / (1 + DF(t))) + 1.0.
-        # Bước 7: Trả về self đã sẵn sàng để transform.
+        -------------------------------------------------
+        # Bước 1: Khởi tạo biến đếm tần suất xuất hiện trong văn bản (Document Frequency - DF) bằng Counter.
+        # Bước 2: Duyệt qua từng văn bản trong raw_documents:
+        #         - Tách từ thành các token đơn lẻ.
+        #         - Lấy tập các từ duy nhất (set of tokens) trong văn bản đó và cập nhật vào biến đếm DF.
+        # Bước 3: Lọc bỏ các từ có DF < min_df để triệt tiêu nhiễu và từ vựng quá hiếm.
+        # Bước 4: Sắp xếp các từ theo tần suất giảm dần (và theo bảng chữ cái nếu bằng nhau).
+        # Bước 5: Nếu có max_features: cắt lấy đúng Top max_features từ vựng quan trọng nhất.
+        # Bước 6: Xây dựng bảng từ điển ánh xạ {từ_vựng: chỉ_số_cột} lưu vào self.vocabulary_.
+        # Bước 7: Tính vector nghịch đảo tần suất văn bản (IDF) theo công thức chuẩn:
+        #         IDF(t) = log((1 + N) / (1 + DF(t))) + 1.0 (với N là tổng số văn bản huấn luyện).
+        # Bước 8: Lưu vector IDF vào self.idf_diag_ và trả về self.
         """
         pass
 
-    def transform(self, texts: List[str]) -> csr_matrix:
+    def transform(self, raw_documents: Union[List[str], pd.Series]) -> csr_matrix:
         """
-        LOGIC BIẾN ĐỔI VĂN BẢN THÀNH MA TRẬN THƯA TF-IDF:
-        ------------------------------------------------
-        # Bước 1: Khởi tạo danh sách các tọa độ thưa (rows, cols, data).
-        # Bước 2: Với từng văn bản, đếm số lần xuất hiện (Term Frequency - TF) của các từ nằm trong từ điển.
-        # Bước 3: Áp dụng biến đổi sublinear TF nếu bật: TF = 1 + log(TF).
-        # Bước 4: Nhân Term Frequency với trọng số IDF tương ứng: TF-IDF = TF * IDF.
-        # Bước 5: Chuẩn hóa vector theo chuẩn Euclidean (L2 normalization) cho từng dòng tài liệu.
-        # Bước 6: Đóng gói thành định dạng ma trận nén CSR (scipy.sparse.csr_matrix).
+        LOGIC BIẾN ĐỔI VĂN BẢN MỚI THÀNH MA TRẬN THƯA TF-IDF:
+        -----------------------------------------------------
+        # Bước 1: Khởi tạo các mảng tọa độ ma trận thưa: rows, cols, data.
+        # Bước 2: Duyệt qua từng văn bản:
+        #         - Đếm tần suất xuất hiện cục bộ (Term Frequency - TF) của từng từ trong văn bản.
+        #         - Với mỗi từ xuất hiện trong từ điển self.vocabulary_:
+        #             + Tính TF: nếu sublinear_tf=True thì TF = 1.0 + log(tf_raw), ngược lại lấy tf_raw.
+        #             + Nhân TF với giá trị IDF tương ứng của từ đó: tfidf = TF * idf[col_idx].
+        #             + Thêm vào (row_idx, col_idx, tfidf).
+        # Bước 3: Tạo ma trận thưa scipy.sparse.csr_matrix từ các danh sách tọa độ.
+        # Bước 4: Nếu norm == 'l2': Chuẩn hóa từng hàng của ma trận theo độ dài vector Euclidean L2 norm
+        #         để loại bỏ sự thiên vị giữa văn bản dài và văn bản ngắn.
+        # Bước 5: Trả về ma trận thưa CSR TF-IDF.
         """
         pass
 
-    def fit_transform(self, texts: List[str]) -> csr_matrix:
-        """Gọi fit(texts) rồi transform(texts) trên tập Train."""
+    def fit_transform(self, raw_documents: Union[List[str], pd.Series]) -> csr_matrix:
+        """Kết hợp fit và transform trên tập dữ liệu huấn luyện."""
         pass
 
 
 class MaxAbsScalerScratch:
     """
-    LOGIC BỘ CHUẨN HÓA ĐỘ LỚN CỰC ĐẠI TỰ XÂY DỰNG (FROM SCRATCH):
-    ------------------------------------------------------------
-    Mục tiêu: Đưa các đặc trưng số học về miền [-1.0, 1.0] hoặc [0.0, 1.0] bằng cách chia cho max(|x|).
-    Ưu điểm cốt lõi: Không trừ giá trị trung bình (mean), do đó KHÔNG làm phá vỡ cấu trúc thưa (sparsity) của ma trận.
+    BỘ CHUẨN HÓA ĐẶC TRƯNG SỐ HỌC BẢO TOÀN TÍNH THƯA (FROM SCRATCH):
+    -----------------------------------------------------------------
+    Chia mỗi đặc trưng cho giá trị tuyệt đối lớn nhất của nó, đưa thang đo về [0, 1] hoặc [-1, 1].
     """
 
     def __init__(self):
+        """Khởi tạo scaler."""
         self.max_abs_: Optional[np.ndarray] = None
 
     def fit(self, X: Union[np.ndarray, csr_matrix]) -> "MaxAbsScalerScratch":
         """
-        LOGIC TÍNH GIÁ TRỊ TUYỆT ĐỐI CỰC ĐẠI TỪNG CỘT:
-        ----------------------------------------------
-        # Bước 1: Tìm max(|x_j|) cho từng cột đặc trưng j trên tập Train.
-        # Bước 2: Với các cột có max == 0 (toàn số 0), thay thế bằng 1.0 để tránh lỗi chia cho 0.
-        # Bước 3: Lưu vector giá trị max_abs_ vào thuộc tính của lớp.
+        LOGIC TÍNH TOÁN GIÁ TRỊ TUYỆT ĐỐI CỰC ĐẠI:
+        -----------------------------------------
+        # Bước 1: Chuyển dữ liệu X về dạng mảng numpy hoặc ma trận thưa.
+        # Bước 2: Tìm giá trị tuyệt đối lớn nhất max_abs trên từng cột đặc trưng.
+        # Bước 3: Thay thế các giá trị max_abs == 0 thành 1.0 để tránh lỗi chia cho 0.
+        # Bước 4: Lưu vector chuẩn hóa vào self.max_abs_ và trả về self.
         """
         pass
 
     def transform(self, X: Union[np.ndarray, csr_matrix]) -> Union[np.ndarray, csr_matrix]:
         """
-        LOGIC CHIA TỶ LỆ TỪNG CỘT:
+        LOGIC CHUẨN HÓA DỮ LIỆU:
         -------------------------
-        # Bước 1: Chia từng giá trị x_ij cho max_abs_[j].
-        # Bước 2: Giữ nguyên định dạng đầu vào (dense array hoặc CSR sparse matrix).
+        # Bước 1: Kiểm tra xem scaler đã được fit hay chưa.
+        # Bước 2: Thực hiện phép chia từng cột cho self.max_abs_.
+        # Bước 3: Trả về ma trận đã được đưa về khoảng chuẩn hóa mà không làm mất tính thưa.
         """
         pass
 
     def fit_transform(self, X: Union[np.ndarray, csr_matrix]) -> Union[np.ndarray, csr_matrix]:
-        """Gọi fit(X) rồi transform(X)."""
+        """Kết hợp fit và transform."""
         pass
 
 
 class SpamSignalFeatureExtractor:
     """
-    LOGIC TRÍCH XUẤT TÍN HIỆU ĐẶC BIỆT CỦA SPAM:
-    -------------------------------------------
-    Trích xuất hai nhóm đặc trưng phi cấu trúc:
-    1. Tín hiệu từ khóa nhạy cảm (Keyword Indicators via Regex).
-    2. Tín hiệu thống kê số học (Numeric & Stylistic Signals).
+    BỘ TRÍCH XUẤT TÍN HIỆU TỪ KHÓA VÀ ĐẶC TRƯNG HÌNH THỨC SPAM THEO ĐỀ BÀI:
+    -----------------------------------------------------------------------
+    Chuyên trích xuất:
+    1. Ma trận xuất hiện của các từ khóa nhạy cảm (Keyword Indicators: free, win, prize, v.v.).
+    2. Ma trận đặc trưng số học: Tần suất dấu chấm than, ký hiệu tiền tệ, tỷ lệ chữ hoa, độ dài.
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Any] = None):
+        """Khởi tạo extractor với danh mục regex từ khóa và cấu hình đặc trưng số."""
         self.config = config
-        self.scaler = MaxAbsScalerScratch()
 
-    def keyword_matrix(self, texts: List[str], patterns: Optional[Dict[str, str]] = None) -> csr_matrix:
+    def build_keyword_matrix(
+        self,
+        texts: Union[List[str], pd.Series],
+        patterns: Optional[Dict[str, str]] = None,
+    ) -> csr_matrix:
         """
-        LOGIC TRÍCH XUẤT MA TRẬN TỪ KHÓA BÁO HIỆU SPAM:
-        ----------------------------------------------
-        # Bước 1: Lấy danh sách biểu thức chính quy (patterns) cho các từ khóa nhạy cảm (free, win, cash, prize, ...).
-        # Bước 2: Với từng email, đếm số lần xuất hiện của từng pattern regex trong văn bản.
-        # Bước 3: Có thể biến đổi log đếm: log(1 + count) hoặc cờ nhị phân (binary 0/1).
-        # Bước 4: Chuyển đổi thành ma trận thưa csr_matrix kích thước (N_samples, N_patterns).
+        LOGIC XÂY DỰNG MA TRẬN TỪ KHÓA NHỊ PHÂN / TẦN SUẤT:
+        ---------------------------------------------------
+        # Bước 1: Lấy danh mục các mẫu regex từ khóa spam từ config hoặc đối số truyền vào.
+        # Bước 2: Khởi tạo các mảng rows, cols, values cho ma trận thưa.
+        # Bước 3: Với từng văn bản email, kiểm tra sự xuất hiện của từng từ khóa nhạy cảm bằng re.search:
+        #         Nếu xuất hiện: ghi nhận giá trị 1.0 (hoặc số lần xuất hiện).
+        # Bước 4: Tạo và trả về ma trận thưa csr_matrix kích thước (N_samples, N_keywords).
         """
         pass
 
-    def numeric_matrix(
+    def extract_numeric_features(
         self,
         df: pd.DataFrame,
-        fit_scaler: bool = True,
-    ) -> csr_matrix:
+        scaler: Optional[MaxAbsScalerScratch] = None,
+        fit: bool = True,
+    ) -> Tuple[csr_matrix, MaxAbsScalerScratch]:
         """
-        LOGIC TRÍCH XUẤT VÀ SCALE ĐẶC TRƯNG THỐNG KÊ SỐ HỌC:
-        ---------------------------------------------------
-        # Bước 1: Tính toán các đặc trưng số học từ văn bản gốc:
-        #         - Chiều dài ký tự (character length).
-        #         - Số lượng từ (word count).
-        #         - Tỷ lệ ký tự viết hoa (uppercase letters / total characters).
-        #         - Số lượng dấu chấm than (!), dấu hỏi (?).
-        #         - Số lượng chữ số (digits).
-        #         - Số lượng đường link URL (http, https, www).
-        #         - Số lượng số điện thoại / chuỗi số liên tục.
-        # Bước 2: Gom các cột thành ma trận 2D số thực.
-        # Bước 3: Nếu fit_scaler=True (trên Train), gọi self.scaler.fit_transform().
-        #         Nếu fit_scaler=False (trên Val/Test/Inference), gọi self.scaler.transform().
-        # Bước 4: Chuyển đổi thành csr_matrix để sẵn sàng ghép nối.
+        LOGIC TRÍCH XUẤT VÀ CHUẨN HÓA ĐẶC TRƯNG SỐ HỌC (NUMERIC MATRIX):
+        -----------------------------------------------------------------
+        # Bước 1: Trích xuất các cột đặc trưng số học đã chuẩn bị trong preprocessing:
+        #         - has_url (0 hoặc 1)
+        #         - has_number (0 hoặc 1)
+        #         - digit_count (tần suất ký tự số, biến đổi log1p)
+        #         - special_char_count (tần suất ký tự đặc biệt, biến đổi log1p)
+        #         - exclamation_count (tần suất dấu chấm than '!', biến đổi log1p)
+        #         - dollar_count (tần suất ký hiệu tiền tệ '$', biến đổi log1p)
+        #         - uppercase_ratio (tỷ lệ chữ in hoa)
+        #         - model_length (độ dài số từ của email, biến đổi log1p)
+        # Bước 2: Ghép các cột thành mảng numpy 2D np.column_stack(...).
+        # Bước 3: Nếu fit=True: khởi tạo MaxAbsScalerScratch mới và fit_transform mảng số học.
+        #         Nếu fit=False: dùng scaler đã truyền vào để transform mảng dữ liệu mới.
+        # Bước 4: Chuyển đổi thành ma trận thưa csr_matrix.
+        # Bước 5: Trả về cặp (ma trận số học chuẩn hóa, đối tượng scaler).
         """
         pass
 
 
 class HybridFeatureBuilderScratch:
     """
-    LOGIC XÂY DỰNG MA TRẬN ĐẶC TRƯNG LAI ĐA THÀNH PHẦN:
-    --------------------------------------------------
-    Kết hợp sức mạnh của:
-    - Unigram TF-IDF (Học tín hiệu từ đơn lẻ)
-    - Bigram TF-IDF (Học ngữ cảnh cụm 2 từ liền kề)
-    - Character N-grams (Học biến thể ký tự, chống né bộ lọc)
-    - Spam Keyword Matrix (Bắt các từ kích hoạt hành vi spam)
-    - Scaled Numeric Matrix (Đặc trưng phong cách văn bản)
+    BỘ GHÉP NỐI KHÔNG GIAN MA TRẬN ĐẶC TRƯNG LAI (HYBRID FEATURE BUILDER):
+    ----------------------------------------------------------------------
+    Ghép các ma trận thành phần:
+    [Word TF-IDF + Char N-grams TF-IDF + Keyword Indicators + Scaled Numeric Features]
+    thành một không gian đặc trưng toàn diện duy nhất dạng csr_matrix.
     """
 
-    def __init__(self, config, text_processor, signal_extractor):
+    def __init__(
+        self,
+        config: Any,
+        text_processor: Any,
+        signal_extractor: SpamSignalFeatureExtractor,
+    ):
+        """Khởi tạo builder kết hợp các module tiền xử lý và trích xuất đặc trưng."""
         self.config = config
         self.text_processor = text_processor
         self.signal_extractor = signal_extractor
-        self.word_vectorizer = TfidfVectorizerScratch()
-        self.char_vectorizer = TfidfVectorizerScratch()
+        self.word_vectorizer: Optional[TfidfVectorizerScratch] = None
+        self.char_vectorizer: Optional[TfidfVectorizerScratch] = None
+        self.numeric_scaler: Optional[MaxAbsScalerScratch] = None
+        self.feature_names_: List[str] = []
 
-    def build_feature_matrices(
-        self,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
-        test_df: Optional[pd.DataFrame] = None,
-        params: Optional[Dict] = None,
-    ) -> Tuple[csr_matrix, csr_matrix, Optional[csr_matrix], Dict]:
+    def fit(self, train_df: pd.DataFrame) -> "HybridFeatureBuilderScratch":
         """
-        LOGIC GHÉP NỐI MA TRẬN ĐẶC TRƯNG LAI HOÀN CHỈNH:
-        -----------------------------------------------
-        # Bước 1: Chuẩn hóa tham số kỹ thuật đặc trưng (params gộp với config).
-        # Bước 2: Huấn luyện Word TF-IDF và Char TF-IDF trên train_df['model_text'].
-        # Bước 3: Biến đổi (transform) ma trận văn bản cho Train, Val, và Test.
-        # Bước 4: Trích xuất Keyword Matrix và Scaled Numeric Matrix cho Train, Val, và Test.
-        # Bước 5: Ghép nối ngang (scipy.sparse.hstack) tất cả các ma trận thành phần lại với nhau:
-        #         X_csr = sparse_hstack([X_word, X_char, X_keywords, X_numeric]).tocsr()
-        # Bước 6: Lưu metadata danh sách tên đặc trưng (feature names) và phạm vi cột của từng nhóm.
-        # Bước 7: Trả về bộ ba ma trận (X_train, X_val, X_test) cùng dictionary metadata.
+        LOGIC HUẤN LUYỆN TẤT CẢ CÁC BỘ VECTOR HÓA TRÊN TẬP TRAIN:
+        ---------------------------------------------------------
+        # Bước 1: Chuẩn bị bảng đặc trưng train_df qua text_processor.prepare_feature_frame().
+        # Bước 2: Huấn luyện bộ word_vectorizer (TfidfVectorizerScratch) trên cột 'model_text'
+        #         với max_unigram_features và min_df quy định.
+        # Bước 3: Huấn luyện bộ char_vectorizer (TfidfVectorizerScratch) để bắt n-grams ký tự (3, 5).
+        # Bước 4: Fit bộ numeric_scaler trên các đặc trưng số học của train_df.
+        # Bước 5: Tổng hợp danh sách toàn bộ tên đặc trưng (feature_names_) theo đúng thứ tự các cột ghép.
+        # Bước 6: Trả về self.
         """
         pass
 
+    def transform(self, df: pd.DataFrame) -> csr_matrix:
+        """
+        LOGIC BIẾN ĐỔI BẢNG DỮ LIỆU THÀNH MA TRẬN ĐẶC TRƯNG LAI:
+        ---------------------------------------------------------
+        # Bước 1: Chuẩn bị bảng đặc trưng qua text_processor.prepare_feature_frame().
+        # Bước 2: Biến đổi văn bản qua word_vectorizer.transform() thu được X_word (CSR).
+        # Bước 3: Biến đổi văn bản qua char_vectorizer.transform() thu được X_char (CSR).
+        # Bước 4: Trích xuất ma trận từ khóa X_kw qua signal_extractor.build_keyword_matrix() (CSR).
+        # Bước 5: Trích xuất ma trận số học X_num qua signal_extractor.extract_numeric_features(fit=False) (CSR).
+        # Bước 6: Ghép nối ngang toàn bộ các khối ma trận bằng scipy.sparse.hstack([X_word, X_char, X_kw, X_num]).
+        # Bước 7: Chuyển về định dạng .tocsr() và trả về ma trận lai hoàn chỉnh.
+        """
+        pass
 
-class ShapTopKSelectionWorkflow:
+    def fit_transform(self, train_df: pd.DataFrame) -> csr_matrix:
+        """Kết hợp fit và transform trên tập Train."""
+        pass
+
+
+def experiment_feature_combinations(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+) -> Dict[str, Tuple[csr_matrix, csr_matrix]]:
     """
-    LOGIC CHỌN LỌC ĐẶC TRƯNG TỐI ƯU BẰNG SHAP VALUE:
-    -----------------------------------------------
-    Được dùng như một cổng kiểm chứng (validation gate):
-    Sử dụng SHAP để đo lường đóng góp thực tế của từng đặc trưng lên xác suất dự đoán của mô hình,
-    sau đó quét tìm ngưỡng Top K đặc trưng cân bằng nhất giữa độ nén và hiệu năng.
+    LOGIC THỬ NGHIỆM CÁC TỔ HỢP ĐẶC TRƯNG THEO ĐỀ BÀI (FEATURE COMBINATIONS):
+    --------------------------------------------------------------------------
+    # Bước 1: Tổ hợp 1 - Word Frequency / TF-IDF đơn thuần (Baseline).
+    # Bước 2: Tổ hợp 2 - Word TF-IDF + Character Frequency (Exclamation, Dollar, v.v.).
+    # Bước 3: Tổ hợp 3 - Word TF-IDF + Keywords Indicators (Spam keywords).
+    # Bước 4: Tổ hợp 4 - Ma trận đặc trưng lai toàn diện (Hybrid: Word + Char + Keywords + Numerics).
+    # Bước 5: Trả về dictionary chứa các cặp ma trận (X_train, X_val) tương ứng với từng tổ hợp
+    #         để phục vụ đánh giá và chứng minh tính hiệu quả của Feature Engineering.
     """
-
-    def __init__(self, target_k_candidates: Optional[List[int]] = None):
-        self.target_k_candidates = target_k_candidates or [300, 500, 800, 1200, 1600, 2000, 2500]
-        self.selected_feature_indices_: Optional[np.ndarray] = None
-
-    def compute_shap_importance(self, model, X_sample: csr_matrix) -> np.ndarray:
-        """
-        LOGIC TÍNH ĐỘ QUAN TRỌNG SHAP CỦA TỪNG ĐẶC TRƯNG:
-        ------------------------------------------------
-        # Bước 1: Dùng KernelExplainer (hoặc Tree/Linear explainer) với tập background đại diện.
-        # Bước 2: Tính giá trị SHAP cho lớp tích cực (Spam class).
-        # Bước 3: Lấy trung bình độ lớn tuyệt đối mean(|SHAP value|) theo từng cột đặc trưng.
-        # Bước 4: Trả về vector xếp hạng độ quan trọng của tất cả đặc trưng.
-        """
-        pass
-
-    def sweep_top_k_on_validation(
-        self,
-        model_class,
-        shap_scores: np.ndarray,
-        X_train: csr_matrix,
-        y_train: np.ndarray,
-        X_val: csr_matrix,
-        y_val: np.ndarray,
-    ) -> pd.DataFrame:
-        """
-        LOGIC QUÉT NGƯỠNG TOP_K TRÊN TẬP VALIDATION:
-        --------------------------------------------
-        # Bước 1: Với mỗi giá trị K trong self.target_k_candidates:
-        #         - Lấy chỉ số của Top K đặc trưng có điểm SHAP cao nhất.
-        #         - Cắt ma trận X_train và X_val theo Top K cột này.
-        #         - Huấn luyện mô hình và đo lường Precision, Recall, F-beta trên Validation.
-        # Bước 2: Lưu kết quả thành bảng so sánh shap_top_k_sweep_df.
-        # Bước 3: Chọn ra K tốt nhất thỏa mãn điều kiện ràng buộc: Recall >= 0.85 và F-beta cao nhất.
-        # Bước 4: Lưu mask chỉ số đặc trưng tốt nhất vào self.selected_feature_indices_.
-        # Bước 5: Trả về DataFrame ghi nhận toàn bộ quá trình quét.
-        """
-        pass
+    pass
