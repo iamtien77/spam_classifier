@@ -71,3 +71,7 @@ results/metrics/*
 
 # Tài liệu và báo cáo cá nhân (Docs, PDF, Word, Notebook gốc lớn)
 docs/
+# Cho phép theo dõi cấu hình agent
+!docs/agents/
+!docs/agents/**
+
