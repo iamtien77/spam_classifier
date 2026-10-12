@@ -58,20 +58,23 @@ def load_raw_data(data_path: Optional[Path] = None) -> list[dict[str, Any]]:
         csv.field_size_limit(previous_limit)
 
 
-def explore_raw_data(df: list[dict[str, Any]]) -> dict[str, Any]:
+def explore_raw_data(records: Optional[list[dict[str, Any]]] = None, *, df: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
     """Thống kê trực tiếp từ dữ liệu, không gán trước tỷ lệ Ham/Spam."""
-    counts = Counter(row.get('label', '') for row in df)
+    data = records if records is not None else df
+    if data is None:
+        raise ValueError("Cần truyền danh sách bản ghi records hoặc df.")
+    counts = Counter(row.get('label', '') for row in data)
     valid = sum(counts.get(label, 0) for label in ('ham', 'spam'))
-    lengths = [len(str(row.get('text') or '')) for row in df]
-    words = [len(str(row.get('text') or '').split()) for row in df]
+    lengths = [len(str(row.get('text') or '')) for row in data]
+    words = [len(str(row.get('text') or '').split()) for row in data]
     def describe(values):
         return {'min': min(values), 'max': max(values), 'mean': mean(values),
                 'median': median(values)} if values else {'min': 0, 'max': 0, 'mean': 0, 'median': 0}
-    return {'n_rows': len(df), 'n_columns': len(df[0]) if df else 0,
-            'missing_values': {key: sum(not str(row.get(key) or '').strip() for row in df)
-                               for key in ('label', 'text')},
+    return {'n_rows': len(data), 'n_columns': len(data[0]) if data else 0,
+            'missing_values': {key: sum(not str(row.get(key) or '').strip() for row in data)
+                                for key in ('label', 'text')},
             'label_counts': dict(counts),
             'label_percentages': {label: 100 * counts.get(label, 0) / valid if valid else 0
                                   for label in ('ham', 'spam')},
-            'invalid_label_count': len(df) - valid,
+            'invalid_label_count': len(data) - valid,
             'character_length': describe(lengths), 'word_length': describe(words)}
