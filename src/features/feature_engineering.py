@@ -124,6 +124,24 @@ class CSRMatrixScratch:
                 result[row][col] = value
         return result
 
+    def to_scipy_csr(self):
+        """Chuyển đổi sang scipy.sparse.csr_matrix để tương thích hoàn toàn với Task 2."""
+        try:
+            from scipy.sparse import csr_matrix
+            import numpy as np
+            return csr_matrix(
+                (np.array(self.data, dtype=np.float64),
+                 np.array(self.indices, dtype=np.int32),
+                 np.array(self.indptr, dtype=np.int64)),
+                shape=self.shape
+            )
+        except ImportError as err:
+            raise ImportError(
+                "Chức năng to_scipy_csr() yêu cầu thư viện scipy. "
+                "Hãy kích hoạt môi trường ảo .venv (ví dụ: .venv\\Scripts\\Activate.ps1) "
+                "hoặc chạy bằng .venv/Scripts/python.exe."
+            ) from err
+
 
 class TfidfVectorizerScratch:
     """DF đếm số tài liệu có token, không phải tổng số lần token xuất hiện.
@@ -383,9 +401,10 @@ class HybridFeatureBuilderScratch:
 
 
 def experiment_feature_combinations(train_df, val_df):
-    """Trả bốn cặp ma trận; chưa đánh giá F1 vì mô hình do Task 2 phụ trách.
+    """Trả năm cặp ma trận; chưa đánh giá F1 vì mô hình do Task 2 phụ trách.
 
     Tổ hợp 2 chỉ thêm character FREQUENCY (!, $), khác char n-grams.
+    Tổ hợp 3 thêm character N-GRAMS (chuỗi con ký tự 3-5).
     Fit một builder trên Train rồi chọn cột: IDF/scaler giống nhau giữa nhánh.
     """
     config = SpamExperimentConfig()
@@ -398,8 +417,68 @@ def experiment_feature_combinations(train_df, val_df):
     word = columns('word')
     char_frequency = [i for i, name in enumerate(builder.feature_names_)
                       if name in ('exclamation_count', 'dollar_count')]
-    combinations = {'word_tfidf': word, 'word_char_frequency': word + char_frequency,
+    combinations = {'word_tfidf': word,
+                    'word_char_frequency': word + char_frequency,
+                    'word_char_ngrams': word + columns('char'),
                     'word_keywords': word + columns('keyword'),
                     'hybrid': list(range(X_train.shape[1]))}
     return {name: (X_train.select_columns(cols), X_val.select_columns(cols))
             for name, cols in combinations.items()}
+
+
+def export_processed_data(
+    train_records: list[dict[str, Any]],
+    val_records: list[dict[str, Any]],
+    test_records: list[dict[str, Any]],
+    builder: Optional[HybridFeatureBuilderScratch] = None,
+    output_dir: Optional[Any] = None,
+) -> dict[str, Any]:
+    """Lưu dữ liệu phân tầng sạch và các ma trận đặc trưng vào data/processed/.
+
+    Đảm bảo tính lưu trữ đệm (Cache Persistence) để Task 2 nạp nhanh không cần parse lại CSV 58MB.
+    """
+    import csv
+    from pathlib import Path
+    from src.config import PROCESSED_DATA_DIR
+
+    target_dir = Path(output_dir) if output_dir is not None else PROCESSED_DATA_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    exported_files: dict[str, Any] = {}
+    for name, split_records in [('train', train_records), ('val', val_records), ('test', test_records)]:
+        csv_path = target_dir / f'{name}_clean.csv'
+        if split_records:
+            fieldnames = ['source_id', 'label', 'text', 'raw_text']
+            with csv_path.open('w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                writer.writeheader()
+                for row in split_records:
+                    writer.writerow(row)
+            exported_files[f'{name}_csv'] = str(csv_path)
+
+    if builder is not None and builder.is_fitted_:
+        try:
+            import numpy as np
+            from scipy.sparse import save_npz
+
+            X_train_sp = builder.transform(train_records).to_scipy_csr()
+            X_val_sp = builder.transform(val_records).to_scipy_csr()
+            X_test_sp = builder.transform(test_records).to_scipy_csr()
+
+            y_train = np.array([int(r.get('label') == 'spam') for r in train_records], dtype=np.int32)
+            y_val = np.array([int(r.get('label') == 'spam') for r in val_records], dtype=np.int32)
+            y_test = np.array([int(r.get('label') == 'spam') for r in test_records], dtype=np.int32)
+
+            save_npz(target_dir / 'X_train.npz', X_train_sp)
+            save_npz(target_dir / 'X_val.npz', X_val_sp)
+            save_npz(target_dir / 'X_test.npz', X_test_sp)
+
+            np.save(target_dir / 'y_train.npy', y_train)
+            np.save(target_dir / 'y_val.npy', y_val)
+            np.save(target_dir / 'y_test.npy', y_test)
+
+            exported_files['matrices_saved'] = True
+        except ImportError:
+            exported_files['matrices_saved'] = False
+
+    return exported_files

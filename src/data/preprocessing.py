@@ -167,6 +167,10 @@ def stratified_split_dataframe(df, label_col='label', train_ratio=0.80,
     return tuple(splits)
 
 
+# Alias tương thích chuẩn kiến trúc list[dict]
+stratified_split_records = stratified_split_dataframe
+
+
 def clean_text_basic(text: str) -> str:
     """Thay token đặc biệt, giữ chữ Unicode; không âm thầm bỏ ngôn ngữ khác.
 
@@ -209,16 +213,42 @@ class SpamTextProcessor:
                 for i in range(len(padded) - n + 1)]
 
     def extract_structural_features(self, raw_text: str) -> dict[str, float]:
-        letters = sum(char.isalpha() for char in raw_text)
-        return {'has_url': float(bool(URL_PATTERN.search(raw_text))),
-                'has_number': float(any(char.isdigit() for char in raw_text)),
-                'digit_count': float(sum(char.isdigit() for char in raw_text)),
-                'special_char_count': float(sum(not char.isalnum() and not char.isspace() for char in raw_text)),
-                'exclamation_count': float(raw_text.count('!')),
-                'dollar_count': float(raw_text.count('$')),
-                'question_count': float(raw_text.count('?')),
-                'uppercase_ratio': sum(char.isupper() for char in raw_text) / letters if letters else 0.0,
-                'raw_length': float(len(raw_text)), 'raw_word_count': float(len(raw_text.split()))}
+        letters = 0
+        uppercase = 0
+        digits = 0
+        special = 0
+        exclamations = 0
+        dollars = 0
+        questions = 0
+
+        for char in raw_text:
+            if char.isalpha():
+                letters += 1
+                if char.isupper():
+                    uppercase += 1
+            elif char.isdigit():
+                digits += 1
+            elif not char.isspace():
+                special += 1
+                if char == '!':
+                    exclamations += 1
+                elif char == '$':
+                    dollars += 1
+                elif char == '?':
+                    questions += 1
+
+        return {
+            'has_url': float(bool(URL_PATTERN.search(raw_text))),
+            'has_number': 1.0 if digits > 0 else 0.0,
+            'digit_count': float(digits),
+            'special_char_count': float(special),
+            'exclamation_count': float(exclamations),
+            'dollar_count': float(dollars),
+            'question_count': float(questions),
+            'uppercase_ratio': (uppercase / letters) if letters else 0.0,
+            'raw_length': float(len(raw_text)),
+            'raw_word_count': float(len(raw_text.split())),
+        }
 
     def prepare_feature_frame(self, df, cap_word_limit=None, use_length_cap=True):
         """Nhận cả văn bản mới không có label; không tự học ngưỡng từ đầu vào."""
