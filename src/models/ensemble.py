@@ -1,95 +1,82 @@
-"""
-ensemble.py - Phương pháp kết hợp mô hình (Ensemble Methods)
-Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - Additional Considerations)
-=============================================================================================
-Đề bài yêu cầu:
-"Ensemble Methods: Combine multiple models (e.g., using random forests or boosting)
- to improve generalization and reduce overfitting."
-
-Module này cài đặt:
-1. SpamVotingEnsemble:
-   - Kết hợp biểu quyết mềm (Soft Voting) hoặc cứng (Hard Voting) giữa 3 mô hình cơ bản:
-     Logistic Regression + Support Vector Machines (SVM) + Naive Bayes.
-   - Cho phép gán trọng số tối ưu (weights) cho từng mô hình thành viên.
-2. RandomForestSpamClassifier & Boosting Wrappers:
-   - Ứng dụng giải thuật Bagging (Random Forest) và Boosting (Gradient Boosting / AdaBoost)
-     nhằm tăng cường độ khái quát hóa và giảm thiểu hiện tượng quá khớp (overfitting).
-"""
-
-from typing import Any, Dict, List, Optional, Tuple, Union
+"""Voting and tree-based ensemble models for spam classification."""
+from typing import Any, Dict, Optional, Union
 import numpy as np
 from scipy.sparse import csr_matrix
 
 
 class SpamVotingEnsemble:
-    """
-    BỘ KẾT HỢP BIỂU QUYẾT (VOTING ENSEMBLE) CHO BÀI TOÁN PHÂN LOẠI EMAIL SPAM:
-    --------------------------------------------------------------------------
-    Kết hợp dự đoán xác suất giữa Logistic Regression, SVM và Naive Bayes.
-    """
-
-    def __init__(
-        self,
-        models: Dict[str, Any],
-        weights: Optional[Dict[str, float]] = None,
-        voting: str = "soft",
-    ):
-        """Khởi tạo tập hợp mô hình thành viên, trọng số biểu quyết, và cơ chế voting ('soft'/'hard')."""
-        self.models = models
-        self.weights = weights or {name: 1.0 for name in models}
+    """Soft- or hard-voting ensemble for fitted or unfitted binary classifiers."""
+    def __init__(self, models: Dict[str, Any], weights: Optional[Dict[str, float]] = None, voting: str = "soft"):
+        if not models:
+            raise ValueError("At least one base model is required")
+        if voting not in {"soft", "hard"}:
+            raise ValueError("voting must be 'soft' or 'hard'")
+        self.models = dict(models)
+        self.weights = dict(weights) if weights is not None else {name: 1.0 for name in models}
+        if any(float(self.weights.get(name, 1.0)) < 0 for name in self.models):
+            raise ValueError("Voting weights must be non-negative")
+        if sum(float(self.weights.get(n, 1.0)) for n in self.models) <= 0:
+            raise ValueError("At least one voting weight must be positive")
         self.voting = voting
         self.classes_ = np.array([0, 1])
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "SpamVotingEnsemble":
-        """
-        LOGIC HUẤN LUYỆN TOÀN BỘ CÁC MÔ HÌNH THÀNH VIÊN TRONG ENSEMBLE:
-        ---------------------------------------------------------------
-        # Bước 1: Duyệt qua từng mô hình thành viên trong self.models (Logistic Regression, SVM, Naive Bayes).
-        # Bước 2: Gọi phương thức .fit(X, y) trên từng mô hình.
-        # Bước 3: Đảm bảo tất cả các mô hình đã hội tụ thành công.
-        # Bước 4: Trả về self.
-        """
-        pass
+        for model in self.models.values():
+            model.fit(X, y)
+        self.n_features_in_ = X.shape[1]
+        return self
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
-        """
-        LOGIC TÍNH XÁC SUẤT TRUNG BÌNH CÓ TRỌNG SỐ (SOFT VOTING PROBABILITIES):
-        ----------------------------------------------------------------------
-        # Bước 1: Khởi tạo ma trận xác suất tích lũy toàn 0 kích thước (N_samples, 2).
-        # Bước 2: Tính tổng các trọng số thành viên (total_weight).
-        # Bước 3: Với từng mô hình:
-        #         - Lấy ma trận xác suất dự đoán qua .predict_proba(X).
-        #         - Nhân với trọng số của mô hình đó và cộng dồn vào ma trận tích lũy.
-        # Bước 4: Chia ma trận tích lũy cho total_weight để ra xác suất trung bình có trọng số.
-        # Bước 5: Trả về ma trận xác suất tổng hợp.
-        """
-        pass
+        total = np.zeros((X.shape[0], 2), dtype=float)
+        denom = 0.0
+        for name, model in self.models.items():
+            weight = float(self.weights.get(name, 1.0))
+            if weight == 0:
+                continue
+            if hasattr(model, "predict_proba"):
+                proba = np.asarray(model.predict_proba(X), dtype=float)
+            elif hasattr(model, "decision_function"):
+                scores = np.asarray(model.decision_function(X)).ravel()
+                p1 = 1.0 / (1.0 + np.exp(-np.clip(scores, -35, 35)))
+                proba = np.column_stack((1 - p1, p1))
+            else:
+                labels = np.asarray(model.predict(X)).astype(int)
+                proba = np.column_stack((labels == 0, labels == 1)).astype(float)
+            if proba.shape != total.shape:
+                raise ValueError(f"Model {name!r} returned invalid probability shape {proba.shape}")
+            total += weight * proba
+            denom += weight
+        if denom <= 0:
+            raise ValueError("Total voting weight must be positive")
+        return total / denom
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.5) -> np.ndarray:
-        """
-        LOGIC RA QUYẾT ĐỊNH DỰ ĐOÁN ENSEMBLE:
-        -------------------------------------
-        # Bước 1: Nếu voting == 'soft':
-        #         - Lấy xác suất Spam từ predict_proba(X)[:, 1].
-        #         - So sánh với threshold để ra nhãn nhị phân.
-        # Bước 2: Nếu voting == 'hard':
-        #         - Lấy nhãn dự đoán nhị phân từ từng mô hình thành viên.
-        #         - Tính tổng số phiếu bầu có trọng số cho từng lớp.
-        #         - Chọn nhãn có tổng số phiếu cao nhất.
-        # Bước 3: Trả về mảng nhãn nhị phân dự đoán.
-        """
-        pass
+        if self.voting == "soft":
+            if not 0 <= threshold <= 1:
+                raise ValueError("threshold must be in [0, 1]")
+            return (self.predict_proba(X)[:, 1] >= threshold).astype(int)
+        votes = np.zeros((X.shape[0], 2), dtype=float)
+        for name, model in self.models.items():
+            weight = float(self.weights.get(name, 1.0))
+            if weight == 0:
+                continue
+            try:
+                pred = np.asarray(model.predict(X, threshold=threshold)).ravel().astype(int)
+            except TypeError:
+                pred = np.asarray(model.predict(X)).ravel().astype(int)
+            votes[:, 0] += weight * (pred == 0)
+            votes[:, 1] += weight * (pred == 1)
+        return (votes[:, 1] > votes[:, 0]).astype(int)
 
 
-def build_tree_based_ensembles(
-    random_state: int = 42,
-) -> Dict[str, Any]:
-    """
-    LOGIC KHỞI TẠO CÁC MÔ HÌNH ENSEMBLE DỰA TRÊN CÂY (RANDOM FOREST & BOOSTING):
-    -----------------------------------------------------------------------------
-    # Bước 1: Khởi tạo mô hình Random Forest (Bagging Ensemble) với n_estimators=100.
-    # Bước 2: Khởi tạo mô hình Gradient Boosting (Boosting Ensemble) với n_estimators=100, learning_rate=0.1.
-    # Bước 3: Đóng gói vào Dictionary với các key: 'random_forest', 'gradient_boosting'.
-    # Bước 4: Trả về Dictionary các mô hình Ensemble sẵn sàng huấn luyện và đánh giá.
-    """
-    pass
+def build_tree_based_ensembles(random_state: int = 42) -> Dict[str, Any]:
+    """Create Random Forest and Gradient Boosting classifier candidates."""
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    return {
+        "random_forest": RandomForestClassifier(
+            n_estimators=100, max_features="sqrt", class_weight="balanced_subsample",
+            random_state=random_state, n_jobs=-1),
+        "gradient_boosting": GradientBoostingClassifier(
+            n_estimators=100, learning_rate=0.1, max_depth=2,
+            random_state=random_state, subsample=0.8),
+    }

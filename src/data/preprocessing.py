@@ -9,8 +9,7 @@ import math
 import random
 import re
 import unicodedata
-from typing import Any, Optional, Tuple, Union
-import pandas as pd
+from typing import Any, Optional
 
 # Danh sách cố định trong mã nguồn: không tải tài nguyên NLP bên ngoài.
 # Giữ 'not', 'no', 'never' vì phủ định có thể thay đổi nghĩa văn bản.
@@ -72,10 +71,9 @@ def audit_data_quality(df, text_col='text', label_col='label') -> dict[str, int]
     """Phương án: đếm lỗi, nhóm mâu thuẫn và bản lặp cùng nhãn riêng biệt."""
     # Ưu tiên đếm nhãn sai trước, rồi text rỗng: mỗi dòng chỉ vào một nhóm lỗi.
     # Tổng nhóm loại + retained_rows phải bằng input_rows.
-    records = df.to_dict('records') if hasattr(df, 'to_dict') else df
     groups = {}
     invalid_label = empty_text = 0
-    for row in records:
+    for row in df:
         label = _normalise_label(row.get(label_col))
         text = row.get(text_col)
         if label not in ('ham', 'spam'):
@@ -86,22 +84,22 @@ def audit_data_quality(df, text_col='text', label_col='label') -> dict[str, int]
             groups.setdefault(_content_key(text), []).append(label)
     conflicts = [labels for labels in groups.values() if len(set(labels)) > 1]
     duplicate_rows = sum(len(labels) - 1 for labels in groups.values() if len(set(labels)) == 1)
-    return {'input_rows': len(records), 'invalid_label_rows': invalid_label,
+    return {'input_rows': len(df), 'invalid_label_rows': invalid_label,
             'empty_text_rows': empty_text, 'conflicting_groups': len(conflicts),
             'conflicting_rows': sum(map(len, conflicts)),
             'duplicate_rows_removed': duplicate_rows,
             'retained_rows': sum(len(set(labels)) == 1 for labels in groups.values())}
 
 
-def clean_email_split(df, text_col='text', label_col='label', as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
+def clean_email_split(df, text_col='text', label_col='label') -> list[dict[str, Any]]:
     """Lọc chất lượng, không thay đổi dữ liệu đầu vào.
 
     QUAN TRỌNG: gọi trên TOÀN BỘ dữ liệu trước chia tập để loại cả nhóm
-    mâu thuẫn và trùng liên tập. Mặc định trả về pandas.DataFrame.
+    mâu thuẫn và trùng liên tập. Tên hàm giữ để nhóm dễ đối chiếu khung cũ.
+    Nhãn vẫn là ham/spam; nhãn số y được tạo ở prepare_feature_frame.
     """
-    records = df.to_dict('records') if hasattr(df, 'to_dict') else df
     groups = {}
-    for row in records:
+    for row in df:
         label = _normalise_label(row.get(label_col))
         text = row.get(text_col)
         if label not in ('ham', 'spam') or not isinstance(text, str) or not text.strip():
@@ -119,15 +117,12 @@ def clean_email_split(df, text_col='text', label_col='label', as_dataframe: bool
         row[label_col] = label
         row.setdefault('raw_text', row[text_col])
         cleaned.append(row)
-    if as_dataframe:
-        return pd.DataFrame(cleaned)
     return cleaned
 
 
 def stratified_split_dataframe(df, label_col='label', train_ratio=0.80,
-                               val_ratio=0.10, test_ratio=0.10, random_state=42,
-                               as_dataframe: bool = True) -> Union[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame], Tuple[list, list, list]]:
-    """Chia phân tầng tự viết bằng Random; mặc định trả train, val, test là pd.DataFrame.
+                               val_ratio=0.10, test_ratio=0.10, random_state=42):
+    """Chia phân tầng tự viết bằng Random; trả train, val, test là list[dict].
 
     Làm tròn bằng phần dư lớn nhất, nên tổng số mẫu được bảo toàn. Với lớp
     quá nhỏ, không thể bảo đảm lớp xuất hiện ở mọi tập; báo lỗi rõ ràng.
@@ -135,12 +130,11 @@ def stratified_split_dataframe(df, label_col='label', train_ratio=0.80,
     ratios = (train_ratio, val_ratio, test_ratio)
     if any(not math.isfinite(r) or r < 0 for r in ratios) or not math.isclose(sum(ratios), 1.0, abs_tol=1e-9):
         raise ValueError('Tỷ lệ chia phải không âm, hữu hạn và có tổng bằng 1.')
-    records = df.to_dict('records') if hasattr(df, 'to_dict') else df
-    if not records:
+    if not df:
         raise ValueError('Dữ liệu chia tập không được rỗng.')
     groups = {}
     content_keys = set()
-    for row in records:
+    for row in df:
         label = _normalise_label(row.get(label_col))
         if label not in ('ham', 'spam'):
             raise ValueError('Hãy lọc nhãn sai bằng clean_email_split trước khi chia.')
@@ -170,14 +164,11 @@ def stratified_split_dataframe(df, label_col='label', train_ratio=0.80,
             start += size
     for split in splits:
         rng.shuffle(split)
-    if as_dataframe:
-        return tuple(pd.DataFrame(s) for s in splits)
     return tuple(splits)
 
 
-def stratified_split_records(df, *args, **kwargs):
-    """Alias phân tầng; mặc định trả về pd.DataFrame."""
-    return stratified_split_dataframe(df, *args, **kwargs)
+# Alias tương thích chuẩn kiến trúc list[dict]
+stratified_split_records = stratified_split_dataframe
 
 
 def clean_text_basic(text: str) -> str:
@@ -259,13 +250,12 @@ class SpamTextProcessor:
             'raw_word_count': float(len(raw_text.split())),
         }
 
-    def prepare_feature_frame(self, df, cap_word_limit=None, use_length_cap=True, as_dataframe: bool = False):
+    def prepare_feature_frame(self, df, cap_word_limit=None, use_length_cap=True):
         """Nhận cả văn bản mới không có label; không tự học ngưỡng từ đầu vào."""
         if cap_word_limit is not None and (not isinstance(cap_word_limit, int) or cap_word_limit < 1):
             raise ValueError('Ngưỡng số từ phải là số nguyên dương.')
-        records = df.to_dict('records') if hasattr(df, 'to_dict') else df
         prepared = []
-        for original in records:
+        for original in df:
             row = dict(original)
             raw_text = row.get('raw_text', row.get('text'))
             if not isinstance(raw_text, str):
@@ -283,6 +273,4 @@ class SpamTextProcessor:
                 row['label'] = label
                 row['y'] = int(label == 'spam')
             prepared.append(row)
-        if as_dataframe:
-            return pd.DataFrame(prepared)
         return prepared
