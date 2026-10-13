@@ -54,7 +54,15 @@ def test_load_raw_data():
         create_synthetic_csv(tmp_path)
         records = load_raw_data(tmp_path)
         assert len(records) == 7, f"Kỳ vọng 7 bản ghi thô, nhận được {len(records)}"
-        for r in records:
+        if hasattr(records, "to_dict"):
+            assert "source_id" in records.columns
+            assert "label" in records.columns
+            assert "text" in records.columns
+            assert "raw_text" in records.columns
+            row_list = records.to_dict("records")
+        else:
+            row_list = records
+        for r in row_list:
             assert "source_id" in r
             assert "label" in r
             assert "text" in r
@@ -104,17 +112,17 @@ def test_stratified_split_preserves_distribution():
     assert len(train) + len(val) + len(test) == 100, "Tổng số mẫu phải được bảo toàn chính xác 100"
 
     # 2. Rời rạc hoàn toàn giữa 3 tập (Không rò rỉ dữ liệu)
-    ids_train = {r["source_id"] for r in train}
-    ids_val = {r["source_id"] for r in val}
-    ids_test = {r["source_id"] for r in test}
+    ids_train = set(train["source_id"]) if hasattr(train, "columns") else {r["source_id"] for r in train}
+    ids_val = set(val["source_id"]) if hasattr(val, "columns") else {r["source_id"] for r in val}
+    ids_test = set(test["source_id"]) if hasattr(test, "columns") else {r["source_id"] for r in test}
     assert ids_train.isdisjoint(ids_val), "Tập train và val bị giao nhau!"
     assert ids_train.isdisjoint(ids_test), "Tập train và test bị giao nhau!"
     assert ids_val.isdisjoint(ids_test), "Tập val và test bị giao nhau!"
 
     # 3. Bảo toàn phân phối nhãn
-    train_spam = sum(1 for r in train if r["label"] == "spam")
-    val_spam = sum(1 for r in val if r["label"] == "spam")
-    test_spam = sum(1 for r in test if r["label"] == "spam")
+    train_spam = int((train["label"] == "spam").sum()) if hasattr(train, "columns") else sum(1 for r in train if r["label"] == "spam")
+    val_spam = int((val["label"] == "spam").sum()) if hasattr(val, "columns") else sum(1 for r in val if r["label"] == "spam")
+    test_spam = int((test["label"] == "spam").sum()) if hasattr(test, "columns") else sum(1 for r in test if r["label"] == "spam")
 
     # 15 spam chia 80/10/10: 12 train, 1 hoặc 2 ở val/test
     assert train_spam == 12, f"Kỳ vọng 12 spam trong train, nhận {train_spam}"
@@ -146,13 +154,16 @@ def test_clean_email_split():
 
     cleaned = clean_email_split(dirty_records)
     assert len(cleaned) == 2, f"Kỳ vọng 2 bản ghi hợp lệ sau làm sạch, nhận {len(cleaned)}"
-    assert {r["source_id"] for r in cleaned} == {1, 2}
+    cleaned_ids = set(cleaned["source_id"]) if hasattr(cleaned, "columns") else {r["source_id"] for r in cleaned}
+    assert cleaned_ids == {1, 2}
 
     # Kiểm tra chuyển đổi nhãn thành y {0, 1}
     processor = SpamTextProcessor()
     prepared = processor.prepare_feature_frame(cleaned)
-    assert prepared[0]["y"] == 0, "Nhãn ham phải ánh xạ về 0"
-    assert prepared[1]["y"] == 1, "Nhãn spam phải ánh xạ về 1"
+    first_y = prepared.iloc[0]["y"] if hasattr(prepared, "iloc") else prepared[0]["y"]
+    second_y = prepared.iloc[1]["y"] if hasattr(prepared, "iloc") else prepared[1]["y"]
+    assert first_y == 0, "Nhãn ham phải ánh xạ về 0"
+    assert second_y == 1, "Nhãn spam phải ánh xạ về 1"
 
 
 class TestDataModule(unittest.TestCase):

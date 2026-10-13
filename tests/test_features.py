@@ -168,6 +168,45 @@ def test_hybrid_feature_builder():
         assert Path(res["train_csv"]).is_file()
 
 
+def test_manual_feature_selector_scratch():
+    """Kiểm thử bộ chọn lọc đặc trưng ManualFeatureSelectorScratch."""
+    import numpy as np
+    from src.features.feature_engineering import ManualFeatureSelectorScratch
+
+    # Tạo ma trận giả định 6 mẫu, 5 đặc trưng
+    X_toy = np.array([
+        [1.0, 0.0, 5.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 0.0, 2.0],
+        [2.0, 0.0, 4.0, 0.0, 1.5],
+        [0.0, 3.0, 0.0, 0.0, 0.5],
+        [3.0, 0.0, 6.0, 0.0, 2.0],
+        [0.0, 2.0, 0.0, 0.0, 1.0],
+    ], dtype=float)
+    y_toy = np.array([1, 0, 1, 0, 1, 0], dtype=int)
+
+    selector = ManualFeatureSelectorScratch()
+
+    # 1. Chi2 scores
+    scores = selector.chi2_scores(X_toy, y_toy)
+    assert len(scores) == 5
+    assert scores[0] > 0.0  # Cột 0 tương quan cao với y=1
+    assert scores[1] > 0.0  # Cột 1 tương quan cao với y=0
+    assert scores[3] == 0.0  # Cột 3 toàn số 0 nên chi2 bằng 0
+
+    # 2. Combined importance
+    comb_scores, ranked = selector.compute_combined_importance(X_toy, y_toy)
+    assert len(ranked) == 5
+    assert 3 in ranked[-2:]  # Cột vô tích sự nằm ở cuối
+
+    # 3. Sweep top k
+    best_sweep, df_sweep = selector.sweep_top_k(
+        X_toy, y_toy, X_toy, y_toy, ranked, candidate_k_list=[2, 3, 5], recall_target=0.85
+    )
+    assert "top_k" in best_sweep
+    assert "selected_indices" in best_sweep
+    assert len(best_sweep["selected_indices"]) == best_sweep["top_k"]
+
+
 class TestFeaturesModule(unittest.TestCase):
     def test_tfidf_case(self):
         test_tfidf_vectorizer_scratch()
@@ -178,6 +217,10 @@ class TestFeaturesModule(unittest.TestCase):
     def test_hybrid_builder_case(self):
         test_hybrid_feature_builder()
 
+    def test_feature_selector_case(self):
+        test_manual_feature_selector_scratch()
+
 
 if __name__ == "__main__":
     unittest.main()
+

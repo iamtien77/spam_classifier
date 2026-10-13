@@ -1,9 +1,10 @@
-"""Đọc CSV bằng thư viện chuẩn. Bảng dữ liệu là list[dict], không phải DataFrame."""
+"""Đọc CSV bằng thư viện chuẩn và pandas. Trả về DataFrame (hoặc list[dict] nếu yêu cầu)."""
 import csv
 from collections import Counter
 from pathlib import Path
 from statistics import mean, median
-from typing import Any, Optional
+from typing import Any, Optional, Union
+import pandas as pd
 
 
 def resolve_data_path(custom_path: Optional[Path] = None) -> Path:
@@ -21,11 +22,11 @@ def resolve_data_path(custom_path: Optional[Path] = None) -> Path:
     raise FileNotFoundError('Không tìm thấy spam.csv. Hãy truyền đường dẫn cụ thể.')
 
 
-def load_raw_data(data_path: Optional[Path] = None) -> list[dict[str, Any]]:
+def load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
     """Giữ cả dòng lỗi để EDA đếm được; lọc chất lượng ở clean_email_split.
 
     raw_text không bị sửa. source_id là số thứ tự bản ghi CSV, dùng kiểm tra
-    chia tập và đối chiếu nguồn (không phải số dòng vật lý nếu có xuống dòng).
+    chia tập và đối chiếu nguồn. Mặc định trả về pandas.DataFrame.
     """
     path = resolve_data_path(data_path)
     # CSV dự án có nội dung dài hơn giới hạn mặc định 128 KiB.
@@ -49,6 +50,8 @@ def load_raw_data(data_path: Optional[Path] = None) -> list[dict[str, Any]]:
                         records.append({'source_id': source_id,
                                         'label': (row.get(label_field) or '').strip().lower(),
                                         'text': text, 'raw_text': text})
+                    if as_dataframe:
+                        return pd.DataFrame(records)
                     return records
             except UnicodeDecodeError:
                 continue
@@ -58,11 +61,13 @@ def load_raw_data(data_path: Optional[Path] = None) -> list[dict[str, Any]]:
         csv.field_size_limit(previous_limit)
 
 
-def explore_raw_data(records: Optional[list[dict[str, Any]]] = None, *, df: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
+def explore_raw_data(records: Optional[Any] = None, *, df: Optional[Any] = None) -> dict[str, Any]:
     """Thống kê trực tiếp từ dữ liệu, không gán trước tỷ lệ Ham/Spam."""
     data = records if records is not None else df
     if data is None:
         raise ValueError("Cần truyền danh sách bản ghi records hoặc df.")
+    if hasattr(data, "to_dict"):
+        data = data.to_dict("records")
     counts = Counter(row.get('label', '') for row in data)
     valid = sum(counts.get(label, 0) for label in ('ham', 'spam'))
     lengths = [len(str(row.get('text') or '')) for row in data]
