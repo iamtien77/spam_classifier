@@ -1,49 +1,41 @@
-"""
-persistence.py - Lưu trữ và tải Pipeline mô hình hoàn chỉnh
-Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - Workflow Bước 4: Deployment)
-================================================================================================
-Module này đảm nhiệm:
-1. Đóng gói toàn bộ Artifacts của hệ thống thành một file duy nhất (.joblib):
-   - Mô hình phân loại tối ưu đã huấn luyện (Trained Classifier)
-   - Bộ tiền xử lý văn bản (SpamTextProcessor)
-   - Bộ vector hóa đặc trưng (HybridFeatureBuilder / TF-IDF Vectorizers)
-   - Bộ chuẩn hóa số học (MaxAbsScaler)
-   - Ngưỡng quyết định tối ưu đã chọn (Best Decision Threshold)
-   - Metadata cấu hình và danh sách đặc trưng
-2. Cung cấp hàm nạp lại pipeline an toàn phục vụ ứng dụng suy luận thời gian thực (Inference Service).
-"""
-
+"""Persistence helpers for saving and loading a trained spam-classification pipeline."""
 from pathlib import Path
 from typing import Any, Dict, Optional
 import joblib
 
 
-def save_spam_pipeline(
-    pipeline_bundle: Dict[str, Any],
-    save_path: Optional[Path] = None,
-) -> Path:
-    """
-    LOGIC ĐÓNG GÓI VÀ LƯU TRỮ PIPELINE ARTIFACT:
-    --------------------------------------------
-    # Bước 1: Nếu save_path không được cung cấp, sử dụng đường dẫn mặc định results/saved_models/spam_pipeline.joblib.
-    # Bước 2: Tự động khởi tạo thư mục cha (save_path.parent.mkdir(parents=True, exist_ok=True)).
-    # Bước 3: Kiểm tra tính đầy đủ của pipeline_bundle (phải chứa model, preprocessor, vectorizer, threshold).
-    # Bước 4: Gọi joblib.dump(pipeline_bundle, save_path, compress=3) để nén và lưu trữ an toàn.
-    # Bước 5: Trả về đường dẫn Path của file vừa lưu.
-    """
-    pass
+def _default_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "results" / "saved_models" / "spam_pipeline.joblib"
 
 
-def load_spam_pipeline(
-    model_path: Optional[Path] = None,
-) -> Dict[str, Any]:
-    """
-    LOGIC TẢI VÀ KHÔI PHỤC PIPELINE TỪ ĐĨA CỨNG:
-    -------------------------------------------
-    # Bước 1: Nếu model_path không được truyền vào, tìm kiếm ở các vị trí mặc định tiềm năng.
-    # Bước 2: Kiểm tra sự tồn tại của file model_path (raise FileNotFoundError nếu không tìm thấy).
-    # Bước 3: Nạp đối tượng pipeline_bundle bằng joblib.load(model_path).
-    # Bước 4: Xác thực các thành phần cốt lõi bên trong bundle để đảm bảo tính toàn vẹn.
-    # Bước 5: Trả về Dictionary chứa toàn bộ đối tượng pipeline sẵn sàng cho tác vụ dự đoán.
-    """
-    pass
+def save_spam_pipeline(pipeline_bundle: Dict[str, Any], save_path: Optional[Path] = None) -> Path:
+    """Validate and persist a pipeline bundle using joblib."""
+    if not isinstance(pipeline_bundle, dict) or not pipeline_bundle:
+        raise ValueError("pipeline_bundle must be a non-empty dictionary")
+    required_groups = ({"model", "final_selected_model", "classifier"},
+                       {"best_threshold", "threshold"})
+    missing = []
+    for options in required_groups:
+        if not any(key in pipeline_bundle for key in options):
+            missing.append(" or ".join(sorted(options)))
+    if missing:
+        raise ValueError("pipeline_bundle is missing required key(s): " + ", ".join(missing))
+    path = Path(save_path) if save_path is not None else _default_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline_bundle, path, compress=3)
+    return path
+
+
+def load_spam_pipeline(model_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Load and validate a previously saved pipeline bundle."""
+    path = Path(model_path) if model_path is not None else _default_path()
+    if not path.exists():
+        raise FileNotFoundError(f"Spam pipeline was not found: {path}")
+    bundle = joblib.load(path)
+    if not isinstance(bundle, dict):
+        raise ValueError("Saved pipeline must contain a dictionary bundle")
+    if not any(key in bundle for key in ("model", "final_selected_model", "classifier")):
+        raise ValueError("Saved pipeline does not contain a model")
+    if not any(key in bundle for key in ("best_threshold", "threshold")):
+        raise ValueError("Saved pipeline does not contain a decision threshold")
+    return bundle

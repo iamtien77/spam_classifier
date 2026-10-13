@@ -1,98 +1,76 @@
-"""
-tuning.py - Tinh chỉnh siêu tham số và tối ưu hóa ngưỡng phân loại
-Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - Hyperparameter Tuning)
-===========================================================================================
-Đề bài yêu cầu:
-"Hyperparameter Tuning: Optimize the model's parameters (e.g., regularization strength,
- learning rate) to achieve better results."
-
-Module này đảm nhiệm:
-1. Tối ưu hóa siêu tham số (Hyperparameter Tuning):
-   - Logistic Regression: Tinh chỉnh hệ số điều chuẩn C, loại penalty (l1/l2), learning_rate.
-   - Support Vector Machines (SVM): Tinh chỉnh hệ số phạt vi phạm lề C, learning_rate, số epoch.
-   - Naive Bayes: Tinh chỉnh hệ số làm mịn Laplace/Lidstone alpha.
-2. Tối ưu hóa ngưỡng quyết định (Threshold Tuning):
-   - Quét lưới 200 giá trị ngưỡng xác suất [0.005, 1.0] trên tập Validation.
-   - Tự động dò tìm ngưỡng tối ưu thỏa mãn ràng buộc nghiệp vụ (Recall >= 0.85) và đạt F1-score / F-beta cao nhất.
-3. Quy trình lựa chọn mô hình vô địch (Model Selection Workflow).
-"""
-
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+"""Hyperparameter tuning, threshold optimization, and validation model selection."""
+from itertools import product
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, fbeta_score, roc_auc_score
+
+
+def _binary_metrics(y_true, y_pred, beta=2.0):
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "precision": float(precision_score(y_true, y_pred, zero_division=0)),
+        "recall": float(recall_score(y_true, y_pred, zero_division=0)),
+        "f1": float(f1_score(y_true, y_pred, zero_division=0)),
+        "f_beta": float(fbeta_score(y_true, y_pred, beta=beta, zero_division=0)),
+    }
 
 
 class ThresholdOptimizerScratch:
-    """
-    BỘ TỐI ƯU HÓA NGƯỠNG PHÂN LOẠI TỰ XÂY DỰNG (FROM SCRATCH):
-    ----------------------------------------------------------
-    Dò quét và chọn ngưỡng quyết định tối ưu trên tập Validation nhằm cân bằng giữa
-    khả năng bắt trúng thư rác (Recall) và hạn chế tối đa chặn nhầm thư hợp lệ (Precision).
-    """
+    """Scan probability thresholds and choose the best threshold meeting target recall."""
+    def __init__(self, recall_target: float = 0.85, beta: float = 2.0, n_points: int = 200):
+        if not 0 <= recall_target <= 1 or beta <= 0 or n_points < 2:
+            raise ValueError("Invalid recall_target, beta, or n_points")
+        self.recall_target = float(recall_target)
+        self.beta = float(beta)
+        self.grid = np.linspace(0.005, 1.0, int(n_points))
+        self.best_threshold_: Optional[float] = None
+        self.best_metrics_: Optional[Dict[str, float]] = None
 
-    def __init__(
-        self,
-        recall_target: float = 0.85,
-        beta: float = 2.0,
-        n_points: int = 200,
-    ):
-        """Khởi tạo mục tiêu Recall, hệ số Beta trong F-beta score, và số mốc ngưỡng quét."""
-        self.recall_target = recall_target
-        self.beta = beta
-        self.grid = np.linspace(0.005, 1.0, n_points)
+    def compute_metrics_at_threshold(self, y_true: np.ndarray, spam_probs: np.ndarray, threshold: float) -> Dict[str, float]:
+        y = np.asarray(y_true).ravel().astype(int)
+        p = np.asarray(spam_probs).ravel().astype(float)
+        if len(y) != len(p):
+            raise ValueError("y_true and spam_probs must have the same length")
+        if len(y) == 0 or not np.all(np.isfinite(p)):
+            raise ValueError("Inputs must be non-empty and probabilities finite")
+        if not 0 <= threshold <= 1:
+            raise ValueError("threshold must be in [0, 1]")
+        pred = (p >= threshold).astype(int)
+        m = _binary_metrics(y, pred, self.beta)
+        m["threshold"] = float(threshold)
+        tn = int(np.sum((y == 0) & (pred == 0)))
+        fp = int(np.sum((y == 0) & (pred == 1)))
+        fn = int(np.sum((y == 1) & (pred == 0)))
+        tp = int(np.sum((y == 1) & (pred == 1)))
+        m.update({"tp": tp, "fp": fp, "tn": tn, "fn": fn})
+        return m
 
-    def compute_metrics_at_threshold(
-        self,
-        y_true: np.ndarray,
-        spam_probs: np.ndarray,
-        threshold: float,
-    ) -> Dict[str, float]:
-        """
-        LOGIC TÍNH CÁC CHỈ SỐ TẠI MỘT NGƯỠNG CỤ THỂ:
-        -------------------------------------------
-        # Bước 1: Sinh nhãn dự đoán nhị phân: y_pred = (spam_probs >= threshold).astype(int).
-        # Bước 2: Tính toán ma trận nhầm lẫn: TP, FP, TN, FN.
-        # Bước 3: Tính Accuracy = (TP + TN) / (TP + TN + FP + FN).
-        # Bước 4: Tính Precision = TP / (TP + FP) nếu (TP + FP) > 0 ngược lại bằng 0.
-        # Bước 5: Tính Recall = TP / (TP + FN) nếu (TP + FN) > 0 ngược lại bằng 0.
-        # Bước 6: Tính F1 = 2 * Precision * Recall / (Precision + Recall).
-        # Bước 7: Tính F-beta = (1 + beta^2) * Precision * Recall / (beta^2 * Precision + Recall).
-        # Bước 8: Trả về Dictionary kết quả các chỉ số.
-        """
-        pass
+    def scan_thresholds(self, y_true: np.ndarray, spam_probs: np.ndarray) -> pd.DataFrame:
+        rows = []
+        for threshold in self.grid:
+            row = self.compute_metrics_at_threshold(y_true, spam_probs, float(threshold))
+            row["target_met"] = bool(row["recall"] >= self.recall_target)
+            rows.append(row)
+        return pd.DataFrame(rows)
 
-    def scan_thresholds(
-        self,
-        y_true: np.ndarray,
-        spam_probs: np.ndarray,
-    ) -> pd.DataFrame:
-        """
-        LOGIC QUÉT QUA TOÀN BỘ LƯỚI NGƯỠNG TRÊN TẬP VALIDATION:
-        ------------------------------------------------------
-        # Bước 1: Lặp qua từng mốc threshold trong self.grid.
-        # Bước 2: Gọi compute_metrics_at_threshold() để lấy toàn bộ chỉ số hiệu năng.
-        # Bước 3: Đánh dấu cờ boolean 'target_met': True nếu Recall >= self.recall_target.
-        # Bước 4: Đóng gói toàn bộ kết quả vào một pandas DataFrame và trả về.
-        """
-        pass
-
-    def select_best_threshold(
-        self,
-        scan_df: pd.DataFrame,
-    ) -> Dict[str, Any]:
-        """
-        LOGIC CHỌN RA NGƯỠNG QUYẾT ĐỊNH VÔ ĐỊCH:
-        ---------------------------------------
-        # Bước 1: Lọc tập con các ngưỡng thỏa mãn điều kiện tiên quyết: scan_df['target_met'] == True.
-        # Bước 2: Nếu có ngưỡng thỏa mãn:
-        #         - Sắp xếp ưu tiên giảm dần theo F-beta, F1, Accuracy, Precision.
-        #         - Chọn dòng đầu tiên làm ngưỡng tối ưu (best_threshold).
-        # Bước 3: Nếu không có ngưỡng nào thỏa mãn:
-        #         - Chọn ngưỡng có Recall cao nhất làm phương án dự phòng an toàn.
-        # Bước 4: Trả về Dictionary chứa thông tin ngưỡng được chọn và các chỉ số kèm theo.
-        """
-        pass
+    def select_best_threshold(self, scan_df: pd.DataFrame) -> Dict[str, Any]:
+        if scan_df is None or scan_df.empty:
+            raise ValueError("scan_df must contain threshold results")
+        valid = scan_df[scan_df["target_met"].astype(bool)] if "target_met" in scan_df else scan_df[scan_df["recall"] >= self.recall_target]
+        target_met = not valid.empty
+        if valid.empty:
+            # Safety fallback: maximize recall first, then F-beta / F1 and precision.
+            valid = scan_df.sort_values(["recall", "f_beta", "f1", "precision"], ascending=False).head(1)
+        else:
+            valid = valid.sort_values(["f_beta", "f1", "accuracy", "precision"], ascending=False)
+        best = valid.iloc[0].to_dict()
+        best["best_threshold"] = float(best.get("threshold", 0.5))
+        best["target_met"] = bool(target_met)
+        self.best_threshold_ = best["best_threshold"]
+        self.best_metrics_ = {k: float(v) for k, v in best.items() if k in {"accuracy", "precision", "recall", "f1", "f_beta"}}
+        return best
 
 
 def tune_model_hyperparameters(
@@ -105,59 +83,91 @@ def tune_model_hyperparameters(
     y_val: np.ndarray,
     scoring_metric: str = "f1",
 ) -> Tuple[Any, Dict[str, Any], float]:
-    """
-    LOGIC TINH CHỈNH SIÊU THAM SỐ (GRID SEARCH TRÊN TẬP VALIDATION):
-    -----------------------------------------------------------------
-    # Bước 1: Sinh toàn bộ các tổ hợp siêu tham số từ param_grid (Cartesian Product).
-    # Bước 2: Khởi tạo biến lưu trữ mô hình tốt nhất (best_model), bộ tham số tốt nhất (best_params), điểm cao nhất (best_score = -inf).
-    # Bước 3: Với mỗi tổ hợp tham số:
-    #         a. Khởi tạo đối tượng mô hình với tổ hợp tham số đó.
-    #         b. Huấn luyện mô hình trên tập X_train, y_train.
-    #         c. Dự đoán trên tập kiểm định X_val và tính điểm theo scoring_metric (F1, Accuracy hoặc Recall).
-    #         d. Nếu điểm đạt được > best_score: cập nhật best_score, best_model, best_params.
-    # Bước 4: Trả về bộ ba: (best_model, best_params, best_score).
-    """
-    pass
+    """Manual grid search; each candidate is fitted only on Train and scored on Validation."""
+    from sklearn.base import clone
+    from sklearn.metrics import get_scorer
+    y_train = np.asarray(y_train).ravel()
+    y_val = np.asarray(y_val).ravel()
+    if len(y_train) != X_train.shape[0] or len(y_val) != X_val.shape[0]:
+        raise ValueError("X and y lengths do not match")
+    keys = list(param_grid)
+    combos = [dict(zip(keys, values)) for values in product(*(param_grid[k] for k in keys))] if keys else [{}]
+    best_model, best_params, best_score = None, {}, -np.inf
+    valid_metrics = {"accuracy", "precision", "recall", "f1", "f_beta", "roc_auc", "f1_macro", "balanced_accuracy"}
+    for params in combos:
+        try:
+            model = model_class(**params)
+        except TypeError:
+            model = clone(model_class).set_params(**params)
+        model.fit(X_train, y_train)
+        if hasattr(model, "predict_proba"):
+            probs = np.asarray(model.predict_proba(X_val))[:, 1]
+            pred_default = (probs >= 0.5).astype(int)
+        else:
+            scores = np.asarray(model.decision_function(X_val)).ravel()
+            probs = None
+            pred_default = (scores >= 0).astype(int)
+        metric = scoring_metric.lower().replace("-", "_")
+        if metric in {"roc_auc", "auc"}:
+            score = roc_auc_score(y_val, probs if probs is not None else scores)
+        elif metric == "f_beta":
+            score = fbeta_score(y_val, pred_default, beta=2, zero_division=0)
+        elif metric in valid_metrics:
+            if metric == "balanced_accuracy":
+                from sklearn.metrics import balanced_accuracy_score
+                score = balanced_accuracy_score(y_val, pred_default)
+            elif metric == "f1_macro":
+                score = f1_score(y_val, pred_default, average="macro", zero_division=0)
+            else:
+                fn = {"accuracy": accuracy_score, "precision": precision_score, "recall": recall_score, "f1": f1_score}[metric]
+                score = fn(y_val, pred_default, zero_division=0) if metric != "accuracy" else fn(y_val, pred_default)
+        else:
+            try:
+                score = get_scorer(scoring_metric)(model, X_val, y_val)
+            except Exception as exc:
+                raise ValueError(f"Unsupported scoring_metric: {scoring_metric}") from exc
+        score = float(score)
+        if score > best_score:
+            best_model, best_params, best_score = model, dict(params), score
+    if best_model is None:
+        raise RuntimeError(f"No valid model candidate for {model_name}")
+    return best_model, best_params, float(best_score)
 
 
 class ModelSelectionWorkflow:
-    """
-    QUY TRÌNH SO SÁNH VÀ LỰA CHỌN MÔ HÌNH VÔ ĐỊCH (MODEL SELECTION WORKFLOW):
-    --------------------------------------------------------------------------
-    So sánh công bằng tất cả các ứng viên mô hình (Default & Tuned) trên tập Validation
-    để chọn ra mô hình tối ưu nhất đưa vào đánh giá cuối và triển khai.
-    """
-
+    """Aggregate validation metrics and select the strongest candidate with recall priority."""
     def __init__(self, recall_target: float = 0.85):
-        """Khởi tạo workflow với ràng buộc nghiệp vụ."""
-        self.recall_target = recall_target
+        self.recall_target = float(recall_target)
 
-    def compare_candidates(
-        self,
-        candidate_results: List[Dict[str, Any]],
-    ) -> pd.DataFrame:
-        """
-        LOGIC XÂY DỰNG BẢNG SO SÁNH TỔNG HỢP CÁC MÔ HÌNH ỨNG VIÊN:
-        ---------------------------------------------------------
-        # Bước 1: Tạo DataFrame tổng hợp từ danh sách kết quả của các mô hình ứng viên:
-        #         - Tên mô hình (Logistic Regression, SVM, Naive Bayes, Ensemble)
-        #         - Trạng thái (Default vs Tuned)
-        #         - Ngưỡng tối ưu (Best Threshold)
-        #         - Validation Accuracy, Precision, Recall, F1, F-beta, ROC-AUC
-        #         - Cờ kiểm tra Recall Target Met (True/False).
-        # Bước 2: Xếp hạng (ranking) các mô hình theo mức độ thỏa mãn mục tiêu và điểm số.
-        # Bước 3: Trả về bảng so sánh đã sắp xếp.
-        """
-        pass
+    def compare_candidates(self, candidate_results: List[Dict[str, Any]]) -> pd.DataFrame:
+        if not candidate_results:
+            return pd.DataFrame(columns=["model_name", "recall", "f1", "f_beta", "target_met", "rank"])
+        rows = []
+        for item in candidate_results:
+            row = dict(item)
+            # Accept common naming differences in results emitted by notebooks.
+            aliases = {"model": "model_name", "name": "model_name", "threshold": "best_threshold",
+                       "accuracy_score": "accuracy", "precision_score": "precision", "recall_score": "recall",
+                       "f1_score": "f1", "fbeta": "f_beta", "f_beta_score": "f_beta", "roc_auc_score": "roc_auc"}
+            for old, new in aliases.items():
+                if new not in row and old in row:
+                    row[new] = row[old]
+            row.setdefault("model_name", row.get("key", "unknown"))
+            row.setdefault("recall", 0.0)
+            row.setdefault("f1", 0.0)
+            row.setdefault("f_beta", 0.0)
+            row["target_met"] = bool(float(row["recall"]) >= self.recall_target)
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        for col in ("accuracy", "precision", "recall", "f1", "f_beta", "roc_auc"):
+            if col not in df:
+                df[col] = np.nan
+        df = df.sort_values(["target_met", "f_beta", "f1", "accuracy"], ascending=[False, False, False, False], na_position="last").reset_index(drop=True)
+        df["rank"] = np.arange(1, len(df) + 1)
+        return df
 
-    def select_final_winner(
-        self,
-        comparison_df: pd.DataFrame,
-    ) -> str:
-        """
-        LOGIC LỰA CHỌN MÔ HÌNH CHIẾN THẮNG CUỐI CÙNG:
-        --------------------------------------------
-        # Bước 1: Lấy tên mô hình đứng đầu bảng xếp hạng (hạng 1) thỏa mãn các tiêu chí kỹ thuật.
-        # Bước 2: Trả về tên định danh của mô hình vô địch.
-        """
-        pass
+    def select_final_winner(self, comparison_df: pd.DataFrame) -> str:
+        if comparison_df is None or comparison_df.empty:
+            raise ValueError("comparison_df is empty")
+        first = comparison_df.iloc[0]
+        return str(first.get("model_name", first.get("model", first.get("name", "unknown"))))
