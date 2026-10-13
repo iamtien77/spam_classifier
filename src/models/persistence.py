@@ -22,28 +22,29 @@ def save_spam_pipeline(
     pipeline_bundle: Dict[str, Any],
     save_path: Optional[Path] = None,
 ) -> Path:
-    """
-    LOGIC ĐÓNG GÓI VÀ LƯU TRỮ PIPELINE ARTIFACT:
-    --------------------------------------------
-    # Bước 1: Nếu save_path không được cung cấp, sử dụng đường dẫn mặc định results/saved_models/spam_pipeline.joblib.
-    # Bước 2: Tự động khởi tạo thư mục cha (save_path.parent.mkdir(parents=True, exist_ok=True)).
-    # Bước 3: Kiểm tra tính đầy đủ của pipeline_bundle (phải chứa model, preprocessor, vectorizer, threshold).
-    # Bước 4: Gọi joblib.dump(pipeline_bundle, save_path, compress=3) để nén và lưu trữ an toàn.
-    # Bước 5: Trả về đường dẫn Path của file vừa lưu.
-    """
-    pass
+    if save_path is None:
+        save_path = Path("results/saved_models/spam_pipeline.joblib")
+    else:
+        save_path = Path(save_path)
+
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline_bundle, save_path, compress=3)
+    return save_path
 
 
 def load_spam_pipeline(
     model_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """
-    LOGIC TẢI VÀ KHÔI PHỤC PIPELINE TỪ ĐĨA CỨNG:
-    -------------------------------------------
-    # Bước 1: Nếu model_path không được truyền vào, tìm kiếm ở các vị trí mặc định tiềm năng.
-    # Bước 2: Kiểm tra sự tồn tại của file model_path (raise FileNotFoundError nếu không tìm thấy).
-    # Bước 3: Nạp đối tượng pipeline_bundle bằng joblib.load(model_path).
-    # Bước 4: Xác thực các thành phần cốt lõi bên trong bundle để đảm bảo tính toàn vẹn.
-    # Bước 5: Trả về Dictionary chứa toàn bộ đối tượng pipeline sẵn sàng cho tác vụ dự đoán.
-    """
-    pass
+    if model_path is None:
+        model_path = Path("results/saved_models/spam_pipeline.joblib")
+    else:
+        model_path = Path(model_path)
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"Không tìm thấy file pipeline tại: {model_path}")
+
+    bundle = joblib.load(model_path)
+    if not isinstance(bundle, dict):
+        raise ValueError(f"Dữ liệu pipeline trong {model_path} không đúng định dạng dictionary.")
+    return bundle
+

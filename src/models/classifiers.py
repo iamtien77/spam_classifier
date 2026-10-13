@@ -23,11 +23,45 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 
+def _safe_dot(X: Any, w: np.ndarray) -> np.ndarray:
+    """Tính tích vô hướng ma trận - vector an toàn cho cả CSRMatrixScratch, SciPy CSR và mảng NumPy."""
+    w = np.asarray(w, dtype=float).ravel()
+    if hasattr(X, "dot"):
+        res = X.dot(w)
+        if hasattr(res, "toarray"):
+            res = res.toarray().ravel()
+        return np.asarray(res, dtype=float).ravel()
+    return np.asarray(X @ w, dtype=float).ravel()
+
+
+def _safe_transpose_dot(X: Any, v: np.ndarray) -> np.ndarray:
+    """Tính X.T @ v an toàn không cần giải nén ma trận đặc."""
+    v = np.asarray(v, dtype=float).ravel()
+    if hasattr(X, "transpose_dot"):
+        return np.asarray(X.transpose_dot(v), dtype=float).ravel()
+    if hasattr(X, "T") and hasattr(X.T, "dot"):
+        res = X.T.dot(v)
+        if hasattr(res, "toarray"):
+            res = res.toarray().ravel()
+        return np.asarray(res, dtype=float).ravel()
+    return np.asarray(np.asarray(X).T @ v, dtype=float).ravel()
+
+
+def _get_shape(X: Any) -> Tuple[int, int]:
+    """Lấy số hàng và số cột của ma trận đầu vào."""
+    if hasattr(X, "shape"):
+        return int(X.shape[0]), int(X.shape[1])
+    if isinstance(X, (list, tuple)):
+        return len(X), len(X[0]) if len(X) > 0 else 0
+    raise ValueError(f"Không thể xác định kích thước cho đối tượng kiểu {type(X)}")
+
+
 class LogisticRegressionFromScratch:
     """
     1. LOGISTIC REGRESSION TỰ CÀI ĐẶT TỪ ĐẦU (FROM SCRATCH):
     --------------------------------------------------------
     Phân loại nhị phân dựa trên hàm Logistic/Sigmoid và tối ưu hóa bằng Gradient Descent.
+    Hỗ trợ cả ma trận thưa CSRMatrixScratch, scipy.sparse.csr_matrix và mảng numpy.
     """
 
     def __init__(
@@ -38,7 +72,6 @@ class LogisticRegressionFromScratch:
         class_weight: Optional[str] = "balanced",
         random_state: int = 42,
     ):
-        """Khởi tạo tốc độ học, số vòng lặp tối đa, hệ số điều chuẩn C, và trọng số lớp."""
         self.learning_rate = learning_rate
         self.max_iter = max_iter
         self.C = C
@@ -49,59 +82,67 @@ class LogisticRegressionFromScratch:
         self.loss_history_: list = []
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "LogisticRegressionFromScratch":
-        """
-        LOGIC HUẤN LUYỆN LOGISTIC REGRESSION BẰNG GRADIENT DESCENT:
-        ----------------------------------------------------------
-        # Bước 1: Xác định số lượng mẫu (N_samples) và số lượng đặc trưng (N_features) từ X.
-        # Bước 2: Chuyển đổi nhãn y sang kiểu mảng numpy nhị phân float (0.0 cho Ham, 1.0 cho Spam).
-        # Bước 3: Tính toán trọng số lớp (class weights) nếu class_weight == 'balanced':
-        #         weight_0 = N_samples / (2.0 * count_0); weight_1 = N_samples / (2.0 * count_1).
-        #         Tạo vector trọng số mẫu sample_weights phạt nặng hơn khi đoán sai lớp thiểu số.
-        # Bước 4: Khởi tạo vector trọng số w toàn 0 hoặc ngẫu nhiên nhỏ (normal(0, 0.01)), bias b = 0.0.
-        # Bước 5: Lặp qua từng epoch từ 1 đến max_iter:
-        #         a. Tính tích vô hướng tuyến tính: z = X * w + b.
-        #         b. Đưa z qua hàm Sigmoid để tính xác suất dự đoán: y_hat = 1.0 / (1.0 + exp(-clip(z, -30, 30))).
-        #         c. Tính sai số có trọng số: error = sample_weights * (y_hat - y).
-        #         d. Tính gradient của hàm mất mát Cross-Entropy kết hợp điều chuẩn L2:
-        #            grad_w = (1 / N_samples) * (X^T * error) + (1.0 / self.C) * w.
-        #            grad_b = (1 / N_samples) * sum(error).
-        #         e. Cập nhật tham số theo chiều ngược gradient:
-        #            w = w - learning_rate * grad_w.
-        #            b = b - learning_rate * grad_b.
-        #         f. Tính giá trị hàm mất mát (Binary Cross-Entropy Loss) và lưu vào loss_history_.
-        # Bước 6: Lưu trữ vector trọng số cuối cùng vào self.weights_ và self.bias_.
-        # Bước 7: Trả về self.
-        """
-        pass
+        n_samples, n_features = _get_shape(X)
+        y_arr = np.asarray(y, dtype=float).ravel()
+
+        if self.class_weight == "balanced":
+            n_0 = max(1, int(np.sum(y_arr == 0.0)))
+            n_1 = max(1, int(np.sum(y_arr == 1.0)))
+            w_0 = n_samples / (2.0 * n_0)
+            w_1 = n_samples / (2.0 * n_1)
+            sample_weights = np.where(y_arr == 1.0, w_1, w_0)
+        else:
+            sample_weights = np.ones(n_samples, dtype=float)
+
+        w = np.zeros(n_features, dtype=float)
+        b = 0.0
+        self.loss_history_ = []
+
+        reg_lambda = 1.0 / max(1e-5, self.C * n_samples)
+        eps = 1e-15
+        for epoch in range(self.max_iter):
+            z = _safe_dot(X, w) + b
+            z_clipped = np.clip(z, -30.0, 30.0)
+            y_hat = 1.0 / (1.0 + np.exp(-z_clipped))
+
+            error = sample_weights * (y_hat - y_arr)
+
+            grad_w = reg_lambda * w + (1.0 / n_samples) * _safe_transpose_dot(X, error)
+            grad_b = float(np.mean(error))
+
+            lr = self.learning_rate / np.sqrt(1.0 + 0.01 * epoch)
+            w -= lr * grad_w
+            b -= lr * grad_b
+
+            loss = -(1.0 / n_samples) * np.sum(
+                sample_weights * (y_arr * np.log(y_hat + eps) + (1.0 - y_arr) * np.log(1.0 - y_hat + eps))
+            ) + 0.5 * reg_lambda * float(np.sum(w ** 2))
+            self.loss_history_.append(float(loss))
+
+        self.weights_ = w
+        self.bias_ = b
+        return self
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
-        """
-        LOGIC TÍNH XÁC SUẤT DỰ ĐOÁN (PREDICT PROBABILITIES):
-        ---------------------------------------------------
-        # Bước 1: Tính tích vô hướng z = X * self.weights_ + self.bias_.
-        # Bước 2: Áp dụng hàm Sigmoid để tính xác suất email là Spam: prob_spam = 1 / (1 + exp(-clip(z, -30, 30))).
-        # Bước 3: Xác suất email là Ham là prob_ham = 1.0 - prob_spam.
-        # Bước 4: Ghép thành ma trận 2D kích thước (N_samples, 2) và trả về.
-        """
-        pass
+        if self.weights_ is None:
+            raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+        z = _safe_dot(X, self.weights_) + self.bias_
+        z_clipped = np.clip(z, -30.0, 30.0)
+        prob_spam = 1.0 / (1.0 + np.exp(-z_clipped))
+        prob_ham = 1.0 - prob_spam
+        return np.column_stack([prob_ham, prob_spam])
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.5) -> np.ndarray:
-        """
-        LOGIC RA QUYẾT ĐỊNH PHÂN LOẠI NHỊ PHÂN VỚI NGƯỠNG:
-        -------------------------------------------------
-        # Bước 1: Lấy xác suất dự đoán lớp Spam từ predict_proba(X)[:, 1].
-        # Bước 2: So sánh xác suất với ngưỡng quyết định threshold:
-        #         Nếu prob_spam >= threshold -> gán nhãn 1 (Spam), ngược lại gán 0 (Ham).
-        # Bước 3: Trả về mảng nhãn nhị phân dạng int (0 hoặc 1).
-        """
-        pass
+        probs = self.predict_proba(X)[:, 1]
+        return (probs >= threshold).astype(int)
 
 
 class LinearSVMFromScratch:
     """
     2. SUPPORT VECTOR MACHINES (SVM) TỰ CÀI ĐẶT TỪ ĐẦU (FROM SCRATCH):
     -----------------------------------------------------------------
-    Tìm siêu phẳng phân tách lề cực đại (Maximum Margin) bằng giải thuật SGD với hàm mất mát Hinge Loss.
+    Tìm siêu phẳng phân tách lề cực đại (Maximum Margin) bằng giải thuật Gradient Descent
+    với hàm mất mát Squared Hinge Loss hoặc Hinge Loss, kết hợp điều chuẩn L2.
     """
 
     def __init__(
@@ -110,67 +151,132 @@ class LinearSVMFromScratch:
         learning_rate: float = 0.05,
         max_iter: int = 150,
         class_weight: Optional[str] = "balanced",
+        loss: str = "squared_hinge",
+        tol: float = 1e-4,
         random_state: int = 42,
     ):
-        """Khởi tạo siêu tham số điều chuẩn C, tốc độ học, số vòng lặp và trọng số lớp."""
-        self.C = C
-        self.learning_rate = learning_rate
-        self.max_iter = max_iter
+        self.C = float(C)
+        self.learning_rate = float(learning_rate)
+        self.max_iter = int(max_iter)
         self.class_weight = class_weight
+        self.loss = loss
+        self.tol = float(tol)
         self.random_state = random_state
         self.weights_: Optional[np.ndarray] = None
         self.bias_: float = 0.0
         self.loss_history_: list = []
+        self.n_features_in_: Optional[int] = None
+        self.n_iter_: int = 0
+
+    @property
+    def w_(self) -> Optional[np.ndarray]:
+        return self.weights_
+
+    @w_.setter
+    def w_(self, val: Optional[np.ndarray]) -> None:
+        self.weights_ = val
+
+    @property
+    def b_(self) -> float:
+        return self.bias_
+
+    @b_.setter
+    def b_(self, val: float) -> None:
+        self.bias_ = val
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "LinearSVMFromScratch":
-        """
-        LOGIC HUẤN LUYỆN LINEAR SVM BẰNG PEGASOS / SGD:
-        ----------------------------------------------
-        # Bước 1: Chuyển đổi nhãn y từ {0, 1} sang {-1.0, +1.0} theo chuẩn toán học SVM.
-        # Bước 2: Tính toán trọng số lớp phạt lỗi mất cân bằng nhãn.
-        # Bước 3: Khởi tạo vector trọng số self.weights_ và bias_ = 0.0.
-        # Bước 4: Lặp qua từng vòng lặp (iteration) từ 1 đến max_iter:
-        #         a. Tính khoảng cách có dấu đến siêu phẳng: score = X * w + b.
-        #         b. Tính khoảng lề (margin): margin = 1.0 - y_signed * score.
-        #         c. Xác định các mẫu vi phạm lề (active = margin > 0).
-        #         d. Tính gradient của hàm mất mát Squared Hinge Loss (hoặc Hinge Loss):
-        #            - Với mẫu vi phạm lề: cộng dồn gradient lỗi phân loại kết hợp trọng số mẫu.
-        #            - Kết hợp với gradient điều chuẩn L2: grad_w = (1 / C) * w + grad_loss.
-        #         e. Cập nhật trọng số w và bias theo learning_rate suy giảm theo thời gian.
-        #         f. Ghi nhận giá trị hàm mục tiêu vào loss_history_.
-        # Bước 5: Hoàn tất và lưu giữ siêu phẳng phân tách tối ưu.
-        # Bước 6: Trả về self.
-        """
-        pass
+        n_samples, n_features = _get_shape(X)
+        self.n_features_in_ = n_features
+        y_arr = np.asarray(y, dtype=float).ravel()
+        y_signed = np.where(y_arr == 1.0, 1.0, -1.0)
+
+        if self.class_weight == "balanced":
+            n_0 = max(1, int(np.sum(y_arr == 0.0)))
+            n_1 = max(1, int(np.sum(y_arr == 1.0)))
+            w_0 = n_samples / (2.0 * n_0)
+            w_1 = n_samples / (2.0 * n_1)
+            sample_weights = np.where(y_arr == 1.0, w_1, w_0)
+        else:
+            sample_weights = np.ones(n_samples, dtype=float)
+
+        rng = np.random.default_rng(self.random_state)
+        w = rng.normal(0.0, 0.001, size=n_features).astype(float)
+        b = 0.0
+        self.loss_history_ = []
+        previous_loss = np.inf
+
+        reg_lambda = 1.0 / max(1e-5, self.C * n_samples)
+
+        for epoch in range(1, self.max_iter + 1):
+            scores = _safe_dot(X, w) + b
+            margins = 1.0 - y_signed * scores
+
+            if self.loss == "squared_hinge":
+                active = margins > 0.0
+                grad_w = w.copy()
+                grad_b = 0.0
+
+                if np.any(active):
+                    full_weighted = np.zeros(n_samples, dtype=float)
+                    full_weighted[active] = sample_weights[active] * y_signed[active] * margins[active]
+                    grad_w -= (2.0 * self.C / max(n_samples, 1)) * _safe_transpose_dot(X, full_weighted)
+                    grad_b -= (2.0 * self.C / max(n_samples, 1)) * float(np.sum(full_weighted))
+
+                step_size = self.learning_rate / np.sqrt(epoch)
+                w -= step_size * grad_w
+                b -= step_size * grad_b
+
+                if epoch == 1 or epoch % 5 == 0 or epoch == self.max_iter:
+                    hinge_sq = np.maximum(0.0, margins) ** 2
+                    curr_loss = 0.5 * float(np.dot(w, w)) + self.C * float(np.mean(sample_weights * hinge_sq))
+                    self.loss_history_.append(curr_loss)
+                    if abs(previous_loss - curr_loss) < self.tol:
+                        self.n_iter_ = epoch
+                        break
+                    previous_loss = curr_loss
+            else:
+                # Standard Hinge Loss (Pegasos Subgradient)
+                violations = margins > 0.0
+                subgrad_v = np.where(violations, -sample_weights * y_signed, 0.0)
+
+                grad_w = reg_lambda * w + (1.0 / n_samples) * _safe_transpose_dot(X, subgrad_v)
+                grad_b = float(np.mean(subgrad_v))
+
+                lr = self.learning_rate / np.sqrt(1.0 + 0.01 * epoch)
+                w -= lr * grad_w
+                b -= lr * grad_b
+
+                curr_loss = 0.5 * reg_lambda * float(np.sum(w ** 2)) + (1.0 / n_samples) * float(
+                    np.sum(sample_weights * np.maximum(0.0, margins))
+                )
+                self.loss_history_.append(curr_loss)
+                if abs(previous_loss - curr_loss) < self.tol:
+                    self.n_iter_ = epoch
+                    break
+                previous_loss = curr_loss
+
+            self.n_iter_ = epoch
+
+        self.weights_ = w
+        self.bias_ = b
+        return self
 
     def decision_function(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
-        """
-        LOGIC TÍNH KHOẢNG CÁCH CÓ DẤU ĐẾN SIÊU PHẲNG:
-        ---------------------------------------------
-        # Bước 1: Tính tích vô hướng z = X * self.weights_ + self.bias_.
-        # Bước 2: Trả về mảng 1D khoảng cách điểm quyết định (decision scores).
-        """
-        pass
+        if self.weights_ is None:
+            raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+        return _safe_dot(X, self.weights_) + self.bias_
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
-        """
-        LOGIC CHUYỂN ĐỔI SVM DECISION SCORES SANG XÁC SUẤT BẰNG PLATT SCALING / SIGMOID:
-        -------------------------------------------------------------------------------
-        # Bước 1: Lấy decision scores từ decision_function(X).
-        # Bước 2: Áp dụng hàm Sigmoid chuẩn hóa: prob_spam = 1.0 / (1.0 + exp(-z)).
-        # Bước 3: Trả về ma trận xác suất (N_samples, 2).
-        """
-        pass
+        z = self.decision_function(X)
+        z_clipped = np.clip(z, -30.0, 30.0)
+        prob_spam = 1.0 / (1.0 + np.exp(-z_clipped))
+        prob_ham = 1.0 - prob_spam
+        return np.column_stack([prob_ham, prob_spam])
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.0) -> np.ndarray:
-        """
-        LOGIC RA QUYẾT ĐỊNH DỰ ĐOÁN THEO NGƯỠNG LỀ:
-        ------------------------------------------
-        # Bước 1: Tính decision score z = decision_function(X).
-        # Bước 2: So sánh z >= threshold: Nếu True -> 1 (Spam), False -> 0 (Ham).
-        # Bước 3: Trả về mảng nhãn nhị phân dự đoán.
-        """
-        pass
+        scores = self.decision_function(X)
+        return (scores >= threshold).astype(int)
+
 
 
 class NaiveBayesClassifier:
@@ -182,63 +288,79 @@ class NaiveBayesClassifier:
     """
 
     def __init__(self, alpha: float = 1.0, kind: str = "complement"):
-        """Khởi tạo hệ số làm mịn Laplace alpha và kiểu thuật toán ('complement' hoặc 'multinomial')."""
-        self.alpha = alpha
-        self.kind = kind
+        self.alpha = float(alpha)
+        self.kind = kind.lower()
         self.classes_: Optional[np.ndarray] = None
         self.class_log_prior_: Optional[np.ndarray] = None
         self.feature_log_prob_: Optional[np.ndarray] = None
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "NaiveBayesClassifier":
-        """
-        LOGIC HUẤN LUYỆN NAIVE BAYES DỰA TRÊN ĐỊNH LÝ BAYES:
-        ---------------------------------------------------
-        # Bước 1: Xác định danh sách các lớp duy nhất (classes_: [0, 1]).
-        # Bước 2: Tính log xác suất tiên nghiệm của từng lớp: log P(y=c) = log(N_c / N_total).
-        # Bước 3: Nếu kind == 'multinomial':
-        #         - Tính tổng số lần xuất hiện của từng từ vựng trong lớp c: N_{c, j} = sum_{y == c} X[sample, j].
-        #         - Áp dụng hệ số làm mịn Laplace: theta_{c, j} = (N_{c, j} + alpha) / sum_j (N_{c, j} + alpha).
-        #         - Lấy log xác suất: feature_log_prob_[c, j] = log(theta_{c, j}).
-        # Bước 4: Nếu kind == 'complement' (Complement Naive Bayes - Rennie et al.):
-        #         - Tính tổng số lần xuất hiện của từng từ trong tất cả các lớp NGOẠI TRỪ lớp c (tập phần bù):
-        #           N_{comp, j} = sum_{y != c} X[sample, j].
-        #         - Làm mịn Laplace: theta_{c, j} = (N_{comp, j} + alpha) / sum_j (N_{comp, j} + alpha).
-        #         - Tính trọng số đặc trưng: w_{c, j} = -log(theta_{c, j}).
-        #         - Chuẩn hóa L1 norm theo từng lớp để triệt tiêu ảnh hưởng của độ dài văn bản.
-        # Bước 5: Lưu trữ trọng số vào self.feature_log_prob_ và trả về self.
-        """
-        pass
+        n_samples, n_features = _get_shape(X)
+        y_arr = np.asarray(y, dtype=int).ravel()
+        self.classes_ = np.unique(y_arr)
+        if len(self.classes_) != 2:
+            self.classes_ = np.array([0, 1], dtype=int)
+
+        self.class_log_prior_ = np.array(
+            [np.log(max(1, int(np.sum(y_arr == c))) / n_samples) for c in self.classes_],
+            dtype=float,
+        )
+
+        feature_log_prob = []
+        for c in self.classes_:
+            if self.kind == "multinomial":
+                mask = (y_arr == c).astype(float)
+                counts = _safe_transpose_dot(X, mask)
+                smoothed = counts + self.alpha
+                total = float(np.sum(smoothed))
+                prob = smoothed / total
+                feature_log_prob.append(np.log(prob))
+            else:
+                # Complement Naive Bayes: học trên tập phần bù (y != c)
+                mask = (y_arr != c).astype(float)
+                counts = _safe_transpose_dot(X, mask)
+                smoothed = counts + self.alpha
+                total = float(np.sum(smoothed))
+                feature_log_prob.append(np.log(smoothed / total))
+
+        self.feature_log_prob_ = np.array(feature_log_prob, dtype=float)
+        return self
+
+    def decision_scores(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
+        if self.feature_log_prob_ is None or self.class_log_prior_ is None:
+            raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+
+        scores_list = []
+        for idx, _ in enumerate(self.classes_):
+            if self.kind == "multinomial":
+                score = _safe_dot(X, self.feature_log_prob_[idx]) + self.class_log_prior_[idx]
+            else:
+                # Complement Naive Bayes chuẩn: - sum(x_j * log(theta_complement)) + log(prior)
+                score = -_safe_dot(X, self.feature_log_prob_[idx]) + self.class_log_prior_[idx]
+            scores_list.append(score)
+        return np.column_stack(scores_list)
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
-        """
-        LOGIC TÍNH XÁC SUẤT HẬU NGHIỆM P(y|x):
-        -------------------------------------
-        # Bước 1: Tính log likelihood cho từng lớp: log_likelihood = X * feature_log_prob_.T + class_log_prior_.
-        # Bước 2: Ổn định số học bằng cách trừ đi giá trị cực đại trên từng dòng.
-        # Bước 3: Áp dụng hàm Softmax để chuyển về phân phối xác suất [0.0, 1.0].
-        # Bước 4: Trả về ma trận xác suất kích thước (N_samples, 2).
-        """
-        pass
+        scores = self.decision_scores(X)
+        max_s = np.max(scores, axis=1, keepdims=True)
+        exp_s = np.exp(np.clip(scores - max_s, -30.0, 30.0))
+        probs = exp_s / np.sum(exp_s, axis=1, keepdims=True)
+        return probs
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.5) -> np.ndarray:
-        """
-        LOGIC DỰ ĐOÁN NHÃN VỚI NGƯỠNG:
-        -----------------------------
-        # Bước 1: Lấy xác suất dự đoán lớp Spam từ predict_proba(X)[:, 1].
-        # Bước 2: So sánh với ngưỡng threshold -> Gán nhãn 1 (Spam) hoặc 0 (Ham).
-        # Bước 3: Trả về vector nhãn nhị phân dự đoán.
-        """
-        pass
+        probs = self.predict_proba(X)[:, 1]
+        return (probs >= threshold).astype(int)
 
 
 def get_baseline_models(config: Optional[Any] = None) -> Dict[str, Any]:
-    """
-    LOGIC KHỞI TẠO BỘ 3 MÔ HÌNH BASELINE THEO ĐÚNG ĐỀ BÀI YÊU CẦU:
-    --------------------------------------------------------------
-    # Bước 1: Khởi tạo mô hình 1 - LogisticRegressionFromScratch (hoặc sklearn LogisticRegression).
-    # Bước 2: Khởi tạo mô hình 2 - LinearSVMFromScratch (hoặc sklearn LinearSVC).
-    # Bước 3: Khởi tạo mô hình 3 - NaiveBayesClassifier (hoặc sklearn ComplementNB).
-    # Bước 4: Đóng gói vào một Dictionary với các key: 'logistic_regression', 'svm', 'naive_bayes'.
-    # Bước 5: Trả về Dictionary 3 mô hình sẵn sàng cho giai đoạn Model Training.
-    """
-    pass
+    """Khởi tạo 3 mô hình cốt lõi theo đúng đề bài quy định."""
+    return {
+        "logistic_regression": LogisticRegressionFromScratch(
+            C=1.0, learning_rate=0.1, max_iter=300, class_weight="balanced"
+        ),
+        "svm": LinearSVMFromScratch(
+            C=1.0, learning_rate=0.05, max_iter=150, class_weight="balanced"
+        ),
+        "naive_bayes": NaiveBayesClassifier(alpha=1.0, kind="complement"),
+    }
+
