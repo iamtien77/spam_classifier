@@ -32,7 +32,7 @@ class SpamModelEvaluator:
     @staticmethod
     def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
         """Hàm chia an toàn tránh lỗi ZeroDivisionError."""
-        pass
+        return float(numerator / denominator) if denominator != 0 else float(default)
 
     def compute_confusion_matrix(
         self,
@@ -49,7 +49,18 @@ class SpamModelEvaluator:
         # Bước 5: Đếm số lượng mẫu dương tính thật (True Positive - TP): (y_true == 1) & (y_pred == 1) [Bắt đúng Spam].
         # Bước 6: Trả về ma trận 2x2: [[TN, FP], [FN, TP]] dạng np.ndarray(dtype=int).
         """
-        pass
+        y_true = np.asarray(y_true, dtype=int).ravel()
+        y_pred = np.asarray(y_pred, dtype=int).ravel()
+        if len(y_true) != len(y_pred):
+            raise ValueError("y_true và y_pred phải có cùng số mẫu.")
+        if not np.all(np.isin(y_true, [0, 1])) or not np.all(np.isin(y_pred, [0, 1])):
+            raise ValueError("Nhãn phải là 0 (Ham) hoặc 1 (Spam).")
+
+        tn = np.sum((y_true == 0) & (y_pred == 0))
+        fp = np.sum((y_true == 0) & (y_pred == 1))
+        fn = np.sum((y_true == 1) & (y_pred == 0))
+        tp = np.sum((y_true == 1) & (y_pred == 1))
+        return np.array([[tn, fp], [fn, tp]], dtype=int)
 
     def compute_all_metrics(
         self,
@@ -74,7 +85,64 @@ class SpamModelEvaluator:
         #           AUC = sum_i (FPR_{i+1} - FPR_i) * (TPR_i + TPR_{i+1}) / 2.
         # Bước 9: Đóng gói toàn bộ các chỉ số vào Dictionary và trả về.
         """
-        pass
+        confusion_matrix = self.compute_confusion_matrix(y_true, y_pred)
+        tn, fp, fn, tp = confusion_matrix.ravel().tolist()
+        if not np.isfinite(beta) or beta <= 0:
+            raise ValueError("beta phải là số dương hữu hạn.")
+
+        accuracy = self.safe_divide(tp + tn, tp + tn + fp + fn)
+        precision = self.safe_divide(tp, tp + fp)
+        recall = self.safe_divide(tp, tp + fn)
+        f1 = self.safe_divide(2 * precision * recall, precision + recall)
+        beta_squared = beta ** 2
+        f_beta = self.safe_divide(
+            (1 + beta_squared) * precision * recall,
+            beta_squared * precision + recall,
+        )
+        specificity = self.safe_divide(tn, tn + fp)
+        fpr = self.safe_divide(fp, fp + tn)
+
+        # AUC không xác định nếu thiếu xác suất hoặc tập dữ liệu chỉ có một lớp.
+        roc_auc = None
+        if y_prob is not None:
+            labels = np.asarray(y_true, dtype=int).ravel()
+            probs = np.asarray(y_prob, dtype=float).ravel()
+            if len(probs) != len(labels) or not np.all(np.isfinite(probs)):
+                raise ValueError("y_prob phải hữu hạn và có cùng số mẫu với y_true.")
+
+            positives = tp + fn
+            negatives = tn + fp
+            if positives > 0 and negatives > 0:
+                fpr_points = [0.0]
+                tpr_points = [0.0]
+                # Xét cùng lúc các mẫu có xác suất bằng nhau tại mỗi ngưỡng.
+                for threshold in np.unique(probs)[::-1]:
+                    predicted_spam = probs >= threshold
+                    fpr_points.append(float(np.sum((labels == 0) & predicted_spam) / negatives))
+                    tpr_points.append(float(np.sum((labels == 1) & predicted_spam) / positives))
+
+                roc_auc = sum(
+                    (fpr_points[i] - fpr_points[i - 1])
+                    * (tpr_points[i] + tpr_points[i - 1]) / 2
+                    for i in range(1, len(fpr_points))
+                )
+
+        return {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "f_beta": f_beta,
+            "specificity": specificity,
+            "tpr": recall,
+            "fpr": fpr,
+            "roc_auc": roc_auc,
+            "confusion_matrix": confusion_matrix,
+            "tn": tn,
+            "fp": fp,
+            "fn": fn,
+            "tp": tp,
+        }
 
     def build_comparison_summary(
         self,
@@ -88,4 +156,15 @@ class SpamModelEvaluator:
         # Bước 3: Tạo DataFrame đối chiếu rõ ràng giữa các thuật toán phân loại theo yêu cầu đề bài.
         # Bước 4: Sắp xếp theo thứ tự ưu tiên (F1-score hoặc Accuracy) và trả về bảng tổng hợp.
         """
-        pass
+        metric_names = ["accuracy", "precision", "recall", "f1", "roc_auc"]
+        rows = []
+        for model_name, metrics in model_results.items():
+            row = {"model_name": model_name}
+            for metric in metric_names:
+                row[metric] = metrics.get(metric)
+            rows.append(row)
+
+        summary = pd.DataFrame(rows, columns=["model_name"] + metric_names)
+        return summary.sort_values(
+            by=["f1", "accuracy"], ascending=False,
+        ).reset_index(drop=True)

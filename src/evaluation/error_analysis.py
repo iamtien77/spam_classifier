@@ -21,7 +21,7 @@ def extract_misclassified_samples(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_prob: Optional[np.ndarray] = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     LOGIC TRÍCH XUẤT CÁC MẪU DỰ ĐOÁN SAI:
     -------------------------------------
@@ -32,7 +32,23 @@ def extract_misclassified_samples(
     #         fn_df = df[(y_true == 1) & (y_pred == 0)].
     # Bước 4: Trả về cặp DataFrame (fp_df, fn_df).
     """
-    pass
+    y_true = np.asarray(y_true, dtype=int).ravel()
+    y_pred = np.asarray(y_pred, dtype=int).ravel()
+    if len(test_df) != len(y_true) or len(y_true) != len(y_pred):
+        raise ValueError("test_df, y_true và y_pred phải có cùng số mẫu.")
+
+    df = test_df.copy()
+    df["y_true"] = y_true
+    df["y_pred"] = y_pred
+    if y_prob is not None:
+        probs = np.asarray(y_prob, dtype=float).ravel()
+        if len(probs) != len(df):
+            raise ValueError("y_prob phải có cùng số mẫu với test_df.")
+        df["y_prob"] = probs
+
+    fp_df = df[(df["y_true"] == 0) & (df["y_pred"] == 1)].copy()
+    fn_df = df[(df["y_true"] == 1) & (df["y_pred"] == 0)].copy()
+    return fp_df, fn_df
 
 
 def profile_error_patterns(
@@ -53,4 +69,50 @@ def profile_error_patterns(
     # Bước 4: Nếu có save_csv_path: lưu kết quả ra file CSV để phục vụ báo cáo đồ án.
     # Bước 5: Trả về DataFrame phân tích lỗi sai chi tiết.
     """
-    pass
+    fp_df = fp_df.copy()
+    fn_df = fn_df.copy()
+    fp_df["error_type"] = "FP"
+    fn_df["error_type"] = "FN"
+    errors = pd.concat([fp_df, fn_df], ignore_index=True)
+
+    # Dùng văn bản gốc để giữ chữ hoa và URL trước bước tiền xử lý.
+    text_column = "raw_text" if "raw_text" in errors.columns else "text"
+    if text_column in errors.columns:
+        texts = errors[text_column].fillna("").astype(str)
+    elif errors.empty:
+        texts = pd.Series([], dtype=str)
+    else:
+        raise ValueError("Dữ liệu phải có cột raw_text hoặc text.")
+
+    errors["text_length"] = texts.str.len()
+    errors["word_count"] = texts.str.split().str.len()
+    errors["uppercase_count"] = [sum(char.isupper() for char in text) for text in texts]
+    for keyword in ["free", "win", "call"]:
+        errors[f"has_{keyword}"] = texts.str.contains(r"\b" + keyword + r"\b", case=False)
+    errors["has_url"] = texts.str.contains(r"https?://|www\.", case=False)
+    errors["mean_text_length"] = errors.groupby("error_type")["text_length"].transform("mean")
+
+    # Các lý do dưới đây là dấu hiệu nghi ngờ, không phải kết luận nguyên nhân.
+    suspected_reasons = []
+    for _, row in errors.iterrows():
+        reasons = []
+        keywords = [keyword for keyword in ["free", "win", "call"] if row[f"has_{keyword}"]]
+        if row["error_type"] == "FP" and keywords:
+            reasons.append("Ham chứa từ khóa dễ gây nhầm: " + ", ".join(keywords))
+        if row["error_type"] == "FN":
+            if row["word_count"] < 5:
+                reasons.append("Nội dung ngắn, ít đặc trưng từ vựng")
+            if not keywords:
+                reasons.append("Thiếu từ khóa spam phổ biến")
+        if row["uppercase_count"] >= 3:
+            reasons.append("Có nhiều chữ in hoa")
+        if row["has_url"]:
+            reasons.append("Có liên kết URL")
+        suspected_reasons.append("; ".join(reasons) or "Cần xem lại nội dung và đặc trưng mô hình")
+    errors["suspected_reason"] = suspected_reasons
+
+    if save_csv_path is not None:
+        save_csv_path = Path(save_csv_path)
+        save_csv_path.parent.mkdir(parents=True, exist_ok=True)
+        errors.to_csv(save_csv_path, index=False, encoding="utf-8-sig")
+    return errors
