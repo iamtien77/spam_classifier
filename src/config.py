@@ -29,11 +29,17 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 RAW_DATA_FILE = RAW_DATA_DIR / "spam.csv"
 CLEAN_DATA_FILE = PROCESSED_DATA_DIR / "spam_clean.csv"
 
-# Thư mục kết quả đầu ra
+# Thư mục kết quả đầu ra chính thức (Pipeline Production - main.py)
 RESULTS_DIR = BASE_DIR / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
 METRICS_DIR = RESULTS_DIR / "metrics"
 SAVED_MODELS_DIR = RESULTS_DIR / "saved_models"
+
+# Thư mục kết quả thực nghiệm dành riêng cho Jupyter Notebooks
+NOTEBOOK_RESULTS_DIR = BASE_DIR / "notebooks" / "results"
+NOTEBOOK_FIGURES_DIR = NOTEBOOK_RESULTS_DIR / "figures"
+NOTEBOOK_METRICS_DIR = NOTEBOOK_RESULTS_DIR / "metrics"
+NOTEBOOK_SAVED_MODELS_DIR = NOTEBOOK_RESULTS_DIR / "saved_models"
 
 # Thư mục logs
 LOGS_DIR = BASE_DIR / "logs"
@@ -41,7 +47,18 @@ LOGS_DIR = BASE_DIR / "logs"
 
 def ensure_directories() -> None:
     """Tự động khởi tạo tất cả các thư mục cần thiết trong hệ thống."""
-    for directory in [RAW_DATA_DIR, PROCESSED_DATA_DIR, FIGURES_DIR, METRICS_DIR, SAVED_MODELS_DIR, LOGS_DIR]:
+    directories = [
+        RAW_DATA_DIR,
+        PROCESSED_DATA_DIR,
+        FIGURES_DIR,
+        METRICS_DIR,
+        SAVED_MODELS_DIR,
+        NOTEBOOK_FIGURES_DIR,
+        NOTEBOOK_METRICS_DIR,
+        NOTEBOOK_SAVED_MODELS_DIR,
+        LOGS_DIR,
+    ]
+    for directory in directories:
         directory.mkdir(parents=True, exist_ok=True)
 
 

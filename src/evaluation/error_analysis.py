@@ -11,28 +11,44 @@ Module này đảm nhiệm việc mổ xẻ nguyên nhân sai lệch của mô h
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+import re
 import numpy as np
 import pandas as pd
 
 
 def extract_misclassified_samples(
-    test_df: pd.DataFrame,
+    test_df: Any,
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_prob: Optional[np.ndarray] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    LOGIC TRÍCH XUẤT CÁC MẪU DỰ ĐOÁN SAI:
-    -------------------------------------
-    # Bước 1: Tạo bản sao DataFrame kiểm tra kèm theo các cột nhãn thực tế, nhãn dự đoán và xác suất.
-    # Bước 2: Lọc tập False Positives (FP):
-    #         fp_df = df[(y_true == 0) & (y_pred == 1)].
-    # Bước 3: Lọc tập False Negatives (FN):
-    #         fn_df = df[(y_true == 1) & (y_pred == 0)].
-    # Bước 4: Trả về cặp DataFrame (fp_df, fn_df).
-    """
-    pass
+    """Trích xuất danh sách các mẫu False Positives (FP) và False Negatives (FN)."""
+    if isinstance(test_df, list):
+        df = pd.DataFrame(test_df)
+    else:
+        df = test_df.copy()
+
+    y_true_arr = np.asarray(y_true, dtype=int).ravel()
+    y_pred_arr = np.asarray(y_pred, dtype=int).ravel()
+
+    df["actual_label"] = np.where(y_true_arr == 1, "Spam", "Ham")
+    df["predicted_label"] = np.where(y_pred_arr == 1, "Spam", "Ham")
+
+    if y_prob is not None:
+        probs = np.asarray(y_prob, dtype=float).ravel()
+        df["spam_probability"] = np.round(probs, 4)
+
+    fp_mask = (y_true_arr == 0) & (y_pred_arr == 1)
+    fn_mask = (y_true_arr == 1) & (y_pred_arr == 0)
+
+    fp_df = df[fp_mask].copy()
+    fp_df["error_type"] = "False Positive (Chặn nhầm)"
+
+    fn_df = df[fn_mask].copy()
+    fn_df["error_type"] = "False Negative (Lọt lưới)"
+
+    return fp_df, fn_df
 
 
 def profile_error_patterns(
@@ -40,17 +56,52 @@ def profile_error_patterns(
     fn_df: pd.DataFrame,
     save_csv_path: Optional[Path] = None,
 ) -> pd.DataFrame:
-    """
-    LOGIC THỐNG KÊ VÀ LẬP HỒ SƠ NGUYÊN NHÂN LỖI SAI:
-    -------------------------------------------------
-    # Bước 1: Phân tích nhóm False Positives (Ham bị chặn nhầm):
-    #         - Độ dài văn bản trung bình, số lượng chữ in hoa, có chứa từ khóa 'free', 'win', 'call' hay không.
-    #         - Xác định các từ ngữ dễ gây nhầm lẫn khiến mô hình kích hoạt nhầm.
-    # Bước 2: Phân tích nhóm False Negatives (Spam lọt lưới):
-    #         - Kiểm tra các thủ thuật lách spam của người gửi (ví dụ: dùng tiếng lóng, viết cố tình sai chính tả,
-    #           nội dung quá ngắn không đủ đặc trưng từ vựng).
-    # Bước 3: Tổng hợp danh sách tất cả các email dự đoán sai kèm lý do nghi ngờ vào một DataFrame duy nhất.
-    # Bước 4: Nếu có save_csv_path: lưu kết quả ra file CSV để phục vụ báo cáo đồ án.
-    # Bước 5: Trả về DataFrame phân tích lỗi sai chi tiết.
-    """
-    pass
+    """Thống kê và phân tích nguyên nhân gây ra các mẫu dự đoán sai."""
+    combined_errors = pd.concat([fp_df, fn_df], ignore_index=True) if not (fp_df.empty and fn_df.empty) else pd.DataFrame()
+
+    if combined_errors.empty:
+        return pd.DataFrame()
+
+    text_col = "text" if "text" in combined_errors.columns else ("raw_text" if "raw_text" in combined_errors.columns else combined_errors.columns[0])
+
+    suspected_causes = []
+    keywords_pattern = re.compile(r"\b(free|win|prize|claim|urgent|cash|call|offer|money|winner)\b", re.IGNORECASE)
+
+    for _, row in combined_errors.iterrows():
+        text = str(row.get(text_col, ""))
+        err_type = str(row.get("error_type", ""))
+        kw_matches = keywords_pattern.findall(text)
+        exclamation_count = text.count("!")
+        upper_count = sum(1 for c in text if c.isupper())
+        total_chars = max(1, len(text))
+        upper_ratio = upper_count / total_chars
+
+        cause = []
+        if "False Positive" in err_type:
+            if kw_matches:
+                cause.append(f"Dính từ khóa nhạy cảm ({', '.join(set(kw_matches))})")
+            if upper_ratio > 0.2:
+                cause.append(f"Tỷ lệ chữ hoa cao ({upper_ratio:.1%})")
+            if exclamation_count >= 2:
+                cause.append(f"Dấu chấm than ({exclamation_count})")
+            if not cause:
+                cause.append("Đặc trưng từ vựng trùng lặp với tập Spam")
+        else:
+            if len(text.split()) < 5:
+                cause.append("Email quá ngắn, thiếu từ khóa")
+            if not kw_matches:
+                cause.append("Spam tinh vi, không dùng từ khóa lộ liễu")
+            if not cause:
+                cause.append("Xác suất spam dưới ngưỡng quyết định")
+
+        suspected_causes.append("; ".join(cause))
+
+    combined_errors["suspected_cause"] = suspected_causes
+
+    if save_csv_path:
+        save_path = Path(save_csv_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        combined_errors.to_csv(save_path, index=False, encoding="utf-8-sig")
+
+    return combined_errors
+

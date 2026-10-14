@@ -1,30 +1,97 @@
-"""
-test_evaluation.py - Unit test logic cho module evaluation
-Dựa trên kiến trúc đánh giá từ Classification_email_spam.ipynb
-"""
+import sys
+from pathlib import Path
+import unittest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import numpy as np
+import pandas as pd
+from src.evaluation.metrics import SpamModelEvaluator
+from src.evaluation.error_analysis import extract_misclassified_samples, profile_error_patterns
+
 
 def test_confusion_matrix_manual():
-    """
-    LOGIC KIỂM THỬ MA TRẬN NHẦM LẪN THỦ CÔNG:
-    - Kiểm tra đếm chính xác số lượng TN, FP, FN, TP trên vector nhãn kiểm thử.
-    - Đảm bảo tổng ma trận bằng đúng số lượng mẫu kiểm thử.
-    """
-    pass
+    """Kiểm tra đếm ma trận nhầm lẫn thủ công."""
+    evaluator = SpamModelEvaluator()
+    y_true = np.array([1, 0, 1, 1, 0, 0, 1, 0])
+    y_pred = np.array([1, 0, 1, 0, 0, 1, 1, 0])
+
+    cm = evaluator.compute_confusion_matrix(y_true, y_pred)
+    assert cm.shape == (2, 2)
+    assert cm[0, 0] == 3  # TN: y=0, pred=0
+    assert cm[0, 1] == 1  # FP: y=0, pred=1
+    assert cm[1, 0] == 1  # FN: y=1, pred=0
+    assert cm[1, 1] == 3  # TP: y=1, pred=1
+    assert int(np.sum(cm)) == len(y_true)
 
 
 def test_fbeta_score_calculation():
-    """
-    LOGIC KIỂM THỬ ĐIỂM F-BETA (BETA=2.0):
-    - Kiểm tra công thức F-beta phạt nặng hơn khi có False Negative.
-    - Đảm bảo giá trị nằm trong đoạn [0.0, 1.0].
-    """
-    pass
+    """Kiểm tra tính điểm F-Beta (Beta=2.0)."""
+    evaluator = SpamModelEvaluator()
+    y_true = np.array([1, 1, 1, 0, 0, 0])
+    y_pred = np.array([1, 1, 0, 0, 0, 0])
+
+    metrics = evaluator.compute_all_metrics(y_true, y_pred, beta=2.0)
+    assert "f_beta" in metrics
+    assert "f1" in metrics
+    assert 0.0 <= metrics["f_beta"] <= 1.0
+
+    # P = 2/2 = 1.0, R = 2/3 = 0.6667
+    # Với beta=2.0, Recall được coi trọng hơn Precision -> F2 < F1
+    assert metrics["f_beta"] < metrics["f1"]
 
 
 def test_trapezoidal_roc_auc():
-    """
-    LOGIC KIỂM THỬ TÍCH PHÂN ROC-AUC HÌNH THANG:
-    - Kiểm tra tính AUC cho một bộ điểm FPR/TPR mẫu.
-    - So sánh kết quả xấp xỉ chính xác với công thức hình học chuẩn.
-    """
-    pass
+    """Kiểm tra tính ROC-AUC."""
+    evaluator = SpamModelEvaluator()
+    y_true = np.array([1, 1, 0, 0])
+    y_prob = np.array([0.9, 0.8, 0.2, 0.1])
+
+    metrics = evaluator.compute_all_metrics(y_true, y_pred=[1, 1, 0, 0], y_prob=y_prob)
+    assert metrics["roc_auc"] == 1.0
+
+
+def test_error_analysis_extraction():
+    """Kiểm tra bóc tách mẫu phân loại sai FP và FN."""
+    test_df = pd.DataFrame({
+        "text": [
+            "Normal work email about meeting",
+            "Win free money claim prize now",
+            "Hey free tickets call me",
+            "Secret urgent notification",
+        ]
+    })
+    y_true = np.array([0, 1, 0, 1])
+    y_pred = np.array([0, 1, 1, 0])  # Mẫu 2 bị FP, Mẫu 3 bị FN
+    y_prob = np.array([0.1, 0.95, 0.8, 0.2])
+
+    fp_df, fn_df = extract_misclassified_samples(test_df, y_true, y_pred, y_prob)
+    assert len(fp_df) == 1
+    assert len(fn_df) == 1
+    assert fp_df.iloc[0]["error_type"] == "False Positive (Chặn nhầm)"
+    assert fn_df.iloc[0]["error_type"] == "False Negative (Lọt lưới)"
+
+    profile_df = profile_error_patterns(fp_df, fn_df)
+    assert len(profile_df) == 2
+    assert "suspected_cause" in profile_df.columns
+
+
+class TestEvaluationModule(unittest.TestCase):
+    def test_cm_case(self):
+        test_confusion_matrix_manual()
+
+    def test_fbeta_case(self):
+        test_fbeta_score_calculation()
+
+    def test_roc_auc_case(self):
+        test_trapezoidal_roc_auc()
+
+    def test_error_case(self):
+        test_error_analysis_extraction()
+
+
+if __name__ == "__main__":
+    unittest.main()
+

@@ -19,9 +19,11 @@ Module này đóng gói dịch vụ SpamInferenceService sẵn sàng đưa vào 
 """
 
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
+from src.models.persistence import load_spam_pipeline
 
 
 class SpamInferenceService:
@@ -38,58 +40,110 @@ class SpamInferenceService:
     ):
         """Khởi tạo dịch vụ từ pipeline bundle đã đóng gói sẵn hoặc nạp từ file .joblib."""
         self.pipeline_bundle = pipeline_bundle
-        self.bundle_path = bundle_path
+        self.bundle_path = Path(bundle_path) if bundle_path is not None else Path("results/saved_models/spam_pipeline.joblib")
+        self.model = None
+        self.text_processor = None
+        self.feature_builder = None
+        self.threshold = 0.5
 
     def load_service(self) -> "SpamInferenceService":
-        """
-        LOGIC KHỞI ĐỘNG DỊCH VỤ VÀ NẠP MODEL ARTIFACT:
-        ----------------------------------------------
-        # Bước 1: Nếu pipeline_bundle chưa có, gọi load_spam_pipeline(self.bundle_path).
-        # Bước 2: Trích xuất các đối tượng thành phần:
-        #         - model = bundle['model']
-        #         - text_processor = bundle['text_processor']
-        #         - feature_builder = bundle['feature_builder']
-        #         - threshold = bundle['best_threshold']
-        # Bước 3: Đảm bảo dịch vụ sẵn sàng nhận yêu cầu suy luận.
-        # Bước 4: Trả về self.
-        """
-        pass
+        """Khởi động dịch vụ và nạp model artifacts."""
+        if self.pipeline_bundle is None:
+            self.pipeline_bundle = load_spam_pipeline(self.bundle_path)
+
+        self.model = self.pipeline_bundle.get("model")
+        self.threshold = float(self.pipeline_bundle.get("best_threshold", 0.5))
+        self.text_processor = self.pipeline_bundle.get("text_processor")
+        self.feature_builder = self.pipeline_bundle.get("feature_builder")
+        self.selected_indices = self.pipeline_bundle.get("selected_indices", None)
+
+        if self.model is None:
+            raise ValueError("Không tìm thấy mô hình trong pipeline bundle.")
+
+        return self
+
+    def _extract_signals(self, email_text: str) -> List[str]:
+        """Trích xuất danh sách tín hiệu cảnh báo trong email."""
+        signals = []
+        kw_pattern = re.compile(r"\b(free|win|prize|claim|urgent|cash|call|offer|money|winner|credit|guaranteed|click)\b", re.IGNORECASE)
+        found_kw = kw_pattern.findall(email_text)
+        if found_kw:
+            signals.append(f"Từ khóa nhạy cảm: {', '.join(sorted(set(k.lower() for k in found_kw)))}")
+
+        if re.search(r"https?://\S+|www\.\S+", email_text, re.IGNORECASE):
+            signals.append("Chứa liên kết web (URL)")
+
+        exclamations = email_text.count("!")
+        if exclamations >= 2:
+            signals.append(f"Dấu chấm than lặp lại ({exclamations} lần)")
+
+        dollar_signs = email_text.count("$") + email_text.count("£") + email_text.count("€")
+        if dollar_signs > 0:
+            signals.append(f"Ký hiệu tiền tệ ({dollar_signs} lần)")
+
+        upper_chars = sum(1 for c in email_text if c.isupper())
+        total_chars = max(1, len(email_text))
+        if (upper_chars / total_chars) > 0.25 and total_chars > 20:
+            signals.append(f"Tỷ lệ chữ in hoa cao ({(upper_chars / total_chars):.1%})")
+
+        return signals
 
     def predict_single(self, email_text: str) -> Dict[str, Any]:
-        """
-        LOGIC PHÂN LOẠI MỘT EMAIL MỚI DUY NHẤT THEO ĐỀ BÀI:
-        ---------------------------------------------------
-        # Bước 1: Tiếp nhận chuỗi email_text thô từ người dùng.
-        # Bước 2: Tạo DataFrame 1 dòng chứa email thô.
-        # Bước 3: Đưa qua bộ tiền xử lý và trích xuất ma trận đặc trưng lai (X_csr).
-        # Bước 4: Dự đoán xác suất email là Spam: prob_spam = model.predict_proba(X_csr)[0, 1].
-        # Bước 5: So sánh prob_spam với best_threshold:
-        #         - Nếu prob_spam >= best_threshold -> label = 'SPAM'.
-        #         - Ngược lại -> label = 'NOT SPAM / HAM'.
-        # Bước 6: Trích xuất các tín hiệu cảnh báo phát hiện được trong email:
-        #         - Các từ khóa spam xuất hiện (ví dụ: 'free', 'win', 'urgent').
-        #         - Có chứa link URL, tỷ lệ chữ in hoa cao, dấu chấm than liên tiếp.
-        # Bước 7: Trả về kết quả chẩn đoán Dictionary:
-        #         {
-        #             'raw_text': email_text,
-        #             'prediction': label,
-        #             'is_spam': bool(label == 'SPAM'),
-        #             'spam_probability': float(prob_spam),
-        #             'threshold_used': float(threshold),
-        #             'risk_level': 'Cao' / 'Trung bình' / 'Thấp',
-        #             'detected_signals': list_of_signals
-        #         }
-        """
-        pass
+        """Phân loại một email mới duy nhất."""
+        if self.model is None:
+            self.load_service()
+
+        signals = self._extract_signals(email_text)
+
+        # Trích xuất đặc trưng
+        if self.feature_builder is not None:
+            X_input = self.feature_builder.transform([{"text": email_text, "raw_text": email_text}])
+            if hasattr(X_input, "to_scipy_csr"):
+                X_mat = X_input.to_scipy_csr()
+            else:
+                X_mat = X_input
+            if self.selected_indices is not None:
+                sel_idx = np.asarray(self.selected_indices, dtype=int)
+                if X_mat.shape[1] >= len(sel_idx) and X_mat.shape[1] != len(sel_idx):
+                    X_mat = X_mat[:, sel_idx]
+        else:
+            raise RuntimeError("Dịch vụ chưa được nạp feature_builder để xử lý văn bản.")
+
+        # Dự đoán xác suất
+        if hasattr(self.model, "predict_proba"):
+            proba = self.model.predict_proba(X_mat)
+            prob_spam = float(proba[0, 1])
+        elif hasattr(self.model, "decision_function"):
+            score = float(self.model.decision_function(X_mat)[0])
+            prob_spam = float(1.0 / (1.0 + np.exp(-np.clip(score, -30.0, 30.0))))
+        else:
+            pred = int(self.model.predict(X_mat)[0])
+            prob_spam = float(pred)
+
+        is_spam = bool(prob_spam >= self.threshold)
+        label = "SPAM" if is_spam else "NOT SPAM / HAM"
+
+        if prob_spam >= 0.80:
+            risk_level = "Rất cao"
+        elif is_spam:
+            risk_level = "Cao"
+        elif prob_spam >= self.threshold * 0.6:
+            risk_level = "Trung bình"
+        else:
+            risk_level = "Thấp"
+
+        return {
+            "raw_text": email_text,
+            "prediction": label,
+            "is_spam": is_spam,
+            "spam_probability": round(prob_spam, 4),
+            "threshold_used": round(self.threshold, 4),
+            "risk_level": risk_level,
+            "detected_signals": signals,
+        }
 
     def predict_batch(self, email_list: List[str]) -> pd.DataFrame:
-        """
-        LOGIC PHÂN LOẠI HÀNG LOẠT NHIỀU EMAIL (BATCH INFERENCE):
-        ---------------------------------------------------------
-        # Bước 1: Nhận danh sách nhiều chuỗi email.
-        # Bước 2: Tiền xử lý và trích xuất ma trận đặc trưng cho toàn bộ danh sách một lượt (vectorized).
-        # Bước 3: Dự đoán xác suất hàng loạt bằng model.predict_proba(X_batch).
-        # Bước 4: Tạo DataFrame tổng hợp kết quả dự đoán cho từng email.
-        # Bước 5: Trả về bảng kết quả phân loại.
-        """
-        pass
+        """Phân loại danh sách nhiều email hàng loạt."""
+        results = [self.predict_single(email) for email in email_list]
+        return pd.DataFrame(results)
+
