@@ -39,8 +39,12 @@ class SpamModelEvaluator:
         y_true: Union[List[int], np.ndarray],
         y_pred: Union[List[int], np.ndarray],
     ) -> np.ndarray:
-        y_true_arr = np.asarray(y_true, dtype=int).ravel()
-        y_pred_arr = np.asarray(y_pred, dtype=int).ravel()
+        y_true_arr = np.asarray(y_true).ravel()
+        y_pred_arr = np.asarray(y_pred).ravel()
+        if not len(y_true_arr) or len(y_true_arr) != len(y_pred_arr):
+            raise ValueError("y_true và y_pred phải không rỗng và có cùng độ dài.")
+        if not np.all(np.isin(y_true_arr, [0, 1])) or not np.all(np.isin(y_pred_arr, [0, 1])):
+            raise ValueError("Nhãn đánh giá phải là 0 hoặc 1.")
         tn = int(np.sum((y_true_arr == 0) & (y_pred_arr == 0)))
         fp = int(np.sum((y_true_arr == 0) & (y_pred_arr == 1)))
         fn = int(np.sum((y_true_arr == 1) & (y_pred_arr == 0)))
@@ -55,6 +59,8 @@ class SpamModelEvaluator:
         beta: float = 2.0,
     ) -> Dict[str, Any]:
         cm = self.compute_confusion_matrix(y_true, y_pred)
+        if not np.isfinite(beta) or beta <= 0:
+            raise ValueError("beta phải hữu hạn và dương.")
         tn, fp = int(cm[0, 0]), int(cm[0, 1])
         fn, tp = int(cm[1, 0]), int(cm[1, 1])
         total = tn + fp + fn + tp
@@ -72,11 +78,20 @@ class SpamModelEvaluator:
         if y_prob is not None:
             probs = np.asarray(y_prob, dtype=float).ravel()
             y_arr = np.asarray(y_true, dtype=int).ravel()
+            if (len(probs) != len(y_arr) or not np.all(np.isfinite(probs))
+                    or np.any((probs < 0) | (probs > 1))):
+                raise ValueError("y_prob phải cùng độ dài với y_true và chứa xác suất hữu hạn thuộc [0, 1].")
             n_pos = int(np.sum(y_arr == 1))
             n_neg = int(np.sum(y_arr == 0))
             if n_pos > 0 and n_neg > 0:
-                # Tính ROC-AUC bằng Mann-Whitney U test (chính xác tuyệt đối)
-                ranks = np.argsort(np.argsort(probs)) + 1
+                # Mann–Whitney U: các điểm bằng nhau nhận thứ hạng trung bình.
+                order = np.argsort(probs, kind="stable")
+                sorted_probs = probs[order]
+                starts = np.r_[0, np.flatnonzero(np.diff(sorted_probs)) + 1]
+                ends = np.r_[starts[1:], len(probs)]
+                ranks = np.empty(len(probs), dtype=float)
+                for start, end in zip(starts, ends):
+                    ranks[order[start:end]] = (start + 1 + end) / 2.0
                 pos_ranks_sum = np.sum(ranks[y_arr == 1])
                 roc_auc = float(pos_ranks_sum - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
 

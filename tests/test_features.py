@@ -208,6 +208,59 @@ def test_manual_feature_selector_scratch():
 
 
 class TestFeaturesModule(unittest.TestCase):
+    def test_export_avoids_direct_open_of_existing_csv(self):
+        import builtins
+        import errno
+        import pandas as pd
+        from unittest.mock import patch
+
+        frame = pd.DataFrame([{'source_id': 1, 'label': 'ham', 'text': 'Chào bạn, café', 'raw_text': 'Chào bạn, café'}])
+        original_open = builtins.open
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'train_clean.csv'
+            target.write_text('old cache', encoding='utf-8')
+
+            def reject_direct_write(file, mode='r', *args, **kwargs):
+                if isinstance(file, (str, Path)) and Path(file) == target and 'w' in mode:
+                    raise OSError(errno.EINVAL, 'Invalid argument', str(target))
+                return original_open(file, mode, *args, **kwargs)
+
+            with patch('builtins.open', side_effect=reject_direct_write):
+                result = export_processed_data(frame, frame, frame, output_dir=tmp)
+            self.assertEqual(pd.read_csv(result['train_csv']).iloc[0]['text'], 'Chào bạn, café')
+            self.assertFalse(list(Path(tmp).glob('*.tmp')))
+
+    def test_failed_csv_export_preserves_previous_file(self):
+        import pandas as pd
+        from unittest.mock import patch
+
+        frame = pd.DataFrame([{'label': 'ham', 'text': 'hello'}])
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'train_clean.csv'
+            target.write_text('old cache', encoding='utf-8')
+            with patch.object(pd.DataFrame, 'to_csv', side_effect=OSError(22, 'Invalid argument')):
+                with self.assertRaises(OSError):
+                    export_processed_data(frame, frame, frame, output_dir=tmp)
+            self.assertEqual(target.read_text(encoding='utf-8'), 'old cache')
+            self.assertFalse(list(Path(tmp).glob('*.tmp')))
+
+    def test_length_cap_is_fitted_only_on_train(self):
+        import numpy as np
+        config = SpamExperimentConfig(default_tuning_params={"cap_quantile": .5}, min_df=1)
+        processor = SpamTextProcessor(config)
+        builder = HybridFeatureBuilderScratch(config, processor, SpamSignalFeatureExtractor(config))
+        train = [
+            {"text": "the and hello friend", "label": "ham"},
+            {"text": "<b>win free cash prize claim</b>", "label": "spam"},
+            {"text": "please review project report today tomorrow", "label": "ham"},
+        ]
+        builder.fit(train)
+        self.assertEqual(builder.cap_word_limit_, 5)
+        before = builder.transform(train).to_scipy_csr().toarray()
+        builder.transform([{"text": "very long unseen " * 1000}])
+        self.assertEqual(builder.cap_word_limit_, 5)
+        np.testing.assert_allclose(builder.transform(train).to_scipy_csr().toarray(), before)
+
     def test_tfidf_case(self):
         test_tfidf_vectorizer_scratch()
 

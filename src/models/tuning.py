@@ -162,6 +162,7 @@ def tune_model_hyperparameters(
     y_val: np.ndarray,
     scoring_metric: str = "f1",
     recall_target: Optional[float] = 0.85,
+    threshold_optimizer: Optional[ThresholdOptimizerScratch] = None,
 ) -> Tuple[Any, Dict[str, Any], float]:
     """Tìm kiếm siêu tham số kết hợp hàm mục tiêu có ràng buộc nghiệp vụ."""
     import itertools
@@ -181,7 +182,13 @@ def tune_model_hyperparameters(
         model = model_class(**params)
         model.fit(X_train, y_train)
 
-        y_pred = np.asarray(model.predict(X_val), dtype=int).ravel()
+        if threshold_optimizer is not None:
+            threshold_info = threshold_optimizer.select_best_threshold(
+                threshold_optimizer.metrics_table(y_val, model.predict_proba(X_val)[:, 1])
+            )
+            y_pred = (model.predict_proba(X_val)[:, 1] >= threshold_info["threshold"]).astype(int)
+        else:
+            y_pred = np.asarray(model.predict(X_val), dtype=int).ravel()
 
         tp = int(np.sum((y_val_arr == 1) & (y_pred == 1)))
         fp = int(np.sum((y_val_arr == 0) & (y_pred == 1)))
@@ -224,6 +231,27 @@ class ModelSelectionWorkflow:
     def __init__(self, recall_target: float = 0.85):
         self.recall_target = float(recall_target)
 
+    def select_candidates(self, models, X_val, y_val, optimizer=None):
+        """Chọn ứng viên và ngưỡng trên Validation; không nhận dữ liệu Test."""
+        if not models:
+            raise ValueError("Cần ít nhất một mô hình ứng viên.")
+        optimizer = optimizer or ThresholdOptimizerScratch(recall_target=self.recall_target)
+        candidates, scans, selections = {}, {}, {}
+        for name, model in models.items():
+            scans[name] = optimizer.metrics_table(y_val, model.predict_proba(X_val)[:, 1])
+            info = optimizer.select_for_recall_target(scans[name], self.recall_target)
+            selections[name] = info
+            candidates[name] = {
+                "threshold": info["threshold"], "target_met": info["target_met"],
+                # Không đạt mục tiêu: ưu tiên recall trước accuracy.
+                "objective_score": info["accuracy"] if info["target_met"] else info["recall"],
+                "val_accuracy": info["accuracy"], "val_precision": info["precision"],
+                "val_recall": info["recall"], "val_f1": info["f1"], "val_f2": info["f2"],
+            }
+        comparison = self.build_comparison_frame(candidates)
+        winner = self.select_final_winner(comparison)
+        return winner, selections[winner], comparison, scans[winner]
+
     def build_comparison_frame(
         self,
         candidates: Dict[str, Dict[str, Any]],
@@ -255,6 +283,7 @@ class ModelSelectionWorkflow:
             df = df.sort_values(
                 by=["target_met", "objective_score", "validation_accuracy", "validation_f1"],
                 ascending=[False, False, False, False],
+                kind="stable",
             ).reset_index(drop=True)
             df["rank"] = np.arange(1, len(df) + 1)
             df["selected_as_final"] = df["rank"] == 1

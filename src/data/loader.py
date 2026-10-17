@@ -23,7 +23,7 @@ def resolve_data_path(custom_path: Optional[Path] = None) -> Path:
 
 
 def load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
-    """Giữ cả dòng lỗi để EDA đếm được; lọc chất lượng ở clean_email_split.
+    """Giữ nhãn sai/text rỗng để EDA; lỗi cấu trúc CSV báo ValueError.
 
     raw_text không bị sửa. source_id là số thứ tự bản ghi CSV, dùng kiểm tra
     chia tập và đối chiếu nguồn. Mặc định trả về pandas.DataFrame.
@@ -37,24 +37,34 @@ def load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True) -
         for encoding in ('utf-8-sig', 'latin-1'):
             try:
                 with path.open(encoding=encoding, newline='') as stream:
-                    reader = csv.DictReader(stream)
+                    reader = csv.DictReader(stream, strict=True)
                     fields = reader.fieldnames or []
-                    lookup = {field.strip().lower(): field for field in fields}
+                    normalized_fields = [field.strip().lower() for field in fields]
+                    if len(set(normalized_fields)) != len(normalized_fields):
+                        raise ValueError('CSV có tên cột trùng sau khi chuẩn hóa hoa/thường và khoảng trắng.')
+                    lookup = dict(zip(normalized_fields, fields))
                     label_field = next((lookup[k] for k in ('label', 'category', 'v1') if k in lookup), None)
                     text_field = next((lookup[k] for k in ('text', 'message', 'v2', 'body') if k in lookup), None)
                     if label_field is None or text_field is None:
                         raise ValueError('CSV cần cột label/text, Category/Message hoặc v1/v2.')
                     records = []
                     for source_id, row in enumerate(reader, 1):
+                        if None in row or any(value is None for value in row.values()):
+                            raise ValueError(
+                                f'CSV sai số trường tại bản ghi {source_id} '
+                                f'(kết thúc ở dòng {reader.line_num}); cần {len(fields)} trường.'
+                            )
                         text = row.get(text_field) or ''
                         records.append({'source_id': source_id,
                                         'label': (row.get(label_field) or '').strip().lower(),
                                         'text': text, 'raw_text': text})
                     if as_dataframe:
-                        return pd.DataFrame(records)
+                        return pd.DataFrame(records, columns=['source_id', 'label', 'text', 'raw_text'])
                     return records
             except UnicodeDecodeError:
                 continue
+            except csv.Error as exc:
+                raise ValueError(f'CSV không hợp lệ gần dòng {reader.line_num}: {exc}') from exc
         raise ValueError('Không thể đọc mã hóa của CSV.')
     finally:
         # Khôi phục cấu hình toàn cục để không ảnh hưởng module CSV khác.

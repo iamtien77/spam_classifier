@@ -79,6 +79,28 @@ def test_error_analysis_extraction():
 
 
 class TestEvaluationModule(unittest.TestCase):
+    def test_auc_ties_and_permutations(self):
+        evaluator = SpamModelEvaluator()
+        for labels, scores, expected in (
+            ([0, 1], [0.5, 0.5], 0.5),
+            ([0, 1, 0, 1], [0.1, 0.5, 0.5, 0.9], 0.875),
+        ):
+            for order in (np.arange(len(labels)), np.arange(len(labels))[::-1]):
+                y = np.asarray(labels)[order]
+                p = np.asarray(scores)[order]
+                self.assertAlmostEqual(evaluator.compute_all_metrics(y, (p >= .5).astype(int), p)["roc_auc"], expected)
+
+    def test_invalid_evaluation_inputs(self):
+        evaluator = SpamModelEvaluator()
+        for truth, predicted, scores in (
+            ([0, 1], [1], None), ([], [], None),
+            ([0, 2], [0, 1], None), ([0, 1], [0, .5], None),
+            ([0, 1], [0, 1], [.5]),
+            ([0, 1], [0, 1], [0, float("nan")]),
+        ):
+            with self.subTest(truth=truth, predicted=predicted, scores=scores), self.assertRaises(ValueError):
+                evaluator.compute_all_metrics(truth, predicted, scores)
+
     def test_cm_case(self):
         test_confusion_matrix_manual()
 

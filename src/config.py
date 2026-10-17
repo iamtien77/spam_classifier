@@ -165,6 +165,9 @@ class SpamExperimentConfig:
     max_char_features: int = MAX_CHAR_FEATURES
     char_ngram_range: Tuple[int, int] = CHAR_NGRAM_RANGE
     recall_target: float = RECALL_TARGET
+    train_ratio: float = TRAIN_RATIO
+    val_ratio: float = VAL_RATIO
+    test_ratio: float = TEST_RATIO
     keyword_patterns: Dict[str, str] = field(default_factory=lambda: KEYWORD_PATTERNS.copy())
     numeric_feature_config: List[Tuple[str, str]] = field(default_factory=lambda: list(NUMERIC_FEATURE_CONFIG))
     default_tuning_params: Dict[str, Any] = field(default_factory=dict)

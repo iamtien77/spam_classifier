@@ -56,7 +56,11 @@ class SpamVotingEnsemble:
         accumulated_prob = None
         for name, model in self.models.items():
             w = float(self.weights.get(name, 1.0))
-            if hasattr(model, "predict_proba"):
+            if self.voting == "hard":
+                # Điểm hard voting là tỷ lệ phiếu có trọng số, không phải soft probability.
+                preds = np.asarray(model.predict(X), dtype=float).ravel()
+                proba = np.column_stack([1.0 - preds, preds])
+            elif hasattr(model, "predict_proba"):
                 proba = model.predict_proba(X)
             elif hasattr(model, "decision_function"):
                 df = model.decision_function(X)

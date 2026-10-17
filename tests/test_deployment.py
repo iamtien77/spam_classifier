@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import unittest
+import tempfile
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -13,6 +14,7 @@ from src.data.preprocessing import SpamTextProcessor
 from src.features.feature_engineering import HybridFeatureBuilderScratch, SpamSignalFeatureExtractor
 from src.models.classifiers import LogisticRegressionFromScratch
 from src.deployment.predictor import SpamInferenceService
+from src.models.persistence import save_spam_pipeline
 
 
 def _create_toy_pipeline_bundle():
@@ -85,6 +87,46 @@ def test_inference_service_batch_prediction():
 
 
 class TestDeploymentModule(unittest.TestCase):
+    def test_selected_columns_roundtrip(self):
+        for full_width in (True, False):
+            with self.subTest(full_width=full_width), tempfile.TemporaryDirectory() as tmp:
+                bundle = _create_toy_pipeline_bundle()
+                text = "Win free cash prize claim now"
+                matrix = bundle["feature_builder"].transform([{"text": text}]).to_scipy_csr()
+                indices = np.arange(matrix.shape[1])[::-1]
+                if not full_width:
+                    indices = indices[:max(1, len(indices) // 2)]
+                bundle["selected_indices"] = indices
+                # Train a model in exactly the selected order, including full-width permutations.
+                train = bundle["feature_builder"].transform([
+                    {"text": text}, {"text": "Please review the project report attached"}
+                ]).to_scipy_csr()[:, indices]
+                bundle["model"].fit(train, np.array([1, 0]))
+                expected = round(float(bundle["model"].predict_proba(matrix[:, indices])[0, 1]), 4)
+                direct = SpamInferenceService(pipeline_bundle=bundle).predict_single(text)
+                path = save_spam_pipeline(bundle, Path(tmp) / "pipeline.joblib")
+                restored = SpamInferenceService(bundle_path=path).predict_single(text)
+                self.assertEqual(direct["spam_probability"], expected)
+                self.assertEqual(restored, direct)
+
+    def test_invalid_bundle(self):
+        for threshold in (float("nan"), -0.1, 1.1):
+            bundle = _create_toy_pipeline_bundle()
+            bundle["best_threshold"] = threshold
+            with self.subTest(threshold=threshold), self.assertRaises(ValueError):
+                SpamInferenceService(pipeline_bundle=bundle).load_service()
+        bundle.pop("feature_builder")
+        with self.assertRaises(ValueError):
+            SpamInferenceService(pipeline_bundle=bundle).load_service()
+
+    def test_invalid_selected_indices(self):
+        for indices in ([0, 0], [-1], [1000000], [.5], [[0]], []):
+            with self.subTest(indices=indices):
+                bundle = _create_toy_pipeline_bundle()
+                bundle["selected_indices"] = indices
+                with self.assertRaises(ValueError):
+                    SpamInferenceService(pipeline_bundle=bundle).predict_single("Win free cash")
+
     def test_single_case(self):
         test_inference_service_single_prediction()
 

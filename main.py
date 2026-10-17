@@ -56,6 +56,8 @@ from src.config import (
     FIGURES_DIR,
     METRICS_DIR,
     SAVED_MODELS_DIR,
+    FBETA_BETA,
+    THRESHOLD_GRID_POINTS,
 )
 from src.utils.logger import setup_logger, log_step, print_section_header
 from src.data.loader import load_raw_data
@@ -100,7 +102,8 @@ from src.deployment.predictor import SpamInferenceService
 
 
 @log_step("GIAI ĐOẠN 1: TIỀN XỬ LÝ & TRÍCH XUẤT ĐẶC TRƯNG")
-def step_data_preprocessing(logger):
+def step_data_preprocessing(logger, config=None):
+    config = config or SpamExperimentConfig()
     logger.info("Nạp dữ liệu thô từ data/raw/spam.csv...")
     raw_data = load_raw_data()
     logger.info(f"Tổng số bản ghi đọc được: {len(raw_data):,} dòng.")
@@ -120,9 +123,10 @@ def step_data_preprocessing(logger):
     plot_outlier_length_distribution(cleaned_data, save_path=FIGURES_DIR / "eda_outlier_length_distribution.png")
 
     # Chia phân tầng 80/10/10
-    logger.info("Chia phân tầng độc lập (Stratified Split 80/10/10)...")
+    logger.info(f"Chia phân tầng Train/Val/Test: {config.train_ratio:.0%}/{config.val_ratio:.0%}/{config.test_ratio:.0%}...")
     train_records, val_records, test_records = stratified_split_dataframe(
-        cleaned_data, train_ratio=0.80, val_ratio=0.10, test_ratio=0.10, random_state=42
+        cleaned_data, train_ratio=config.train_ratio, val_ratio=config.val_ratio,
+        test_ratio=config.test_ratio, random_state=config.random_state,
     )
     logger.info(f"Kích thước tập: Train={len(train_records):,}, Val={len(val_records):,}, Test={len(test_records):,}")
 
@@ -130,19 +134,13 @@ def step_data_preprocessing(logger):
         y_train = np.array([1 if str(l).lower() == "spam" else 0 for l in train_records["label"]], dtype=int)
         y_val = np.array([1 if str(l).lower() == "spam" else 0 for l in val_records["label"]], dtype=int)
         y_test = np.array([1 if str(l).lower() == "spam" else 0 for l in test_records["label"]], dtype=int)
-        train_word_counts = [len(str(t).split()) for t in train_records["text"].fillna("")]
     else:
         y_train = np.array([1 if r["label"] == "spam" else 0 for r in train_records], dtype=int)
         y_val = np.array([1 if r["label"] == "spam" else 0 for r in val_records], dtype=int)
         y_test = np.array([1 if r["label"] == "spam" else 0 for r in test_records], dtype=int)
-        train_word_counts = [len(str(r.get("text", "")).split()) for r in train_records]
-
-    cap_word_limit = int(np.ceil(np.percentile(train_word_counts, 99)))
-    logger.info(f"Xác định ngưỡng Outlier Capping (p99 trên Train): max_words = {cap_word_limit}")
 
     # Trích xuất đặc trưng lai
     logger.info("Khởi tạo và fit HybridFeatureBuilderScratch trên Train...")
-    config = SpamExperimentConfig()
     text_processor = SpamTextProcessor(config=config)
     signal_extractor = SpamSignalFeatureExtractor(config=config)
     builder = HybridFeatureBuilderScratch(
@@ -152,6 +150,7 @@ def step_data_preprocessing(logger):
     )
 
     X_train_raw = builder.fit(train_records).transform(train_records)
+    logger.info(f"Ngưỡng cắt số từ sau chuẩn hóa, học trên Train: max_words = {builder.cap_word_limit_}")
     X_val_raw = builder.transform(val_records)
     X_test_raw = builder.transform(test_records)
 
@@ -166,7 +165,8 @@ def step_data_preprocessing(logger):
     _, ranked_indices = selector.compute_combined_importance(X_train_full, y_train)
     candidate_ks = [500, 1000, 1500, 2000, 2500, min(3000, X_train_full.shape[1]), X_train_full.shape[1]]
     best_sweep, sweep_df = selector.sweep_top_k(
-        X_train_full, y_train, X_val_full, y_val, ranked_indices, candidate_k_list=candidate_ks, recall_target=0.85
+        X_train_full, y_train, X_val_full, y_val, ranked_indices,
+        candidate_k_list=candidate_ks, recall_target=config.recall_target,
     )
     logger.info(f"Top-K tối ưu được chọn: {best_sweep['top_k']} đặc trưng (Tiết kiệm {best_sweep['dimension_saving_pct']:.1f}% số chiều, Val F1 = {best_sweep['val_f1']:.4f}).")
     plot_top_k_feature_sweep(sweep_df, save_path=FIGURES_DIR / "feature_selection_sweep.png")
@@ -186,13 +186,14 @@ def step_data_preprocessing(logger):
 
 
 @log_step("GIAI ĐOẠN 2: HUẤN LUYỆN 3 MÔ HÌNH CỐT LÕI (FROM-SCRATCH)")
-def step_model_training(logger, X_train, y_train):
+def step_model_training(logger, X_train, y_train, X_val=None, y_val=None, config=None):
+    config = config or SpamExperimentConfig()
     logger.info("Huấn luyện Mô hình 1: Logistic Regression (Binary Cross-Entropy & L2)...")
-    lr = LogisticRegressionFromScratch(C=1.0, learning_rate=0.1, max_iter=200, class_weight="balanced")
+    lr = LogisticRegressionFromScratch(C=1.0, learning_rate=0.1, max_iter=200, class_weight="balanced", random_state=config.random_state)
     lr.fit(X_train, y_train)
 
     logger.info("Huấn luyện Mô hình 2: Support Vector Machines (Linear SVM - Squared Hinge Loss)...")
-    svm = LinearSVMFromScratch(C=1.0, learning_rate=0.05, max_iter=150, class_weight="balanced", loss="squared_hinge")
+    svm = LinearSVMFromScratch(C=1.0, learning_rate=0.05, max_iter=150, class_weight="balanced", loss="squared_hinge", random_state=config.random_state)
     svm.fit(X_train, y_train)
 
     logger.info("Huấn luyện Mô hình 3: Complement Naive Bayes (Laplace smoothing)...")
@@ -200,48 +201,72 @@ def step_model_training(logger, X_train, y_train):
     nb.fit(X_train, y_train)
 
     logger.info("Đã hoàn tất huấn luyện 3 mô hình cốt lõi.")
-    return {"Logistic Regression": lr, "Linear SVM": svm, "Complement Naive Bayes": nb}
+    models = {"Logistic Regression": lr, "Linear SVM": svm, "Complement Naive Bayes": nb}
+    if X_val is not None and y_val is not None:
+        optimizer = ThresholdOptimizerScratch(config.recall_target, FBETA_BETA, THRESHOLD_GRID_POINTS)
+        grids = {
+            "Logistic Regression": (LogisticRegressionFromScratch, {
+                "C": [0.5, 1.0, 2.0], "learning_rate": [0.1],
+                "max_iter": [200], "class_weight": ["balanced"], "random_state": [config.random_state],
+            }),
+            "Linear SVM": (LinearSVMFromScratch, {
+                "C": [0.5, 1.0, 2.0], "learning_rate": [0.05], "max_iter": [150],
+                "class_weight": ["balanced"], "loss": ["squared_hinge"], "random_state": [config.random_state],
+            }),
+            "Complement Naive Bayes": (NaiveBayesClassifier, {"alpha": [0.5, 1.0, 2.0], "kind": ["complement"]}),
+        }
+        for name, (model_class, grid) in grids.items():
+            tuned, params, _ = tune_model_hyperparameters(
+                name, model_class, grid, X_train, y_train, X_val, y_val,
+                recall_target=config.recall_target, threshold_optimizer=optimizer,
+            )
+            models[f"{name} (Tuned)"] = tuned
+            logger.info(f"[{name}] Tham số chọn trên Validation: {params}")
+    return models
 
 
 @log_step("GIAI ĐOẠN 3: ĐÁNH GIÁ, TUNING, ENSEMBLE & PHÂN TÍCH LỖI")
-def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, test_records):
+def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, test_records, config=None):
+    config = config or SpamExperimentConfig()
     evaluator = SpamModelEvaluator()
-
-    # 1. Đánh giá từng mô hình cơ bản trên Test
-    baseline_results = {}
-    for name, model in models.items():
-        probs = model.predict_proba(X_test)[:, 1] if hasattr(model, "predict_proba") else None
-        preds = model.predict(X_test)
-        metrics = evaluator.compute_all_metrics(y_test, preds, y_prob=probs, beta=2.0)
-        baseline_results[name] = metrics
-        logger.info(f"[{name}] Acc={metrics['accuracy']:.4f}, Prec={metrics['precision']:.4f}, Rec={metrics['recall']:.4f}, F1={metrics['f1']:.4f}")
 
     # 2. Xây dựng SpamVotingEnsemble
     logger.info("Xây dựng bộ kết hợp biểu quyết SpamVotingEnsemble...")
     ensemble = SpamVotingEnsemble(
-        models=models,
+        models={name: model for name, model in models.items() if not name.endswith(" (Tuned)")},
         weights={"Logistic Regression": 1.0, "Linear SVM": 1.0, "Complement Naive Bayes": 1.2},
         voting="soft",
     )
 
-    # 3. Tối ưu hóa ngưỡng phân loại trên tập Validation & Bảng chỉ số chi tiết
-    logger.info("Dò quét 100 mốc ngưỡng xác suất trên Validation set (mục tiêu Recall >= 0.85)...")
-    val_probs = ensemble.predict_proba(X_val)[:, 1]
-    optimizer = ThresholdOptimizerScratch(recall_target=0.85, beta=2.0, n_points=100)
-    scan_df = optimizer.metrics_table(y_val, val_probs)
-    best_th_info = optimizer.select_for_recall_target(scan_df, recall_target=0.85)
+    candidates = {**models, "SpamVotingEnsemble": ensemble}
+    tuned_members = {name: model for name, model in models.items() if name.endswith(" (Tuned)")}
+    if tuned_members:
+        candidates["SpamVotingEnsemble (Tuned)"] = SpamVotingEnsemble(models=tuned_members, voting="soft")
+    optimizer = ThresholdOptimizerScratch(config.recall_target, FBETA_BETA, THRESHOLD_GRID_POINTS)
+    winner_name, best_th_info, comparison, scan_df = ModelSelectionWorkflow(config.recall_target).select_candidates(
+        candidates, X_val, y_val, optimizer,
+    )
+    winner = candidates[winner_name]
+    best_th_info["candidate_key"] = winner_name
+    comparison.to_csv(METRICS_DIR / "validation_model_selection.csv", index=False)
+    logger.info(f"Mô hình chọn trên Validation: {winner_name}")
     best_threshold = float(best_th_info["threshold"])
     logger.info(f"Ngưỡng tối ưu tìm thấy: tau = {best_threshold:.4f} (Val Recall = {best_th_info['recall']:.2%}, F1 = {best_th_info['f1']:.4f}, Quy tắc: {best_th_info['selection_rule']})")
 
     # 4. Xuất biểu đồ đường cong độ nhạy ngưỡng (Threshold Sensitivity Curve)
-    plot_threshold_sensitivity_curve(scan_df, recall_target=0.85, selected_threshold=best_threshold, save_path=FIGURES_DIR / "threshold_sensitivity.png")
+    plot_threshold_sensitivity_curve(scan_df, recall_target=config.recall_target, selected_threshold=best_threshold, save_path=FIGURES_DIR / "threshold_sensitivity.png")
 
-    # 5. Đánh giá kiểm thử cuối cùng cho Ensemble tại best_threshold
-    test_probs = ensemble.predict_proba(X_test)[:, 1]
-    test_preds = ensemble.predict(X_test, threshold=best_threshold)
-    final_metrics = evaluator.compute_all_metrics(y_test, test_preds, y_prob=test_probs, beta=2.0)
-    baseline_results["SpamVotingEnsemble (Winner)"] = final_metrics
-    logger.info(f"[SpamVotingEnsemble] Test Acc={final_metrics['accuracy']:.4f}, Prec={final_metrics['precision']:.4f}, Rec={final_metrics['recall']:.4f}, F1={final_metrics['f1']:.4f}")
+    # 5. Đánh giá mô hình đã chọn tại ngưỡng Validation đã chốt
+    test_probs = winner.predict_proba(X_test)[:, 1]
+    test_preds = (test_probs >= best_threshold).astype(int)
+    final_metrics = evaluator.compute_all_metrics(y_test, test_preds, y_prob=test_probs, beta=FBETA_BETA)
+    # Bảng Test phục vụ báo cáo, không tham gia lựa chọn ứng viên.
+    baseline_results = {}
+    for name, model in models.items():
+        probs = model.predict_proba(X_test)[:, 1]
+        baseline_results[name] = evaluator.compute_all_metrics(y_test, (probs >= .5).astype(int), probs, beta=FBETA_BETA)
+    baseline_results[f"{winner_name} (Winner)"] = final_metrics
+    logger.info(f"[{winner_name}] Test Acc={final_metrics['accuracy']:.4f}, Prec={final_metrics['precision']:.4f}, Rec={final_metrics['recall']:.4f}, F1={final_metrics['f1']:.4f}")
 
     # 6. Kiểm toán tính nhất quán của kết quả đánh giá (Evaluation Consistency Audit)
     audit_df = evaluator.audit_evaluation_consistency(y_test, test_preds, y_prob=test_probs)
@@ -250,8 +275,8 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
     # 7. Xuất biểu đồ báo cáo
     logger.info("Xuất bản biểu đồ đánh giá vào results/figures/...")
     summary_df = evaluator.build_comparison_summary(baseline_results)
-    plot_confusion_matrix_heatmap(final_metrics["confusion_matrix"], model_name="SpamVotingEnsemble", save_path=FIGURES_DIR / "confusion_matrix.png")
-    plot_roc_and_pr_curves(y_test, test_probs, best_threshold=best_threshold, model_name="SpamVotingEnsemble", save_path=FIGURES_DIR / "roc_pr_curve.png")
+    plot_confusion_matrix_heatmap(final_metrics["confusion_matrix"], model_name=winner_name, save_path=FIGURES_DIR / "confusion_matrix.png")
+    plot_roc_and_pr_curves(y_test, test_probs, best_threshold=best_threshold, model_name=winner_name, save_path=FIGURES_DIR / "roc_pr_curve.png")
     plot_models_comparison_bar(summary_df, save_path=FIGURES_DIR / "models_comparison.png")
 
     # 8. Mổ xẻ phân tích lỗi sai (Error Analysis)
@@ -261,7 +286,7 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
     error_profile = profile_error_patterns(fp_df, fn_df, save_csv_path=METRICS_DIR / "misclassified_samples.csv")
     logger.info(f"Phân tích lỗi hoàn tất: FP={len(fp_df):,} mẫu, FN={len(fn_df):,} mẫu. Đã lưu {METRICS_DIR / 'misclassified_samples.csv'}")
 
-    return ensemble, best_threshold, best_th_info, final_metrics, summary_df
+    return winner, best_threshold, best_th_info, final_metrics, summary_df
 
 
 @log_step("GIAI ĐOẠN 4: ĐÓNG GÓI PIPELINE & DEMO TRIỂN KHAI SUY LUẬN")
@@ -311,6 +336,7 @@ def run_pipeline():
     """Điều phối toàn diện Pipeline từ đầu đến cuối."""
     ensure_directories()
     logger = setup_logger("spam_classifier")
+    config = SpamExperimentConfig()
 
     print_section_header("BẮT ĐẦU CHẠY TOÀN BỘ PIPELINE PHÂN LOẠI EMAIL SPAM")
     logger.info("Khởi chạy Spam Classifier Pipeline...")
@@ -321,14 +347,14 @@ def run_pipeline():
         X_train, X_val, X_test,
         y_train, y_val, y_test,
         text_processor, builder, selected_indices,
-    ) = step_data_preprocessing(logger)
+    ) = step_data_preprocessing(logger, config=config)
 
     # Giai đoạn 2
-    models = step_model_training(logger, X_train, y_train)
+    models = step_model_training(logger, X_train, y_train, X_val, y_val, config=config)
 
     # Giai đoạn 3
     ensemble, best_threshold, best_th_info, final_metrics, summary_df = step_evaluation_and_tuning(
-        logger, models, X_val, y_val, X_test, y_test, test_records
+        logger, models, X_val, y_val, X_test, y_test, test_records, config=config,
     )
 
     # Giai đoạn 4

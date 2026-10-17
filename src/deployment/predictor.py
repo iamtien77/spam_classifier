@@ -51,14 +51,21 @@ class SpamInferenceService:
         if self.pipeline_bundle is None:
             self.pipeline_bundle = load_spam_pipeline(self.bundle_path)
 
-        self.model = self.pipeline_bundle.get("model")
-        self.threshold = float(self.pipeline_bundle.get("best_threshold", 0.5))
-        self.text_processor = self.pipeline_bundle.get("text_processor")
-        self.feature_builder = self.pipeline_bundle.get("feature_builder")
-        self.selected_indices = self.pipeline_bundle.get("selected_indices", None)
-
-        if self.model is None:
+        model = self.pipeline_bundle.get("model")
+        threshold = float(self.pipeline_bundle.get("best_threshold", 0.5))
+        feature_builder = self.pipeline_bundle.get("feature_builder")
+        if model is None:
             raise ValueError("Không tìm thấy mô hình trong pipeline bundle.")
+        if feature_builder is None:
+            raise ValueError("Không tìm thấy feature_builder trong pipeline bundle.")
+        if not np.isfinite(threshold) or not 0 <= threshold <= 1:
+            raise ValueError("best_threshold phải hữu hạn và thuộc [0, 1].")
+        # Chỉ công bố trạng thái sau khi bundle đã hợp lệ.
+        self.model = model
+        self.threshold = threshold
+        self.feature_builder = feature_builder
+        self.text_processor = self.pipeline_bundle.get("text_processor")
+        self.selected_indices = self.pipeline_bundle.get("selected_indices", None)
 
         return self
 
@@ -103,9 +110,13 @@ class SpamInferenceService:
             else:
                 X_mat = X_input
             if self.selected_indices is not None:
-                sel_idx = np.asarray(self.selected_indices, dtype=int)
-                if X_mat.shape[1] >= len(sel_idx) and X_mat.shape[1] != len(sel_idx):
-                    X_mat = X_mat[:, sel_idx]
+                sel_idx = np.asarray(self.selected_indices)
+                if (sel_idx.ndim != 1 or sel_idx.size == 0
+                        or not np.issubdtype(sel_idx.dtype, np.integer)
+                        or np.any(sel_idx < 0) or np.any(sel_idx >= X_mat.shape[1])
+                        or len(np.unique(sel_idx)) != len(sel_idx)):
+                    raise ValueError("selected_indices phải là các chỉ số cột nguyên, hợp lệ và không trùng.")
+                X_mat = X_mat[:, sel_idx]
         else:
             raise RuntimeError("Dịch vụ chưa được nạp feature_builder để xử lý văn bản.")
 

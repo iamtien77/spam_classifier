@@ -79,5 +79,5 @@ docs/
 # Cho phép theo dõi cấu hình agent
 !docs/agents/
 !docs/agents/**
-data/
+data/processed/
 

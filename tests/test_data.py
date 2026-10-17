@@ -167,6 +167,37 @@ def test_clean_email_split():
 
 
 class TestDataModule(unittest.TestCase):
+    def test_csv_structure_and_empty_schema(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "input.csv"
+            for contents in ("label, Label ,text\nham,spam,hello\n",
+                             "label,text\nham,hello,extra\n",
+                             "label,text\nham\n",
+                             'label,text\nham,"unclosed\n'):
+                with self.subTest(contents=contents):
+                    path.write_text(contents, encoding="utf-8")
+                    previous_limit = csv.field_size_limit()
+                    with self.assertRaises(ValueError):
+                        load_raw_data(path)
+                    self.assertEqual(csv.field_size_limit(), previous_limit)
+            path.write_text("label,text\n", encoding="utf-8")
+            frame = load_raw_data(path)
+            self.assertTrue(frame.empty)
+            self.assertEqual(list(frame.columns), ["source_id", "label", "text", "raw_text"])
+            self.assertEqual(load_raw_data(path, as_dataframe=False), [])
+
+    def test_csv_encodings_and_semantic_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "input.csv"
+            for encoding in ("utf-8-sig", "latin-1"):
+                with self.subTest(encoding=encoding):
+                    path.write_text('Category,Message\nham,"café, hello"\ninvalid,\n', encoding=encoding)
+                    records = load_raw_data(path, as_dataframe=False)
+                    self.assertEqual(records[0]["raw_text"], "café, hello")
+                    self.assertEqual(records[1]["label"], "invalid")
+                    self.assertEqual(records[1]["text"], "")
+                    self.assertEqual(load_raw_data(path).to_dict("records"), records)
+
     def test_load_raw_data_case(self):
         test_load_raw_data()
 

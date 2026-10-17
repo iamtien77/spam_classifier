@@ -178,6 +178,81 @@ def test_threshold_optimizer_scratch():
 
 
 class TestModelsModule(unittest.TestCase):
+    def test_hard_voting_scores_match_decisions(self):
+        class FixedModel:
+            def __init__(self, score):
+                self.score = score
+
+            def predict_proba(self, X):
+                return np.array([[1 - self.score, self.score]])
+
+            def predict(self, X):
+                return np.array([int(self.score >= .5)])
+
+        ensemble = SpamVotingEnsemble(
+            {"a": FixedModel(.51), "b": FixedModel(.51), "c": FixedModel(.01)}, voting="hard",
+        )
+        self.assertAlmostEqual(ensemble.predict_proba(None)[0, 1], 2 / 3)
+        self.assertEqual(ensemble.predict(None)[0], 1)
+
+    def test_hyperparameters_evaluated_with_tuned_threshold(self):
+        from src.models.tuning import tune_model_hyperparameters
+
+        class Candidate:
+            def __init__(self, variant):
+                self.variant = variant
+
+            def fit(self, X, y):
+                return self
+
+            def predict_proba(self, X):
+                scores = np.array([.5, .5, .5, .5] if self.variant == 0 else [.1, .2, .3, .4])
+                return np.column_stack([1 - scores, scores])
+
+            def predict(self, X):
+                return (self.predict_proba(X)[:, 1] >= .5).astype(int)
+
+        model, params, score = tune_model_hyperparameters(
+            "toy", Candidate, {"variant": [0, 1]}, None, [0, 0, 1, 1], None, [0, 0, 1, 1],
+            threshold_optimizer=ThresholdOptimizerScratch(),
+        )
+        self.assertEqual(params, {"variant": 1})
+        self.assertEqual(score, 1.0)
+
+    def test_validation_selects_single_model_over_ensemble(self):
+        from src.models.tuning import ModelSelectionWorkflow
+
+        class FixedModel:
+            def __init__(self, scores):
+                self.scores = np.asarray(scores)
+
+            def predict_proba(self, X):
+                return np.column_stack([1 - self.scores, self.scores])
+
+        models = {"ensemble": FixedModel([.5, .5, .5, .5]), "single": FixedModel([.1, .2, .8, .9])}
+        name, info, comparison, _ = ModelSelectionWorkflow().select_candidates(models, None, [0, 0, 1, 1])
+        self.assertEqual(name, "single")
+        self.assertTrue(info["target_met"])
+        self.assertEqual(comparison.iloc[0]["validation_accuracy"], 1.0)
+
+    def test_validation_fallback_and_tie(self):
+        from src.models.tuning import ModelSelectionWorkflow
+
+        class FixedModel:
+            def __init__(self, scores):
+                self.scores = np.asarray(scores)
+
+            def predict_proba(self, X):
+                return np.column_stack([1 - self.scores, self.scores])
+
+        optimizer = ThresholdOptimizerScratch(default_grid=np.array([.5]))
+        models = {"low_recall": FixedModel([.1, .1, .1, .9]), "higher_recall": FixedModel([.9, .1, .9, .9])}
+        name, info, _, _ = ModelSelectionWorkflow().select_candidates(models, None, [0, 1, 1, 1], optimizer)
+        self.assertEqual(name, "higher_recall")
+        self.assertFalse(info["target_met"])
+        models["same"] = models["higher_recall"]
+        self.assertEqual(ModelSelectionWorkflow().select_candidates(models, None, [0, 1, 1, 1], optimizer)[0], name)
+
     def test_lr_case(self):
         test_logistic_regression_fit_predict()
 

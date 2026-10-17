@@ -650,6 +650,7 @@ def export_processed_data(
     Đảm bảo tính lưu trữ đệm (Cache Persistence) để Task 2 nạp nhanh không cần parse lại CSV 58MB.
     """
     import csv
+    from tempfile import NamedTemporaryFile
     from pathlib import Path
     from src.config import PROCESSED_DATA_DIR
 
@@ -660,16 +661,35 @@ def export_processed_data(
     for name, split_records in [('train', train_records), ('val', val_records), ('test', test_records)]:
         csv_path = target_dir / f'{name}_clean.csv'
         if split_records is not None and len(split_records) > 0:
-            if hasattr(split_records, "to_csv"):
-                cols = [c for c in ['source_id', 'label', 'text', 'raw_text'] if c in split_records.columns]
-                split_records[cols].to_csv(csv_path, index=False)
-            else:
-                fieldnames = ['source_id', 'label', 'text', 'raw_text']
-                with csv_path.open('w', encoding='utf-8', newline='') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                    writer.writeheader()
-                    for row in split_records:
-                        writer.writerow(row)
+            temp_path = None
+            try:
+                # Cùng thư mục để replace không vượt volume; đóng handle trước
+                # khi replace trên Windows. Không mở/truncate CSV đích bằng pandas.
+                with NamedTemporaryFile(mode='w', encoding='utf-8', newline='',
+                                       dir=target_dir, prefix=f'.{name}_clean-',
+                                       suffix='.tmp', delete=False) as stream:
+                    temp_path = Path(stream.name)
+                    if hasattr(split_records, "to_csv"):
+                        cols = [c for c in ['source_id', 'label', 'text', 'raw_text'] if c in split_records.columns]
+                        split_records[cols].to_csv(stream, index=False)
+                    else:
+                        fieldnames = ['source_id', 'label', 'text', 'raw_text']
+                        writer = csv.DictWriter(stream, fieldnames=fieldnames, extrasaction='ignore')
+                        writer.writeheader()
+                        for row in split_records:
+                            writer.writerow(row)
+                temp_path.replace(csv_path)
+            except OSError as exc:
+                raise OSError(
+                    exc.errno,
+                    f'Không thể xuất CSV tới {str(csv_path)!r}: {exc.strerror}. '
+                    'Kiểm tra đường dẫn, quyền ghi và ứng dụng đang mở file; '
+                    'nếu vừa chuyển thư mục dự án, hãy restart kernel.',
+                    str(csv_path),
+                ) from exc
+            finally:
+                if temp_path is not None:
+                    temp_path.unlink(missing_ok=True)
             exported_files[f'{name}_csv'] = str(csv_path)
 
     if builder is not None and builder.is_fitted_:
