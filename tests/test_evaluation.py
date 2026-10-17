@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -79,6 +80,37 @@ def test_error_analysis_extraction():
 
 
 class TestEvaluationModule(unittest.TestCase):
+    def test_plot_auc_matches_metrics_for_ties_and_single_class(self):
+        from src.evaluation.visualization import plot_roc_and_pr_curves, plt
+
+        for labels, scores, expected in (
+            ([0, 1], [.5, .5], "0.5000"),
+            ([1, 0], [.5, .5], "0.5000"),
+            ([0, 1, 0, 1], [.1, .5, .5, .9], "0.8750"),
+            ([0, 0], [.2, .8], "N/A"),
+        ):
+            with self.subTest(labels=labels):
+                fig, axes = plt.subplots(1, 2)
+                try:
+                    with patch.object(plt, "subplots", return_value=(fig, axes)):
+                        plot_roc_and_pr_curves(labels, scores)
+                    self.assertEqual(axes[0].lines[0].get_label(), f"ROC (AUC = {expected})")
+                finally:
+                    plt.close(fig)
+
+    def test_plot_recall_target_is_vertical(self):
+        from src.evaluation.visualization import plot_roc_and_pr_curves, plt
+
+        fig, axes = plt.subplots(1, 2)
+        try:
+            with patch.object(plt, "subplots", return_value=(fig, axes)):
+                plot_roc_and_pr_curves([0, 1], [.2, .8])
+            target = next(line for line in axes[1].lines if line.get_label() == "Mục tiêu Recall >= 0.85")
+            np.testing.assert_allclose(target.get_xdata(), [.85, .85])
+            np.testing.assert_allclose(target.get_ydata(), [0, 1])
+        finally:
+            plt.close(fig)
+
     def test_auc_ties_and_permutations(self):
         evaluator = SpamModelEvaluator()
         for labels, scores, expected in (

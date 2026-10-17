@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from src.evaluation.metrics import SpamModelEvaluator
 
 
 def plot_class_distribution(
@@ -531,16 +532,17 @@ def plot_roc_and_pr_curves(
         precision_list.append(prec)
         recall_list.append(rec)
 
-    # Tính ROC-AUC bằng Mann-Whitney U test
-    ranks = np.argsort(np.argsort(y_scores_arr)) + 1
-    pos_ranks = np.sum(ranks[y_true_arr == 1])
-    roc_auc = float(pos_ranks - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
+    # Dùng chung bộ metrics để xử lý đúng các điểm bằng nhau.
+    roc_auc = SpamModelEvaluator().compute_all_metrics(
+        y_true_arr, (y_scores_arr >= 0.5).astype(int), y_prob=y_scores_arr,
+    )["roc_auc"]
+    auc_label = f"{roc_auc:.4f}" if roc_auc is not None else "N/A"
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
 
     # 1. ROC Curve
     order = np.argsort(fpr_list)
-    axes[0].plot(np.array(fpr_list)[order], np.array(tpr_list)[order], color="#1F77B4", lw=2, label=f"ROC (AUC = {roc_auc:.4f})")
+    axes[0].plot(np.array(fpr_list)[order], np.array(tpr_list)[order], color="#1F77B4", lw=2, label=f"ROC (AUC = {auc_label})")
     axes[0].plot([0, 1], [0, 1], color="#7F7F7F", lw=1.5, linestyle="--", label="Random Chance")
     if best_threshold is not None:
         idx_th = np.argmin(np.abs(thresholds - best_threshold))
@@ -559,7 +561,7 @@ def plot_roc_and_pr_curves(
     if best_threshold is not None:
         idx_th = np.argmin(np.abs(thresholds - best_threshold))
         axes[1].scatter([recall_list[idx_th]], [precision_list[idx_th]], color="#D62728", s=90, zorder=5, label=f"Ngưỡng tối ưu ({best_threshold:.2f})")
-    axes[1].axhline(y=0.85, color="#FF7F0E", linestyle=":", lw=1.5, label="Mục tiêu Recall >= 0.85")
+    axes[1].axvline(x=0.85, color="#FF7F0E", linestyle=":", lw=1.5, label="Mục tiêu Recall >= 0.85")
     axes[1].set_title(f"Precision-Recall Curve - {model_name}", fontsize=13, fontweight="bold")
     axes[1].set_xlabel("Recall", fontsize=11)
     axes[1].set_ylabel("Precision", fontsize=11)
