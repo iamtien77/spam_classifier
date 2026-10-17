@@ -7,11 +7,11 @@ Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - W
    - Mô hình nhị phân phổ biến hàng đầu cho bài toán phân loại email spam.
    - Mô hình hóa xác suất một email là spam bằng hàm Sigmoid / Logistic function:
      P(y=1|x) = 1 / (1 + exp(-(w^T * x + b))).
-   - Huấn luyện bằng thuật toán Gradient Descent / Mini-batch với hàm mất mát Binary Cross-Entropy.
+   - Huấn luyện bằng Gradient Descent với backtracking trên Binary Cross-Entropy.
 2. Support Vector Machines (SVM):
    - Phương pháp phân loại mạnh mẽ, đặc biệt hiệu quả khi làm việc với không gian đặc trưng nhiều chiều (High-dimensional text).
    - Tìm siêu phẳng lề cực đại (Maximum Margin Hyperplane) phân tách giữa email spam và ham.
-   - Huấn luyện bằng thuật toán Stochastic Gradient Descent (SGD) / Pegasos với hàm mất mát Hinge Loss và điều chuẩn L2.
+   - Huấn luyện bằng Gradient Descent với backtracking trên Hinge Loss và điều chuẩn L2.
 3. Naive Bayes:
    - Thuật toán xác suất đơn giản nhưng cực kỳ hiệu quả dựa trên định lý Bayes (Bayes' Theorem).
    - Giả định tính độc lập có điều kiện giữa các đặc trưng khi biết lớp.
@@ -56,6 +56,42 @@ def _get_shape(X: Any) -> Tuple[int, int]:
     raise ValueError(f"Không thể xác định kích thước cho đối tượng kiểu {type(X)}")
 
 
+def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, tol=1e-7):
+    """Spectral gradient descent với Armijo; không phụ thuộc sklearn.
+
+    Bước học ban đầu được điều chỉnh theo độ cong, tránh đứng gần nghiệm
+    khởi tạo trên TF-IDF hoặc phân kỳ khi tăng learning_rate cố định.
+    objective trả loss và gradient tại cùng một bộ tham số.
+    """
+    if learning_rate <= 0 or max_iter < 1:
+        raise ValueError("learning_rate và max_iter phải dương.")
+    parameters = initial.copy()
+    value, gradient = objective(parameters)
+    history = [float(value)]
+    step = float(learning_rate)
+    for _ in range(max_iter):
+        norm_sq = float(gradient @ gradient)
+        if norm_sq <= tol ** 2:
+            break
+        for _ in range(60):
+            candidate = parameters - step * gradient
+            next_value, next_gradient = objective(candidate)
+            if np.isfinite(next_value) and next_value <= value - 1e-4 * step * norm_sq:
+                break
+            step *= .5
+        else:
+            break
+        displacement = candidate - parameters
+        gradient_change = next_gradient - gradient
+        curvature = float(displacement @ gradient_change)
+        next_step = (float(displacement @ displacement) / curvature
+                     if curvature > 0 else step * 2)
+        parameters, value, gradient = candidate, next_value, next_gradient
+        history.append(float(value))
+        step = float(np.clip(next_step, 1e-8, 1e8))
+    return parameters, history
+
+
 class LogisticRegressionFromScratch:
     """
     1. LOGISTIC REGRESSION TỰ CÀI ĐẶT TỪ ĐẦU (FROM SCRATCH):
@@ -94,33 +130,23 @@ class LogisticRegressionFromScratch:
         else:
             sample_weights = np.ones(n_samples, dtype=float)
 
-        w = np.zeros(n_features, dtype=float)
-        b = 0.0
-        self.loss_history_ = []
-
         reg_lambda = 1.0 / max(1e-5, self.C * n_samples)
-        eps = 1e-15
-        for epoch in range(self.max_iter):
+
+        def objective(parameters):
+            w, b = parameters[:-1], parameters[-1]
             z = _safe_dot(X, w) + b
-            z_clipped = np.clip(z, -30.0, 30.0)
-            y_hat = 1.0 / (1.0 + np.exp(-z_clipped))
+            # logaddexp calcule BCE sans clipping du loss ni overflow.
+            loss = np.mean(sample_weights * (np.logaddexp(0, z) - y_arr * z))
+            loss += .5 * reg_lambda * float(w @ w)
+            probabilities = 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+            error = sample_weights * (probabilities - y_arr)
+            grad_w = reg_lambda * w + _safe_transpose_dot(X, error) / n_samples
+            return float(loss), np.r_[grad_w, np.mean(error)]
 
-            error = sample_weights * (y_hat - y_arr)
-
-            grad_w = reg_lambda * w + (1.0 / n_samples) * _safe_transpose_dot(X, error)
-            grad_b = float(np.mean(error))
-
-            lr = self.learning_rate / np.sqrt(1.0 + 0.01 * epoch)
-            w -= lr * grad_w
-            b -= lr * grad_b
-
-            loss = -(1.0 / n_samples) * np.sum(
-                sample_weights * (y_arr * np.log(y_hat + eps) + (1.0 - y_arr) * np.log(1.0 - y_hat + eps))
-            ) + 0.5 * reg_lambda * float(np.sum(w ** 2))
-            self.loss_history_.append(float(loss))
-
-        self.weights_ = w
-        self.bias_ = b
+        parameters, self.loss_history_ = _gradient_descent_backtracking(
+            objective, np.zeros(n_features + 1), self.learning_rate, self.max_iter,
+        )
+        self.weights_, self.bias_ = parameters[:-1], float(parameters[-1])
         return self
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
@@ -199,66 +225,29 @@ class LinearSVMFromScratch:
         else:
             sample_weights = np.ones(n_samples, dtype=float)
 
-        rng = np.random.default_rng(self.random_state)
-        w = rng.normal(0.0, 0.001, size=n_features).astype(float)
-        b = 0.0
-        self.loss_history_ = []
-        previous_loss = np.inf
-
+        if self.loss not in ("hinge", "squared_hinge"):
+            raise ValueError("loss phải là hinge hoặc squared_hinge.")
         reg_lambda = 1.0 / max(1e-5, self.C * n_samples)
 
-        for epoch in range(1, self.max_iter + 1):
-            scores = _safe_dot(X, w) + b
-            margins = 1.0 - y_signed * scores
-
+        def objective(parameters):
+            w, b = parameters[:-1], parameters[-1]
+            margins = np.maximum(0., 1 - y_signed * (_safe_dot(X, w) + b))
             if self.loss == "squared_hinge":
-                active = margins > 0.0
-                grad_w = w.copy()
-                grad_b = 0.0
-
-                if np.any(active):
-                    full_weighted = np.zeros(n_samples, dtype=float)
-                    full_weighted[active] = sample_weights[active] * y_signed[active] * margins[active]
-                    grad_w -= (2.0 * self.C / max(n_samples, 1)) * _safe_transpose_dot(X, full_weighted)
-                    grad_b -= (2.0 * self.C / max(n_samples, 1)) * float(np.sum(full_weighted))
-
-                step_size = self.learning_rate / np.sqrt(epoch)
-                w -= step_size * grad_w
-                b -= step_size * grad_b
-
-                if epoch == 1 or epoch % 5 == 0 or epoch == self.max_iter:
-                    hinge_sq = np.maximum(0.0, margins) ** 2
-                    curr_loss = 0.5 * float(np.dot(w, w)) + self.C * float(np.mean(sample_weights * hinge_sq))
-                    self.loss_history_.append(curr_loss)
-                    if abs(previous_loss - curr_loss) < self.tol:
-                        self.n_iter_ = epoch
-                        break
-                    previous_loss = curr_loss
+                losses = margins ** 2
+                derivative = -2 * sample_weights * y_signed * margins
             else:
-                # Standard Hinge Loss (Pegasos Subgradient)
-                violations = margins > 0.0
-                subgrad_v = np.where(violations, -sample_weights * y_signed, 0.0)
+                losses = margins
+                derivative = -sample_weights * y_signed * (margins > 0)
+            value = .5 * reg_lambda * float(w @ w) + np.mean(sample_weights * losses)
+            grad_w = reg_lambda * w + _safe_transpose_dot(X, derivative) / n_samples
+            return float(value), np.r_[grad_w, np.mean(derivative)]
 
-                grad_w = reg_lambda * w + (1.0 / n_samples) * _safe_transpose_dot(X, subgrad_v)
-                grad_b = float(np.mean(subgrad_v))
-
-                lr = self.learning_rate / np.sqrt(1.0 + 0.01 * epoch)
-                w -= lr * grad_w
-                b -= lr * grad_b
-
-                curr_loss = 0.5 * reg_lambda * float(np.sum(w ** 2)) + (1.0 / n_samples) * float(
-                    np.sum(sample_weights * np.maximum(0.0, margins))
-                )
-                self.loss_history_.append(curr_loss)
-                if abs(previous_loss - curr_loss) < self.tol:
-                    self.n_iter_ = epoch
-                    break
-                previous_loss = curr_loss
-
-            self.n_iter_ = epoch
-
-        self.weights_ = w
-        self.bias_ = b
+        parameters, self.loss_history_ = _gradient_descent_backtracking(
+            objective, np.zeros(n_features + 1), self.learning_rate, self.max_iter,
+            tol=min(self.tol, 1e-7),
+        )
+        self.weights_, self.bias_ = parameters[:-1], float(parameters[-1])
+        self.n_iter_ = len(self.loss_history_) - 1
         return self
 
     def decision_function(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:

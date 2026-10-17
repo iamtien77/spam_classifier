@@ -1,6 +1,7 @@
 """Kiểm thử tích hợp luồng Train–Validation–Test và artifacts trong thư mục tạm."""
 import csv
 import io
+import json
 import logging
 import tempfile
 import unittest
@@ -45,8 +46,15 @@ class TestPipeline(unittest.TestCase):
                     logger, models, X_val, y_val, X_test, y_test, test, config,
                 )
                 self.assertTrue((root / "validation_model_selection.csv").is_file())
+                selected = summary.loc[summary['selected_on_validation']].iloc[0]
+                self.assertEqual(selected['Mô hình'], info['candidate_key'])
+                self.assertAlmostEqual(selected['Recall'], metrics['recall'])
+                self.assertAlmostEqual(selected['F1-Score'], metrics['f1'])
                 with redirect_stdout(io.StringIO()):
                     pipeline.step_deployment_and_demo.__wrapped__(logger, winner, processor, builder, indices, threshold, info, metrics)
+                report = json.loads((root / 'run_summary.json').read_text(encoding='utf-8'))
+                self.assertEqual(report['model'], info['candidate_key'])
+                self.assertEqual(report['test']['confusion_matrix'], metrics['confusion_matrix'].tolist())
                 service = SpamInferenceService(bundle_path=root / "spam_pipeline.joblib").load_service()
                 for i, text in enumerate(test["text"]):
                     expected = round(float(winner.predict_proba(X_test[i:i + 1])[0, 1]), 4)

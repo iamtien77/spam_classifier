@@ -178,6 +178,20 @@ def test_threshold_optimizer_scratch():
 
 
 class TestModelsModule(unittest.TestCase):
+    def test_sparse_linear_models_learn_small_tfidf_signals(self):
+        from scipy.sparse import csr_matrix
+
+        X = csr_matrix(np.eye(20)[np.arange(200) % 20] * .1)
+        y = (np.arange(200) % 20 >= 10).astype(int)
+        for model_class in (LogisticRegressionFromScratch, LinearSVMFromScratch):
+            with self.subTest(model=model_class.__name__):
+                model = model_class(C=1000).fit(X, y)
+                probabilities = model.predict_proba(X)[:, 1]
+                self.assertGreater(probabilities[y == 1].mean(), .7)
+                self.assertLess(probabilities[y == 0].mean(), .3)
+                self.assertTrue(np.isfinite(model.loss_history_).all())
+                self.assertLess(model.loss_history_[-1], model.loss_history_[0])
+
     def test_hard_voting_scores_match_decisions(self):
         class FixedModel:
             def __init__(self, score):

@@ -33,6 +33,8 @@ GIAI ĐOẠN 4: MODEL DEPLOYMENT (TRIỂN KHAI SUY LUẬN EMAIL MỚI)
 """
 
 import sys
+import json
+import hashlib
 from pathlib import Path
 
 # Đảm bảo mã hóa UTF-8 trên Windows console
@@ -63,6 +65,7 @@ from src.utils.logger import setup_logger, log_step, print_section_header
 from src.data.loader import load_raw_data
 from src.data.preprocessing import (
     clean_email_split,
+    audit_data_quality,
     stratified_split_dataframe,
     SpamTextProcessor,
 )
@@ -111,6 +114,7 @@ def step_data_preprocessing(logger, config=None):
     # Lọc chất lượng & khử trùng lặp
     logger.info("Kiểm toán và làm sạch dữ liệu (clean_email_split)...")
     cleaned_data = clean_email_split(raw_data)
+    audit = audit_data_quality(raw_data)
     logger.info(f"Số mẫu sạch giữ lại sau kiểm toán: {len(cleaned_data):,} mẫu.")
 
     # Xuất bản bộ 6 biểu đồ khám phá dữ liệu (EDA & Outliers)
@@ -129,6 +133,13 @@ def step_data_preprocessing(logger, config=None):
         test_ratio=config.test_ratio, random_state=config.random_state,
     )
     logger.info(f"Kích thước tập: Train={len(train_records):,}, Val={len(val_records):,}, Test={len(test_records):,}")
+    audit['splits'] = {
+        name: {'rows': len(frame), 'labels': frame['label'].value_counts().to_dict()}
+        for name, frame in [('train', train_records), ('validation', val_records), ('test', test_records)]
+    }
+    (METRICS_DIR / 'data_audit.json').write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2), encoding='utf-8',
+    )
 
     if hasattr(train_records, "columns"):
         y_train = np.array([1 if str(l).lower() == "spam" else 0 for l in train_records["label"]], dtype=int)
@@ -170,6 +181,7 @@ def step_data_preprocessing(logger, config=None):
     )
     logger.info(f"Top-K tối ưu được chọn: {best_sweep['top_k']} đặc trưng (Tiết kiệm {best_sweep['dimension_saving_pct']:.1f}% số chiều, Val F1 = {best_sweep['val_f1']:.4f}).")
     plot_top_k_feature_sweep(sweep_df, save_path=FIGURES_DIR / "feature_selection_sweep.png")
+    sweep_df.drop(columns=['selected_indices'], errors='ignore').to_csv(METRICS_DIR / 'top_k_sweep.csv', index=False)
 
     selected_indices = best_sweep["selected_indices"]
     X_train = X_train_full[:, selected_indices]
@@ -221,6 +233,7 @@ def step_model_training(logger, X_train, y_train, X_val=None, y_val=None, config
                 recall_target=config.recall_target, threshold_optimizer=optimizer,
             )
             models[f"{name} (Tuned)"] = tuned
+            tuned.tuning_params_ = params
             logger.info(f"[{name}] Tham số chọn trên Validation: {params}")
     return models
 
@@ -275,6 +288,17 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
     # 7. Xuất biểu đồ báo cáo
     logger.info("Xuất bản biểu đồ đánh giá vào results/figures/...")
     summary_df = evaluator.build_comparison_summary(baseline_results)
+    # Mỗi ứng viên dùng ngưỡng chốt trên Validation, để so sánh công bằng.
+    test_results = {}
+    for name, model in candidates.items():
+        threshold = float(comparison.loc[comparison.candidate_key == name, 'threshold'].iloc[0])
+        probabilities = model.predict_proba(X_test)[:, 1]
+        test_results[name] = evaluator.compute_all_metrics(
+            y_test, (probabilities >= threshold).astype(int), probabilities, beta=FBETA_BETA,
+        )
+    summary_df = evaluator.build_comparison_summary(test_results)
+    summary_df['selected_on_validation'] = summary_df['Mô hình'] == winner_name
+    summary_df.to_csv(METRICS_DIR / 'test_models_comparison.csv', index=False)
     plot_confusion_matrix_heatmap(final_metrics["confusion_matrix"], model_name=winner_name, save_path=FIGURES_DIR / "confusion_matrix.png")
     plot_roc_and_pr_curves(y_test, test_probs, best_threshold=best_threshold, model_name=winner_name, save_path=FIGURES_DIR / "roc_pr_curve.png")
     plot_models_comparison_bar(summary_df, save_path=FIGURES_DIR / "models_comparison.png")
@@ -303,6 +327,21 @@ def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected
         "metrics_test": final_metrics,
     }
     save_spam_pipeline(bundle, save_path=pipeline_path)
+    report = {
+        'experiment': 'main.py', 'model': best_th_info['candidate_key'],
+        'selection_rule': best_th_info['selection_rule'], 'threshold': best_threshold,
+        'features_before_selection': len(builder.feature_names_), 'selected_features': len(selected_indices),
+        'validation': best_th_info,
+        'test': {key: value.tolist() if isinstance(value, np.ndarray) else value
+                 for key, value in final_metrics.items()},
+        'source_sha256': {
+            str(path.relative_to(PROJECT_ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in [Path(__file__), *sorted((PROJECT_ROOT / 'src').rglob('*.py'))]
+        },
+    }
+    (METRICS_DIR / 'run_summary.json').write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8',
+    )
 
     logger.info("Khởi động dịch vụ suy luận SpamInferenceService từ file đã lưu...")
     service = SpamInferenceService(bundle_path=pipeline_path).load_service()

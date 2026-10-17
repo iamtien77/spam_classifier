@@ -2,6 +2,10 @@
 
 Chạy lần lượt 01 → 02 → 03 → 04 → 05 từ kernel sạch. Các notebook dùng thuật toán from-scratch trong `src/`; không cần chạy `main.py` để tạo artifacts.
 
+`main.py` là thí nghiệm tham chiếu cho README và báo cáo Word. Chuỗi notebook có baseline, lưới tham số và thành phần ensemble riêng nên không yêu cầu kết quả số trùng `main.py`; không trộn kết quả giữa hai thư mục. Dùng Restart & Run All trong Jupyter cho từng notebook và lưu outputs sau khi chạy thành công.
+
+LR/SVM hiện dùng gradient descent với spectral step và Armijo backtracking. SVM squared hinge dùng cùng cách chuẩn hóa L2 `lambda = 1/(C*N)` như nhánh hinge. Đây không phải Pegasos; sigmoid điểm SVM chưa được calibration.
+
 | Notebook | Thực nghiệm và đầu ra |
 |---|---|
 | 01 — EDA | Kiểm toán dữ liệu, phân bố nhãn, độ dài/ngoại lai, từ khóa, tín hiệu và tương quan. EDA toàn bộ dữ liệu chỉ mang tính mô tả. |

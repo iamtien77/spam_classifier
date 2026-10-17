@@ -242,6 +242,9 @@ class ModelSelectionWorkflow:
             info = optimizer.select_for_recall_target(scans[name], self.recall_target)
             selections[name] = info
             candidates[name] = {
+                "branch": "Tuned" if name.endswith(" (Tuned)") else "Default",
+                "parameter_source": "Grid Search" if hasattr(model, "tuning_params_") else "Pre-set",
+                "params": getattr(model, "tuning_params_", {}),
                 "threshold": info["threshold"], "target_met": info["target_met"],
                 # Không đạt mục tiêu: ưu tiên recall trước accuracy.
                 "objective_score": info["accuracy"] if info["target_met"] else info["recall"],
