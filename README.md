@@ -467,13 +467,13 @@ Các notebook dùng mã nguồn chung trong `src/`, nhưng tạo **một chuỗi
 
 Các khác biệt hiện tại cần lưu ý:
 
-| Thành phần | `main.py` | Notebooks |
-| --- | --- | --- |
-| EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch | Notebook 01 dùng dữ liệu thô |
-| Baseline LR: learning rate / số vòng | `0.1 / 200` | `1.0 / 150` |
-| Baseline SVM: learning rate / số vòng | `0.05 / 150` | `0.5 / 100` |
-| Grid Search | Lưới tại mục 4.4 | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
-| Ensemble | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5` |
+| Thành phần                            | `main.py`                    | Notebooks                                                                    |
+| --------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
+| EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                             |
+| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `1.0 / 150`                                                                |
+| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.5 / 100`                                                                |
+| Grid Search                             | Lưới tại mục 4.4           | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
+| Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5`  |
 
 Notebook 02 dùng cùng cấu hình chia tập, hybrid builder và dải Top-K với main ở cấu hình mặc định. Notebook 05 giữ winner/ngưỡng đã chốt trên Validation trước khi đánh giá Test. Ngưỡng `0.0` của SVM trong notebook 03 áp dụng trên điểm `decision_function`, tương đương ngưỡng sigmoid `0.5`.
 
@@ -517,12 +517,6 @@ Log từng giai đoạn được ghi vào `logs/pipeline.log`. Hàm lưu pipelin
 Kết quả nằm trong `notebooks/results/`, gồm `figures/`, `metrics/`, `saved_models/`. Các bảng chính: `feature_ablation.csv`, `top_k_sweep.csv`, `baseline_validation.csv`, `hyperparameter_tuning.csv`, `validation_model_selection.csv`, `test_models_comparison.csv`, `misclassified_samples.csv`.
 
 Model trung gian gồm `feature_artifacts.joblib`, `baseline_models.joblib` và `spam_pipeline.joblib`; mỗi bundle được dùng theo đúng thứ tự notebook và `run_id`.
-
-### 11.3. Tài liệu báo cáo
-
-Thư mục `docs/` có PDF đề bài, báo cáo Task 1–3, phân công và kịch bản thuyết trình. Năm báo cáo Word đã được cập nhật theo kết quả tham chiếu; bản Word trước khi chỉnh được lưu tại `docs/original_reports_before_fix.zip`.
-
-Khi đổi dữ liệu hoặc chạy thí nghiệm mới, đối chiếu báo cáo với `run_summary.json` và `data_audit.json`. `.gitignore` hiện bỏ qua dữ liệu xử lý, kết quả, model và docs; khi nộp bài cần đóng gói các tài nguyên cần thiết cùng mã nguồn, thay vì chỉ gửi bản clone Git.
 
 ---
 
