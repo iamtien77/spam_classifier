@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 from src.models.persistence import load_spam_pipeline
+from src.config import SAVED_MODELS_DIR
 
 
 class SpamInferenceService:
@@ -40,7 +41,7 @@ class SpamInferenceService:
     ):
         """Khởi tạo dịch vụ từ pipeline bundle đã đóng gói sẵn hoặc nạp từ file .joblib."""
         self.pipeline_bundle = pipeline_bundle
-        self.bundle_path = Path(bundle_path) if bundle_path is not None else Path("results/saved_models/spam_pipeline.joblib")
+        self.bundle_path = Path(bundle_path) if bundle_path is not None else SAVED_MODELS_DIR / "spam_pipeline.joblib"
         self.model = None
         self.text_processor = None
         self.feature_builder = None

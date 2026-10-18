@@ -4,7 +4,7 @@ Dự án Học Máy (Machine Learning) cho bài **“Practice 1: Classifying Spa
 
 > **Cách triển khai:** tự cài đặt các mô hình LR, Linear SVM, Naive Bayes và các chỉ số đánh giá bằng Python, NumPy/SciPy; dùng pandas để xử lý bảng và joblib để lưu model.
 >
-> **Kiểm chứng gần nhất:** **36/36 tests pass**, pipeline `main.py` và **5 notebooks** đã chạy thành công trong lần cập nhật ngày **17/10/2026**.
+> **Kiểm chứng ngày 18/10/2026:** **40/40 tests pass**, bao gồm kiểm thử tích hợp. Kết quả chạy lại `main.py` được đối chiếu từ artifacts trong `results/`. Năm notebook đã được kiểm tra cú pháp 31 code cell, chưa chạy lại toàn bộ trong đợt cập nhật này.
 >
 > **Kết quả tham chiếu:** Linear SVM (Tuned), Test Accuracy **70,85%**, Recall **85,47%**, F1 **71,46%**. Tỷ lệ chặn nhầm email hợp lệ còn cao; đây là dự án thực nghiệm phục vụ học tập.
 
@@ -119,19 +119,29 @@ File joblib lưu mô hình cùng bộ biến đổi và thứ tự cột đã ch
 
 ### 3.2. TF-IDF tự triển khai
 
-Với một token xuất hiện `tf` lần trong tài liệu, vectorizer dùng sublinear TF:
+Gọi `c(t,d)` là số lần token `t` xuất hiện trong tài liệu `d`. Vectorizer dùng sublinear TF với log tự nhiên:
 
 $$
-\operatorname{TF}(t,d)=1+\log(\operatorname{count}(t,d))
+\mathrm{TF}(t,d)=
+\begin{cases}
+1+\ln c(t,d), & c(t,d)>0, \\
+0, & c(t,d)=0.
+\end{cases}
 $$
 
 Smooth IDF được tính từ số tài liệu Train chứa token:
 
 $$
-\operatorname{IDF}(t)=\log\left(\frac{1+N}{1+\operatorname{df}(t)}\right)+1
+\mathrm{IDF}(t)=\ln\left(\frac{1+N}{1+\mathrm{df}(t)}\right)+1
 $$
 
-Mỗi khối TF-IDF được chuẩn hóa L2. Từ vựng được học trên Train với `min_df = 2`; token không có trong từ vựng được bỏ qua khi transform dữ liệu mới. Bigram và character n-gram được giữ dưới dạng đơn vị token riêng, kể cả khi chúng chứa khoảng trắng.
+Trong đó `N` là số tài liệu Train và `df(t)` là số tài liệu Train chứa token `t`. Đặt `v(t,d) = TF(t,d) × IDF(t)`, mỗi khối được chuẩn hóa L2:
+
+$$
+x_{t,d}=\frac{v_{t,d}}{\sqrt{\sum_j v_{j,d}^{2}}}
+$$
+
+Nếu toàn bộ vector bằng 0 thì giữ nguyên vector 0. Từ vựng được học trên Train với `min_df = 2`; token không có trong từ vựng được bỏ qua khi transform dữ liệu mới. Bigram và character n-gram được giữ dưới dạng đơn vị token riêng, kể cả khi chúng chứa khoảng trắng.
 
 ### 3.3. Năm khối đặc trưng lai
 
@@ -147,6 +157,8 @@ Trong lần chạy tham chiếu, mỗi email được biểu diễn bởi **4.31
 | **Tổng**         | **4.318** | Ghép ngang thành ma trận thưa                                                                                      |
 
 Tám đặc trưng số được chọn trong cấu hình là `has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`. Các biến đếm được biến đổi theo cấu hình rồi co dãn bằng `MaxAbsScalerScratch`, fit trên Train. Tên mode cũ có chữ `minmax`, nhưng scaler đang sử dụng thực tế là **MaxAbs**.
+
+Hai biểu đồ EDA về tỷ lệ tín hiệu và tương quan dùng chung `URL_PATTERN` với processor: nhận liên kết bắt đầu bằng `http://`, `https://` hoặc `www.` có nội dung theo sau. Địa chỉ email hoặc domain đơn thuần không được tính là URL theo định nghĩa này.
 
 ### 3.4. Chọn đặc trưng Top-K & ablation
 
@@ -165,14 +177,24 @@ Notebook 02 còn so sánh năm tổ hợp: Word TF-IDF; Word + Character frequen
 Mô hình tính điểm tuyến tính rồi đưa qua sigmoid:
 
 $$
-P(y=1\mid x)=\sigma(w^Tx+b)=\frac{1}{1+e^{-(w^Tx+b)}}
+z_i=w^{\top}x_i+b,\qquad p_i=\sigma(z_i)=\frac{1}{1+\exp(-z_i)}
 $$
 
-Hàm mục tiêu là Binary Cross-Entropy có trọng số lớp và điều chuẩn L2, với:
+Với nhãn `y_i ∈ {0,1}`, hàm mục tiêu Binary Cross-Entropy có trọng số lớp và điều chuẩn L2 là:
 
 $$
-\lambda=\frac{1}{C\cdot N},\qquad J=\operatorname{BCE}_{weighted}+\frac{\lambda}{2}\lVert w\rVert_2^2
+J(w,b)=-\frac{1}{N}\sum_{i=1}^{N}a_i
+\left[y_i\ln p_i+(1-y_i)\ln(1-p_i)\right]
++\frac{\lambda}{2}\sum_{j=1}^{D}w_j^2
 $$
+
+`N` là số mẫu Train, `D` là số đặc trưng, `a_i` là trọng số mẫu theo lớp; bias `b` không bị điều chuẩn. Khi dùng `class_weight="balanced"`, `a_i = N / (2 × N_{y_i})`, với `N_{y_i}` là số mẫu thuộc lớp của mẫu `i` (khi Train có đủ hai lớp). Mã nguồn tính hệ số điều chuẩn như sau:
+
+$$
+\lambda=\frac{1}{\max(10^{-5},\,C N)}
+$$
+
+Với cấu hình thực nghiệm hiện tại, công thức này tương đương `lambda = 1/(C*N)`.
 
 Loss được tính bằng `np.logaddexp` để ổn định số học. Gradient được cập nhật bằng **spectral gradient descent kết hợp Armijo backtracking**: bước học được điều chỉnh theo độ cong và giảm nếu chưa làm loss giảm đủ. Cách này đã thay vòng cập nhật bước học giảm cố định vốn hội tụ chậm trên tín hiệu TF-IDF nhỏ.
 
@@ -181,10 +203,12 @@ Loss được tính bằng `np.logaddexp` để ổn định số học. Gradien
 Nhãn được đổi sang `{-1, +1}`; mô hình tìm hàm điểm `wᵀx + b`. Với squared hinge, hàm mục tiêu là:
 
 $$
-J=\frac{\lambda}{2}\lVert w\rVert_2^2+\frac{1}{N}\sum_{i=1}^{N}a_i\max(0,1-y_i(w^Tx_i+b))^2
+J(w,b)=\frac{\lambda}{2}\sum_{j=1}^{D}w_j^2
++\frac{1}{N}\sum_{i=1}^{N}a_i
+\left[\max\left(0,\,1-\widetilde{y}_i(w^{\top}x_i+b)\right)\right]^2
 $$
 
-Trong đó `aᵢ` là trọng số lớp và `lambda = 1/(C*N)`. Lớp hỗ trợ cả `hinge` và `squared_hinge`; pipeline tham chiếu dùng **squared hinge**, tối ưu bằng gradient descent có backtracking.
+Trong đó nhãn có dấu $\widetilde{y}_i = 2y_i - 1$ thuộc `{-1,+1}`; `a_i` và `lambda` được tính như phần Logistic Regression. Lớp hỗ trợ cả `hinge` và `squared_hinge`; pipeline tham chiếu dùng **squared hinge**, tối ưu bằng gradient descent có backtracking.
 
 `decision_function()` trả điểm khoảng cách có dấu. `predict_proba()` đưa điểm qua sigmoid để dùng chung giao diện tuning/voting. Điểm sigmoid này **chưa được calibration**; cách triển khai hiện tại không phải Platt scaling. Vì vậy, không diễn giải giá trị 0,8 như một xác suất spam thực tế đã được hiệu chỉnh.
 
@@ -210,6 +234,8 @@ Trong `main.py`, lưới tuning hiện tại gồm:
 | Complement NB       | `alpha ∈ {0.5, 1.0, 2.0}` | `kind='complement'`                                                           |
 
 Mỗi cấu hình được fit trên Train và tối ưu threshold trên Validation. Bộ `ThresholdOptimizerScratch` mặc định quét **200 ngưỡng từ 0,005 đến 1,0**. Ngưỡng đạt Recall mục tiêu được xếp theo Accuracy, F1, Precision rồi FPR; nếu không đạt mục tiêu, ưu tiên Recall trước.
+
+Khi chọn siêu tham số, các cấu hình đạt Recall mục tiêu được xếp theo **Accuracy → F1**; nếu không cấu hình nào đạt, dùng **Recall → Accuracy → F1**. Việc chọn dùng thứ tự ưu tiên này, không cộng điểm Accuracy vào Recall để quyết định nhánh fallback. Tuning từ chối nhãn rỗng/không nhị phân, xác suất sai độ dài hoặc không hữu hạn/ngoài `[0,1]`, và lưới threshold rỗng hoặc không hợp lệ.
 
 `SpamVotingEnsemble` hỗ trợ soft voting và hard voting. `main.py` thử soft voting của ba mô hình mặc định và soft voting của các mô hình đã tuning; notebook 04 thử thêm hard voting. Ensemble tham gia so sánh như các ứng viên khác, không được mặc định chọn làm mô hình cuối.
 
@@ -320,6 +346,8 @@ Sender, recipient, subject line là các **ví dụ đặc trưng** trong đề;
 
 Kết quả trong phần này thuộc luồng **`main.py`**, lấy từ [`run_summary.json`](results/metrics/run_summary.json) và [`validation_model_selection.csv`](results/metrics/validation_model_selection.csv).
 
+Đã đối chiếu artifacts sau lần chạy lại ngày **18/10/2026**: cả **21 hash SHA-256** trong run summary khớp mã nguồn hiện tại. Winner, threshold và các chỉ số chính vẫn giống kết quả tham chiếu trước đó; đợt sửa kiểm tra đầu vào, phân xử hòa, đường dẫn và EDA không làm thay đổi kết quả cuối của lần chạy này.
+
 | Thuộc tính               | Giá trị                                                                                                  |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Mô hình được chọn    | **Linear SVM (Tuned)**                                                                               |
@@ -396,7 +424,7 @@ Pipeline sẽ thực hiện bốn giai đoạn ở mục 5, ghi log, tạo bản
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Lần kiểm chứng gần nhất có **36 tests pass**. Phạm vi gồm dữ liệu/encoding/CSV lỗi; chia tập; TF-IDF/scaler/Top-K; mô hình, voting và threshold; AUC đồng hạng và metrics; lưu/nạp và inference; tích hợp toàn pipeline.
+Lần kiểm chứng ngày **18/10/2026** có **40/40 tests pass**. Phạm vi gồm dữ liệu/encoding/CSV lỗi; chia tập; TF-IDF/scaler/Top-K; mô hình, voting và threshold; AUC đồng hạng và metrics; lưu/nạp và inference; tích hợp toàn pipeline. Các test mới kiểm tra đầu vào tuning, phân xử hòa/fallback, đường dẫn bundle mặc định và tính nhất quán URL giữa EDA với processor.
 
 Kiểm thử hồi quy còn kiểm tra LR/SVM học được tín hiệu nhỏ trên ma trận thưa, tránh lặp lại lỗi hội tụ hoặc phân kỳ khi thay `C`. Tests xác nhận hành vi phần mềm; chất lượng dự đoán vẫn cần đánh giá trên dữ liệu có nhãn.
 
@@ -407,9 +435,7 @@ Chạy ví dụ sau từ thư mục gốc sau khi đã có file pipeline:
 ```python
 from src.deployment.predictor import SpamInferenceService
 
-service = SpamInferenceService(
-    bundle_path="results/saved_models/spam_pipeline.joblib"
-).load_service()
+service = SpamInferenceService().load_service()
 
 result = service.predict_single(
     "Dear team, please review the meeting notes before Monday."
@@ -422,6 +448,8 @@ batch_results = service.predict_batch([
 ])
 print(batch_results[["prediction", "spam_probability", "threshold_used"]])
 ```
+
+Đường dẫn bundle mặc định là `SAVED_MODELS_DIR / "spam_pipeline.joblib"`, được xác định từ thư mục dự án, không phụ thuộc thư mục làm việc. Python vẫn cần import được package `src`. Có thể truyền `bundle_path` để chọn model khác; đường dẫn tùy chỉnh tương đối được tính từ thư mục làm việc hiện tại.
 
 `predict_single()` trả dictionary gồm `raw_text`, `prediction`, `is_spam`, `spam_probability`, `threshold_used`, `risk_level`, `detected_signals`. `predict_batch()` trả DataFrame. Tên trường `spam_probability` là giao diện hiện tại; với SVM/voting, nên đọc giá trị này như điểm dự đoán chưa hiệu chỉnh. `risk_level` là nhãn diễn giải theo quy tắc trong dịch vụ.
 
@@ -436,6 +464,18 @@ Sau khi thay cấu hình đặc trưng hoặc thuật toán, chạy lại thí n
 ## 10. Năm Jupyter Notebooks & Quy Tắc Tái Lập
 
 Các notebook dùng mã nguồn chung trong `src/`, nhưng tạo **một chuỗi thực nghiệm riêng** với baseline, lưới tham số và ensemble khác `main.py`. Vì vậy, kết quả và mô hình thắng có thể khác nhau. Báo cáo số liệu cần ghi rõ thuộc luồng nào.
+
+Các khác biệt hiện tại cần lưu ý:
+
+| Thành phần | `main.py` | Notebooks |
+| --- | --- | --- |
+| EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch | Notebook 01 dùng dữ liệu thô |
+| Baseline LR: learning rate / số vòng | `0.1 / 200` | `1.0 / 150` |
+| Baseline SVM: learning rate / số vòng | `0.05 / 150` | `0.5 / 100` |
+| Grid Search | Lưới tại mục 4.4 | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
+| Ensemble | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5` |
+
+Notebook 02 dùng cùng cấu hình chia tập, hybrid builder và dải Top-K với main ở cấu hình mặc định. Notebook 05 giữ winner/ngưỡng đã chốt trên Validation trước khi đánh giá Test. Ngưỡng `0.0` của SVM trong notebook 03 áp dụng trên điểm `decision_function`, tương đương ngưỡng sigmoid `0.5`.
 
 | Thứ tự | Notebook                                                                                      | Nội dung chính                                                              |
 | -------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |

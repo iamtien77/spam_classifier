@@ -41,10 +41,24 @@ class ThresholdOptimizerScratch:
         """Khởi tạo mục tiêu Recall, hệ số Beta trong F-beta score, và số mốc ngưỡng quét."""
         self.recall_target = float(recall_target)
         self.beta = float(beta)
+        if not np.isfinite(self.recall_target) or not 0 <= self.recall_target <= 1:
+            raise ValueError("recall_target phải hữu hạn và thuộc [0, 1].")
+        if not np.isfinite(self.beta) or self.beta <= 0:
+            raise ValueError("beta phải hữu hạn và dương.")
         if default_grid is not None:
-            self.grid = np.asarray(default_grid, dtype=float)
+            self.grid = self._validate_grid(default_grid)
         else:
+            if not isinstance(n_points, (int, np.integer)) or n_points < 1:
+                raise ValueError("n_points phải là số nguyên dương.")
             self.grid = np.linspace(0.005, 1.0, n_points)
+
+    @staticmethod
+    def _validate_grid(thresholds):
+        grid = np.asarray(thresholds, dtype=float)
+        if (grid.ndim != 1 or grid.size == 0 or not np.all(np.isfinite(grid))
+                or np.any((grid < 0) | (grid > 1))):
+            raise ValueError("Lưới threshold phải một chiều, không rỗng, hữu hạn và thuộc [0, 1].")
+        return grid
 
     @staticmethod
     def fbeta_from_precision_recall(precision: float, recall: float, beta: float = 2.0) -> float:
@@ -60,8 +74,15 @@ class ThresholdOptimizerScratch:
         spam_probs: np.ndarray,
         threshold: float,
     ) -> Dict[str, Any]:
-        y_arr = np.asarray(y_true, dtype=int).ravel()
+        y_arr = np.asarray(y_true).ravel()
         probs = np.asarray(spam_probs, dtype=float).ravel()
+        if not y_arr.size or y_arr.size != probs.size:
+            raise ValueError("Nhãn và xác suất phải không rỗng và có cùng độ dài.")
+        if not np.all(np.isin(y_arr, [0, 1])):
+            raise ValueError("Nhãn đánh giá phải là 0 hoặc 1.")
+        if not np.all(np.isfinite(probs)) or np.any((probs < 0) | (probs > 1)):
+            raise ValueError("Xác suất phải hữu hạn và thuộc [0, 1].")
+        self._validate_grid([threshold])
         y_pred = (probs >= float(threshold)).astype(int)
 
         tp = int(np.sum((y_arr == 1) & (y_pred == 1)))
@@ -103,7 +124,7 @@ class ThresholdOptimizerScratch:
         thresholds: Optional[np.ndarray] = None,
     ) -> pd.DataFrame:
         """Xuất bảng chi tiết tất cả các chỉ số ứng với từng mốc threshold."""
-        grid = self.grid if thresholds is None else np.asarray(thresholds, dtype=float)
+        grid = self._validate_grid(self.grid if thresholds is None else thresholds)
         records = [
             self.compute_metrics_at_threshold(y_true, spam_scores, th)
             for th in grid
@@ -124,6 +145,10 @@ class ThresholdOptimizerScratch:
     ) -> Dict[str, Any]:
         """Chọn ngưỡng đạt Recall >= recall_target và có Accuracy / F1 cao nhất."""
         target = self.recall_target if recall_target is None else float(recall_target)
+        if not np.isfinite(target) or not 0 <= target <= 1:
+            raise ValueError("recall_target phải hữu hạn và thuộc [0, 1].")
+        if threshold_df.empty:
+            raise ValueError("Bảng threshold không được rỗng.")
         work_df = threshold_df.copy()
         work_df["target_met"] = work_df["recall"] >= target
 
@@ -169,13 +194,21 @@ def tune_model_hyperparameters(
 
     keys = list(param_grid.keys())
     combinations = list(itertools.product(*[param_grid[k] for k in keys]))
+    if not combinations:
+        raise ValueError("Lưới siêu tham số phải có ít nhất một tổ hợp.")
+    if recall_target is not None and (not np.isfinite(recall_target) or not 0 <= recall_target <= 1):
+        raise ValueError("recall_target phải hữu hạn và thuộc [0, 1].")
 
     best_score = -float("inf")
+    best_rank = None
     best_model = None
     best_params = {}
 
-    y_val_arr = np.asarray(y_val, dtype=int).ravel()
-    y_train_arr = np.asarray(y_train, dtype=int).ravel()
+    from src.evaluation.metrics import SpamModelEvaluator
+    evaluator = SpamModelEvaluator()
+    y_val_arr = np.asarray(y_val).ravel()
+    evaluator.compute_confusion_matrix(y_val_arr, y_val_arr)
+    evaluator.compute_confusion_matrix(y_train, y_train)
 
     for combo in combinations:
         params = dict(zip(keys, combo))
@@ -183,12 +216,14 @@ def tune_model_hyperparameters(
         model.fit(X_train, y_train)
 
         if threshold_optimizer is not None:
-            threshold_info = threshold_optimizer.select_best_threshold(
-                threshold_optimizer.metrics_table(y_val, model.predict_proba(X_val)[:, 1])
+            probabilities = model.predict_proba(X_val)[:, 1]
+            threshold_info = threshold_optimizer.select_for_recall_target(
+                threshold_optimizer.metrics_table(y_val, probabilities), recall_target,
             )
-            y_pred = (model.predict_proba(X_val)[:, 1] >= threshold_info["threshold"]).astype(int)
+            y_pred = (probabilities >= threshold_info["threshold"]).astype(int)
         else:
-            y_pred = np.asarray(model.predict(X_val), dtype=int).ravel()
+            y_pred = np.asarray(model.predict(X_val)).ravel()
+        evaluator.compute_confusion_matrix(y_val_arr, y_pred)
 
         tp = int(np.sum((y_val_arr == 1) & (y_pred == 1)))
         fp = int(np.sum((y_val_arr == 0) & (y_pred == 1)))
@@ -212,7 +247,14 @@ def tune_model_hyperparameters(
         else:
             score = accuracy
 
-        if score > best_score:
+        # So sánh theo thứ tự ưu tiên, không trộn Recall và Accuracy thành một điểm.
+        if recall_target is not None:
+            target_met = recall >= float(recall_target)
+            rank = (target_met, accuracy if target_met else recall, accuracy, f1)
+        else:
+            rank = (score,)
+        if best_rank is None or rank > best_rank:
+            best_rank = rank
             best_score = score
             best_model = model
             best_params = params

@@ -87,6 +87,16 @@ def test_inference_service_batch_prediction():
 
 
 class TestDeploymentModule(unittest.TestCase):
+    def test_default_bundle_path(self):
+        from unittest.mock import patch
+        from src.config import SAVED_MODELS_DIR
+        bundle = _create_toy_pipeline_bundle()
+        with patch('src.deployment.predictor.load_spam_pipeline', return_value=bundle) as load:
+            SpamInferenceService().load_service()
+            load.assert_called_once_with(SAVED_MODELS_DIR / 'spam_pipeline.joblib')
+        self.assertEqual(SpamInferenceService(bundle_path='custom.joblib').bundle_path,
+                         Path('custom.joblib'))
+
     def test_selected_columns_roundtrip(self):
         for full_width in (True, False):
             with self.subTest(full_width=full_width), tempfile.TemporaryDirectory() as tmp:

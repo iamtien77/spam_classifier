@@ -178,6 +178,49 @@ def test_threshold_optimizer_scratch():
 
 
 class TestModelsModule(unittest.TestCase):
+    def test_threshold_invalid_inputs(self):
+        optimizer = ThresholdOptimizerScratch()
+        for labels, scores in [([], []), ([0, 1], [.8]), ([0, .5], [.2, .8]),
+                               ([0, 1], [.2, np.nan]), ([0, 1], [.2, 1.1])]:
+            with self.subTest(labels=labels, scores=scores), self.assertRaises(ValueError):
+                optimizer.metrics_table(labels, scores)
+        for grid in ([], [np.nan], [-.1], [1.1], [[.5]]):
+            with self.subTest(grid=grid), self.assertRaises(ValueError):
+                optimizer.metrics_table([0, 1], [.2, .8], thresholds=grid)
+            with self.subTest(default_grid=grid), self.assertRaises(ValueError):
+                ThresholdOptimizerScratch(default_grid=grid)
+        for kwargs in ({'recall_target': np.nan}, {'recall_target': 1.1},
+                       {'beta': 0}, {'beta': np.inf}, {'n_points': 0}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                ThresholdOptimizerScratch(**kwargs)
+
+    def test_tuning_ranks_ties_and_fallback(self):
+        from src.models.tuning import tune_model_hyperparameters
+
+        class Candidate:
+            def __init__(self, predictions):
+                self.predictions = predictions
+
+            def fit(self, X, y):
+                return self
+
+            def predict(self, X):
+                return np.array(self.predictions)
+
+        cases = [
+            ([0, 0, 1, 1], [[0, 0, 0, 1], [1, 0, 1, 1]], .5),
+            # Recall must outrank accuracy even when its improvement is tiny.
+            ([1] * 1000 + [0] * 1000,
+             [[1] * 500 + [0] * 1500, [1] * 501 + [0] * 499 + [1] * 1000], .85),
+        ]
+        for labels, candidates, target in cases:
+            with self.subTest(target=target):
+                _, params, _ = tune_model_hyperparameters(
+                    'toy', Candidate, {'predictions': candidates}, None, labels,
+                    None, labels, recall_target=target,
+                )
+                self.assertTrue(params['predictions'] is candidates[1])
+
     def test_sparse_linear_models_learn_small_tfidf_signals(self):
         from scipy.sparse import csr_matrix
 

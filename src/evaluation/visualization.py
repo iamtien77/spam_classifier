@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from src.evaluation.metrics import SpamModelEvaluator
+from src.data.preprocessing import URL_PATTERN
 
 
 def plot_class_distribution(
@@ -180,7 +181,7 @@ def plot_spam_signals_comparison(
         caps_ratio = (uppers / letters) if letters else 0.0
         has_excl = "!" in t_str
         has_curr = bool(re.search(r"[$£€¥]|\b(?:cash|prize|free|money|dollar|bonus)\b", t_str, re.IGNORECASE))
-        has_url = bool(re.search(r"https?://|www\.|\.com|\.org|\.net|[a-z0-9]+@[a-z0-9]+\.[a-z]{2,}", t_str, re.IGNORECASE))
+        has_url = bool(URL_PATTERN.search(t_str))
         has_phone = bool(re.search(r"\b\d{7,}\b|\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b", t_str))
         has_shout = caps_ratio >= 0.12
         return {
@@ -202,7 +203,7 @@ def plot_spam_signals_comparison(
         ("Dấu chấm than (!)", "excl"),
         ("Tiền tệ / Quà tặng ($/£/win)", "curr"),
         ("Tỷ lệ chữ hoa (>12%)", "shout"),
-        ("Liên kết Web / Email (URL)", "url"),
+        ("Liên kết Web (http/https/www)", "url"),
         ("Số ĐT / Chuỗi số dài", "phone"),
     ]
 
@@ -405,7 +406,7 @@ def plot_feature_correlation_heatmap(
         digits = sum(1 for c in t_str if c.isdigit())
         excls = t_str.count("!")
         currs = len(re.findall(r"[$£€¥]", t_str))
-        has_url = float(bool(re.search(r"https?://|www\.|\.com|\.org|\.net", t_str, re.IGNORECASE)))
+        has_url = float(bool(URL_PATTERN.search(t_str)))
         has_phone = float(bool(re.search(r"\b\d{7,}\b", t_str)))
         is_spam = 1.0 if str(row[label_col]).lower() == "spam" else 0.0
 

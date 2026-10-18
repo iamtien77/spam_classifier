@@ -80,6 +80,32 @@ def test_error_analysis_extraction():
 
 
 class TestEvaluationModule(unittest.TestCase):
+    def test_url_plots_match_pipeline(self):
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from src.data.preprocessing import SpamTextProcessor
+        from src.evaluation.visualization import plot_spam_signals_comparison, plot_feature_correlation_heatmap
+        frame = pd.DataFrame({'label': ['ham', 'ham', 'spam', 'spam'],
+                              'text': ['contact@example.com', 'plain text',
+                                       'https://example.com', 'www.example.org']})
+        urls = [SpamTextProcessor().extract_structural_features(t)['has_url'] for t in frame.text]
+        try:
+            with patch('matplotlib.pyplot.show'):
+                plot_spam_signals_comparison(frame)
+            axis = plt.gcf().axes[0]
+            self.assertEqual([axis.containers[0][3].get_height(), axis.containers[1][3].get_height()],
+                             [np.mean(urls[:2]) * 100, np.mean(urls[2:]) * 100])
+            with patch('matplotlib.pyplot.show'):
+                plot_feature_correlation_heatmap(frame)
+            axis = plt.gcf().axes[0]
+            labels = [label.get_text() for label in axis.get_xticklabels()]
+            correlation = axis.images[0].get_array()
+            self.assertAlmostEqual(float(correlation[labels.index('Chứa URL'), labels.index('Nhãn là Spam')]),
+                                   float(np.corrcoef(urls, [0, 0, 1, 1])[0, 1]))
+        finally:
+            plt.close('all')
+
     def test_plot_auc_matches_metrics_for_ties_and_single_class(self):
         from src.evaluation.visualization import plot_roc_and_pr_curves, plt
 
