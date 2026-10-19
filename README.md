@@ -446,12 +446,12 @@ batch_results = service.predict_batch([
     "URGENT! Claim your free cash prize now!",
     "Please send the weekly project report when ready.",
 ])
-print(batch_results[["prediction", "spam_probability", "threshold_used"]])
+print(batch_results[["prediction", "spam_score", "is_calibrated", "threshold_used"]])
 ```
 
 Đường dẫn bundle mặc định là `SAVED_MODELS_DIR / "spam_pipeline.joblib"`, được xác định từ thư mục dự án, không phụ thuộc thư mục làm việc. Python vẫn cần import được package `src`. Có thể truyền `bundle_path` để chọn model khác; đường dẫn tùy chỉnh tương đối được tính từ thư mục làm việc hiện tại.
 
-`predict_single()` trả dictionary gồm `raw_text`, `prediction`, `is_spam`, `spam_probability`, `threshold_used`, `risk_level`, `detected_signals`. `predict_batch()` trả DataFrame. Tên trường `spam_probability` là giao diện hiện tại; với SVM/voting, nên đọc giá trị này như điểm dự đoán chưa hiệu chỉnh. `risk_level` là nhãn diễn giải theo quy tắc trong dịch vụ.
+`predict_single()` trả dictionary gồm `raw_text`, `prediction`, `is_spam`, `spam_score`, `threshold_used`, `risk_level`, `detected_signals` và metadata diễn giải điểm. `predict_batch()` trả DataFrame. Trường cũ `spam_probability` được giữ làm alias của `spam_score`; `is_calibrated=False` và `score_note` nêu rõ chưa hiệu chỉnh. `risk_level` là Cao/Thấp theo quyết định tại threshold, không phải xác suất rủi ro; xem `risk_basis`.
 
 ### 9.5. Thay đổi cấu hình thực nghiệm
 

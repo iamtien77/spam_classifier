@@ -76,6 +76,11 @@ notebooks/results/metrics/*
 
 # Tài liệu và báo cáo cá nhân (Docs, PDF, Word, Notebook gốc lớn)
 docs/*
+docs/review_fixes.md
+docs/data_provenance.md
+results/experiments/
+results/archive/
+
 
 # Theo dõi tài liệu đề bài và thư mục thuật toán
 !docs/Algorithms/
@@ -89,4 +94,5 @@ docs/*
 !docs/agents/
 !docs/agents/**
 data/processed/
+
 

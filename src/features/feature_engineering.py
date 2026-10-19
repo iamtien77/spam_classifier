@@ -13,6 +13,35 @@ from src.config import SpamExperimentConfig
 from src.data.preprocessing import SpamTextProcessor
 
 
+class FittedFeatureTransform:
+    """Fitted builder and ordered column selection shared by train and inference.
+
+    The builder remains unchanged, so legacy bundles/notebooks can still access
+    full-width features. This object never fits on incoming records.
+    """
+
+    def __init__(self, builder, selected_indices=None):
+        self.builder = builder
+        self.selected_indices = None if selected_indices is None else tuple(selected_indices)
+
+    def select_matrix(self, matrix):
+        import numpy as np
+        if hasattr(matrix, "to_scipy_csr"):
+            matrix = matrix.to_scipy_csr()
+        if self.selected_indices is None:
+            return matrix
+        indices = np.asarray(self.selected_indices)
+        if (indices.ndim != 1 or indices.size == 0
+                or not np.issubdtype(indices.dtype, np.integer)
+                or np.any(indices < 0) or np.any(indices >= matrix.shape[1])
+                or len(np.unique(indices)) != len(indices)):
+            raise ValueError("selected_indices phải là chỉ số cột nguyên, hợp lệ và không trùng.")
+        return matrix[:, indices]
+
+    def transform(self, records):
+        return self.select_matrix(self.builder.transform(records))
+
+
 class CSRMatrixScratch:
     """Ma trận Compressed Sparse Row độc lập với SciPy.
 

@@ -14,7 +14,7 @@ Module này đóng gói dịch vụ SpamInferenceService sẵn sàng đưa vào 
    - So sánh xác suất với ngưỡng quyết định tối ưu (Best Decision Threshold)
 3. Trả về kết quả JSON / Dictionary chi tiết:
    - Nhãn dự đoán: 'SPAM' hoặc 'NOT SPAM / HAM'
-   - Điểm số xác suất (Spam Probability [0.0, 1.0])
+   - Điểm phân loại chưa calibration [0.0, 1.0]
    - Danh sách các tín hiệu rủi ro bị kích hoạt (Triggered Keywords & Signals).
 """
 
@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 from src.models.persistence import load_spam_pipeline
 from src.config import SAVED_MODELS_DIR
+from src.features.feature_engineering import FittedFeatureTransform
 
 
 class SpamInferenceService:
@@ -67,6 +68,7 @@ class SpamInferenceService:
         self.feature_builder = feature_builder
         self.text_processor = self.pipeline_bundle.get("text_processor")
         self.selected_indices = self.pipeline_bundle.get("selected_indices", None)
+        self.feature_transform = FittedFeatureTransform(feature_builder, self.selected_indices)
 
         return self
 
@@ -98,28 +100,14 @@ class SpamInferenceService:
 
     def predict_single(self, email_text: str) -> Dict[str, Any]:
         """Phân loại một email mới duy nhất."""
+        if not isinstance(email_text, str) or not email_text.strip():
+            raise ValueError("Email phải là chuỗi văn bản không rỗng.")
         if self.model is None:
             self.load_service()
 
         signals = self._extract_signals(email_text)
 
-        # Trích xuất đặc trưng
-        if self.feature_builder is not None:
-            X_input = self.feature_builder.transform([{"text": email_text, "raw_text": email_text}])
-            if hasattr(X_input, "to_scipy_csr"):
-                X_mat = X_input.to_scipy_csr()
-            else:
-                X_mat = X_input
-            if self.selected_indices is not None:
-                sel_idx = np.asarray(self.selected_indices)
-                if (sel_idx.ndim != 1 or sel_idx.size == 0
-                        or not np.issubdtype(sel_idx.dtype, np.integer)
-                        or np.any(sel_idx < 0) or np.any(sel_idx >= X_mat.shape[1])
-                        or len(np.unique(sel_idx)) != len(sel_idx)):
-                    raise ValueError("selected_indices phải là các chỉ số cột nguyên, hợp lệ và không trùng.")
-                X_mat = X_mat[:, sel_idx]
-        else:
-            raise RuntimeError("Dịch vụ chưa được nạp feature_builder để xử lý văn bản.")
+        X_mat = self.feature_transform.transform([{"text": email_text, "raw_text": email_text}])
 
         # Dự đoán xác suất
         if hasattr(self.model, "predict_proba"):
@@ -135,22 +123,24 @@ class SpamInferenceService:
         is_spam = bool(prob_spam >= self.threshold)
         label = "SPAM" if is_spam else "NOT SPAM / HAM"
 
-        if prob_spam >= 0.80:
-            risk_level = "Rất cao"
-        elif is_spam:
-            risk_level = "Cao"
-        elif prob_spam >= self.threshold * 0.6:
-            risk_level = "Trung bình"
-        else:
-            risk_level = "Thấp"
+        if not np.isfinite(prob_spam) or not 0 <= prob_spam <= 1:
+            raise ValueError("Điểm phân loại phải hữu hạn và thuộc [0, 1].")
+        # Heuristic relative to the selected threshold, not a probability of harm.
+        risk_level = "Cao" if is_spam else "Thấp"
 
         return {
             "raw_text": email_text,
             "prediction": label,
             "is_spam": is_spam,
+            "spam_score": round(prob_spam, 4),
+            "score_kind": "uncalibrated_score",
+            "is_calibrated": False,
+            "score_note": "Điểm phân loại chưa calibration; không diễn giải thành xác suất thực tế.",
+            # Legacy alias retained for existing notebooks and consumers.
             "spam_probability": round(prob_spam, 4),
             "threshold_used": round(self.threshold, 4),
             "risk_level": risk_level,
+            "risk_basis": "Quy tắc theo ngưỡng phân loại, không phải ước lượng xác suất rủi ro.",
             "detected_signals": signals,
         }
 

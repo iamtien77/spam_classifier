@@ -20,7 +20,7 @@ Chuẩn hóa theo yêu cầu đề bài (ML project: Classifying Spam Emails - W
 
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, issparse
 
 
 def _safe_dot(X: Any, w: np.ndarray) -> np.ndarray:
@@ -54,6 +54,53 @@ def _get_shape(X: Any) -> Tuple[int, int]:
     if isinstance(X, (list, tuple)):
         return len(X), len(X[0]) if len(X) > 0 else 0
     raise ValueError(f"Không thể xác định kích thước cho đối tượng kiểu {type(X)}")
+
+
+def _validate_matrix(X, expected_features=None, nonnegative=False):
+    """Validate dense/sparse inputs without densifying a sparse matrix."""
+    if not issparse(X) and not hasattr(X, "iter_row"):
+        X = np.asarray(X, dtype=float)
+    if len(X.shape) != 2 or X.shape[0] == 0 or X.shape[1] == 0:
+        raise ValueError("X phải là ma trận hai chiều không rỗng.")
+    values = np.asarray(X.data if issparse(X) or hasattr(X, "iter_row") else X, dtype=float)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("X phải chứa các giá trị hữu hạn.")
+    if nonnegative and np.any(values < 0):
+        raise ValueError("Naive Bayes yêu cầu đặc trưng không âm.")
+    if expected_features is not None and X.shape[1] != expected_features:
+        raise ValueError("Số đặc trưng phải khớp với dữ liệu huấn luyện.")
+    return X
+
+
+def _validate_training(X, y, nonnegative=False):
+    X = _validate_matrix(X, nonnegative=nonnegative)
+    labels = np.asarray(y)
+    if labels.ndim != 1 or len(labels) != X.shape[0]:
+        raise ValueError("y phải là vector một chiều có số nhãn bằng số mẫu X.")
+    if not np.all(np.isin(labels, [0, 1])):
+        raise ValueError("Nhãn huấn luyện phải là 0 hoặc 1.")
+    if len(np.unique(labels)) != 2:
+        raise ValueError("Huấn luyện phân loại nhị phân cần đủ hai lớp 0 và 1.")
+    return X, labels.astype(float)
+
+
+def _positive(name, value):
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} phải hữu hạn và dương.")
+
+
+def _validate_linear_parameters(model):
+    _positive("C", model.C)
+    _positive("learning_rate", model.learning_rate)
+    if isinstance(model.max_iter, bool) or not isinstance(model.max_iter, (int, np.integer)) or model.max_iter < 1:
+        raise ValueError("max_iter phải là số nguyên dương.")
+    if model.class_weight not in (None, "balanced"):
+        raise ValueError("class_weight phải là None hoặc 'balanced'.")
+
+
+def _validate_threshold(threshold, probability=True):
+    if not np.isfinite(threshold) or (probability and not 0 <= threshold <= 1):
+        raise ValueError("Ngưỡng phải hữu hạn và thuộc miền điểm dự đoán.")
 
 
 def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, tol=1e-7):
@@ -120,8 +167,9 @@ class LogisticRegressionFromScratch:
         self.loss_history_: list = []
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "LogisticRegressionFromScratch":
+        _validate_linear_parameters(self)
+        X, y_arr = _validate_training(X, y)
         n_samples, n_features = _get_shape(X)
-        y_arr = np.asarray(y, dtype=float).ravel()
 
         if self.class_weight == "balanced":
             n_0 = max(1, int(np.sum(y_arr == 0.0)))
@@ -154,6 +202,7 @@ class LogisticRegressionFromScratch:
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
         if self.weights_ is None:
             raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+        X = _validate_matrix(X, len(self.weights_))
         z = _safe_dot(X, self.weights_) + self.bias_
         z_clipped = np.clip(z, -30.0, 30.0)
         prob_spam = 1.0 / (1.0 + np.exp(-z_clipped))
@@ -161,6 +210,7 @@ class LogisticRegressionFromScratch:
         return np.column_stack([prob_ham, prob_spam])
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.5) -> np.ndarray:
+        _validate_threshold(threshold)
         probs = self.predict_proba(X)[:, 1]
         return (probs >= threshold).astype(int)
 
@@ -187,7 +237,7 @@ class LinearSVMFromScratch:
     ):
         self.C = float(C)
         self.learning_rate = float(learning_rate)
-        self.max_iter = int(max_iter)
+        self.max_iter = max_iter
         self.class_weight = class_weight
         self.loss = loss
         self.tol = float(tol)
@@ -215,9 +265,11 @@ class LinearSVMFromScratch:
         self.bias_ = val
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "LinearSVMFromScratch":
+        _validate_linear_parameters(self)
+        _positive("tol", self.tol)
+        X, y_arr = _validate_training(X, y)
         n_samples, n_features = _get_shape(X)
         self.n_features_in_ = n_features
-        y_arr = np.asarray(y, dtype=float).ravel()
         y_signed = np.where(y_arr == 1.0, 1.0, -1.0)
 
         if self.class_weight == "balanced":
@@ -257,9 +309,11 @@ class LinearSVMFromScratch:
     def decision_function(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
         if self.weights_ is None:
             raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+        X = _validate_matrix(X, len(self.weights_))
         return _safe_dot(X, self.weights_) + self.bias_
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
+        """Sigmoid margin scores for compatibility; not calibrated probabilities."""
         z = self.decision_function(X)
         z_clipped = np.clip(z, -30.0, 30.0)
         prob_spam = 1.0 / (1.0 + np.exp(-z_clipped))
@@ -267,6 +321,7 @@ class LinearSVMFromScratch:
         return np.column_stack([prob_ham, prob_spam])
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.0) -> np.ndarray:
+        _validate_threshold(threshold, probability=False)
         scores = self.decision_function(X)
         return (scores >= threshold).astype(int)
 
@@ -290,11 +345,12 @@ class NaiveBayesClassifier:
         self.feature_log_prob_: Optional[np.ndarray] = None
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "NaiveBayesClassifier":
+        _positive("alpha", self.alpha)
+        if self.kind not in ("multinomial", "complement"):
+            raise ValueError("kind phải là multinomial hoặc complement.")
+        X, y_arr = _validate_training(X, y, nonnegative=True)
         n_samples, n_features = _get_shape(X)
-        y_arr = np.asarray(y, dtype=int).ravel()
-        self.classes_ = np.unique(y_arr)
-        if len(self.classes_) != 2:
-            self.classes_ = np.array([0, 1], dtype=int)
+        self.classes_ = np.array([0, 1], dtype=int)
 
         self.class_log_prior_ = np.array(
             [np.log(max(1, int(np.sum(y_arr == c))) / n_samples) for c in self.classes_],
@@ -325,6 +381,8 @@ class NaiveBayesClassifier:
         if self.feature_log_prob_ is None or self.class_log_prior_ is None:
             raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
 
+        X = _validate_matrix(X, self.feature_log_prob_.shape[1], nonnegative=True)
+
         scores_list = []
         for idx, _ in enumerate(self.classes_):
             if self.kind == "multinomial":
@@ -343,6 +401,7 @@ class NaiveBayesClassifier:
         return probs
 
     def predict(self, X: Union[np.ndarray, csr_matrix], threshold: float = 0.5) -> np.ndarray:
+        _validate_threshold(threshold)
         probs = self.predict_proba(X)[:, 1]
         return (probs >= threshold).astype(int)
 

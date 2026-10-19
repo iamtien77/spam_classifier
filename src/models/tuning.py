@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
+from src.evaluation.metrics import SpamModelEvaluator
 
 
 class ThresholdOptimizerScratch:
@@ -85,36 +86,14 @@ class ThresholdOptimizerScratch:
         self._validate_grid([threshold])
         y_pred = (probs >= float(threshold)).astype(int)
 
-        tp = int(np.sum((y_arr == 1) & (y_pred == 1)))
-        fp = int(np.sum((y_arr == 0) & (y_pred == 1)))
-        tn = int(np.sum((y_arr == 0) & (y_pred == 0)))
-        fn = int(np.sum((y_arr == 1) & (y_pred == 0)))
-
-        total = tp + fp + tn + fn
-        accuracy = (tp + tn) / total if total > 0 else 0.0
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
-        f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-        f_beta = self.fbeta_from_precision_recall(precision, recall, beta=self.beta)
-
+        metrics = SpamModelEvaluator().compute_all_metrics(y_arr, y_pred, beta=self.beta)
         return {
             "threshold": float(threshold),
-            "tp": tp,
-            "fp": fp,
-            "tn": tn,
-            "fn": fn,
-            "accuracy": float(accuracy),
-            "precision": float(precision),
-            "recall": float(recall),
-            "tpr": float(recall),
-            "fpr": float(fpr),
-            "specificity": float(specificity),
-            "f1": float(f1),
-            "f2": float(f_beta),
-            "f_beta": float(f_beta),
-            "target_met": bool(recall >= self.recall_target),
+            **{key: value for key, value in metrics.items()
+               if key not in ("confusion_matrix", "roc_auc")},
+            "tpr": metrics["recall"],
+            "f2": self.fbeta_from_precision_recall(metrics["precision"], metrics["recall"], beta=2.0),
+            "target_met": bool(metrics["recall"] >= self.recall_target),
         }
 
     def metrics_table(
@@ -204,7 +183,6 @@ def tune_model_hyperparameters(
     best_model = None
     best_params = {}
 
-    from src.evaluation.metrics import SpamModelEvaluator
     evaluator = SpamModelEvaluator()
     y_val_arr = np.asarray(y_val).ravel()
     evaluator.compute_confusion_matrix(y_val_arr, y_val_arr)
@@ -223,16 +201,8 @@ def tune_model_hyperparameters(
             y_pred = (probabilities >= threshold_info["threshold"]).astype(int)
         else:
             y_pred = np.asarray(model.predict(X_val)).ravel()
-        evaluator.compute_confusion_matrix(y_val_arr, y_pred)
-
-        tp = int(np.sum((y_val_arr == 1) & (y_pred == 1)))
-        fp = int(np.sum((y_val_arr == 0) & (y_pred == 1)))
-        fn = int(np.sum((y_val_arr == 1) & (y_pred == 0)))
-        tn = int(np.sum((y_val_arr == 0) & (y_pred == 0)))
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        accuracy = (tp + tn) / max(len(y_val_arr), 1)
-        f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        metrics = evaluator.compute_all_metrics(y_val_arr, y_pred)
+        recall, accuracy, f1 = metrics["recall"], metrics["accuracy"], metrics["f1"]
 
         if recall_target is not None:
             # Constrained objective: nếu đạt recall mục tiêu, tối đa hóa accuracy; nếu không đạt, phạt nặng

@@ -70,6 +70,7 @@ from src.data.preprocessing import (
     SpamTextProcessor,
 )
 from src.features.feature_engineering import (
+    FittedFeatureTransform,
     SpamSignalFeatureExtractor,
     HybridFeatureBuilderScratch,
     ManualFeatureSelectorScratch,
@@ -82,7 +83,7 @@ from src.models.classifiers import (
 )
 from src.models.ensemble import SpamVotingEnsemble
 from src.models.tuning import ThresholdOptimizerScratch, ModelSelectionWorkflow, tune_model_hyperparameters
-from src.models.persistence import save_spam_pipeline
+from src.models.persistence import save_spam_pipeline, experiment_metadata, archive_run_outputs
 from src.evaluation.metrics import SpamModelEvaluator
 from src.evaluation.visualization import (
     plot_class_distribution,
@@ -160,6 +161,11 @@ def step_data_preprocessing(logger, config=None):
         signal_extractor=signal_extractor,
     )
 
+    builder.run_metadata_ = experiment_metadata(config, raw_data)
+    builder.run_metadata_["split_source_ids"] = {
+        name: frame["source_id"].tolist()
+        for name, frame in (("train", train_records), ("validation", val_records), ("test", test_records))
+    }
     X_train_raw = builder.fit(train_records).transform(train_records)
     logger.info(f"Ngưỡng cắt số từ sau chuẩn hóa, học trên Train: max_words = {builder.cap_word_limit_}")
     X_val_raw = builder.transform(val_records)
@@ -184,9 +190,10 @@ def step_data_preprocessing(logger, config=None):
     sweep_df.drop(columns=['selected_indices'], errors='ignore').to_csv(METRICS_DIR / 'top_k_sweep.csv', index=False)
 
     selected_indices = best_sweep["selected_indices"]
-    X_train = X_train_full[:, selected_indices]
-    X_val = X_val_full[:, selected_indices]
-    X_test = X_test_full[:, selected_indices]
+    feature_transform = FittedFeatureTransform(builder, selected_indices)
+    X_train = feature_transform.select_matrix(X_train_full)
+    X_val = feature_transform.select_matrix(X_val_full)
+    X_test = feature_transform.select_matrix(X_test_full)
     logger.info(f"Ma trận sau chọn lọc: {X_train.shape[0]:,} mẫu x {X_train.shape[1]:,} chiều.")
 
     return (
@@ -266,6 +273,8 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
     best_threshold = float(best_th_info["threshold"])
     logger.info(f"Ngưỡng tối ưu tìm thấy: tau = {best_threshold:.4f} (Val Recall = {best_th_info['recall']:.2%}, F1 = {best_th_info['f1']:.4f}, Quy tắc: {best_th_info['selection_rule']})")
 
+    scan_df.to_csv(METRICS_DIR / "validation_threshold_tradeoffs.csv", index=False)
+
     # 4. Xuất biểu đồ đường cong độ nhạy ngưỡng (Threshold Sensitivity Curve)
     plot_threshold_sensitivity_curve(scan_df, recall_target=config.recall_target, selected_threshold=best_threshold, save_path=FIGURES_DIR / "threshold_sensitivity.png")
 
@@ -319,6 +328,7 @@ def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected
     logger.info(f"Đóng gói Pipeline Bundle vào: {pipeline_path}...")
     bundle = {
         "model": ensemble,
+        "run_metadata": getattr(builder, "run_metadata_", None),
         "text_processor": text_processor,
         "feature_builder": builder,
         "selected_indices": selected_indices,
@@ -329,6 +339,7 @@ def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected
     save_spam_pipeline(bundle, save_path=pipeline_path)
     report = {
         'experiment': 'main.py', 'model': best_th_info['candidate_key'],
+        'run_metadata': getattr(builder, 'run_metadata_', None),
         'selection_rule': best_th_info['selection_rule'], 'threshold': best_threshold,
         'features_before_selection': len(builder.feature_names_), 'selected_features': len(selected_indices),
         'validation': best_th_info,
@@ -363,7 +374,7 @@ def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected
     for idx, email in enumerate(demo_emails, 1):
         result = service.predict_single(email)
         status_tag = "[SPAM]" if result["is_spam"] else "[HAM / HỢP LỆ]"
-        print(f"\n📧 Email #{idx}: {status_tag} (Xác suất Spam: {result['spam_probability']:.2%}, Rủi ro: {result['risk_level']})")
+        print(f"\n📧 Email #{idx}: {status_tag} (Điểm Spam (chưa calibration): {result['spam_score']:.4f}, Rủi ro: {result['risk_level']})")
         print(f"   Nội dung: \"{result['raw_text']}\"")
         if result["detected_signals"]:
             print(f"   Tín hiệu kích hoạt: {result['detected_signals']}")
@@ -376,6 +387,11 @@ def run_pipeline():
     ensure_directories()
     logger = setup_logger("spam_classifier")
     config = SpamExperimentConfig()
+    archived = archive_run_outputs(
+        [METRICS_DIR, FIGURES_DIR, SAVED_MODELS_DIR], PROJECT_ROOT / "results" / "archive",
+    )
+    if archived is not None:
+        logger.info(f"Previous results archived at: {archived}")
 
     print_section_header("BẮT ĐẦU CHẠY TOÀN BỘ PIPELINE PHÂN LOẠI EMAIL SPAM")
     logger.info("Khởi chạy Spam Classifier Pipeline...")
