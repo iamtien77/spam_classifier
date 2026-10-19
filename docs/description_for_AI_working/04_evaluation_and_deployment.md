@@ -75,15 +75,17 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Đóng gói toàn bộ đối tượng phục vụ suy luận vào một Bundle Dictionary duy nhất:
   ```python
   bundle = {
-      "model": winner_model,              # Đối tượng LinearSVMFromScratch đã fit
-      "feature_builder": feature_builder,  # HybridFeatureBuilderScratch đã fit (TF-IDF, Scaler, vocab)
-      "selected_indices": selected_indices,# Danh sách 4.318 cột đặc trưng
-      "threshold": 0.465,                  # Ngưỡng quyết định đã chốt
-      "metrics": test_metrics,             # Các chỉ số Test tham chiếu
-      "config": experiment_config          # Cấu hình thực nghiệm
+      "model": winner,                       # Mô hình phân loại tối ưu (LinearSVMFromScratch)
+      "run_metadata": run_metadata,          # SHA-256 fingerprint của dữ liệu thô và 21 file mã nguồn
+      "text_processor": text_processor,      # Bộ tiền xử lý và chuẩn hóa văn bản
+      "feature_builder": builder,            # HybridFeatureBuilderScratch đã fit (TF-IDF, Scaler, vocab)
+      "selected_indices": selected_indices,  # Danh sách 4.318 cột đặc trưng đã chọn
+      "best_threshold": 0.465,               # Ngưỡng quyết định đã chốt trên Validation
+      "metrics_val": best_th_info,           # Các chỉ số và quy tắc chọn trên Validation
+      "metrics_test": final_metrics          # Các chỉ số Test tham chiếu
   }
   ```
-- Lưu bundle bằng thư viện `joblib` vào [`results/saved_models/spam_pipeline.joblib`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/saved_models/spam_pipeline.joblib).
+- Lưu bundle bằng thư viện `joblib` (mức nén 3) vào [`results/saved_models/spam_pipeline.joblib`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/saved_models/spam_pipeline.joblib).
 
 ### Bước 9. Kiểm toán toàn vẹn mã nguồn (Source Integrity Audit)
 - Tự động tính toán mã băm SHA-256 cho toàn bộ 21 file mã nguồn chính trong `src/` và `main.py`.
@@ -97,7 +99,12 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
      - Làm sạch văn bản email bằng `SpamTextProcessor` có sẵn trong bundle.
      - Biến đổi thành vector đặc trưng thưa bằng `feature_builder.transform()`.
      - Lọc cột bằng `selected_indices`.
-     - Tính xác suất spam bằng `model.predict_proba()`.
-     - So sánh với `threshold = 0.465` và xuất kết quả: `prediction` (`ham` hoặc `spam`), `spam_probability`, `threshold_used`.
+     - Tính điểm phân loại spam bằng `model.predict_proba()`.
+     - So sánh với `threshold = 0.465` và xuất kết quả: `prediction` (`ham` hoặc `spam`), `spam_score` (kèm alias `spam_probability`), `is_calibrated=False`, `risk_level`, `threshold_used`, `detected_signals`.
   3. `predict_batch(texts)`: Dự đoán hàng loạt và trả về bảng `pd.DataFrame`.
 - **Thực thi kiểm chứng Demo:** Chạy dự đoán trực tiếp trên 5 mẫu email mẫu ở cuối chương trình `main.py` để chứng minh hệ thống hoạt động hoàn hảo từ đầu cuối (End-to-End).
+
+### Bước 11. Chạy thực nghiệm phát triển đa seed độc lập (Development Experiments Runner)
+- Triển khai module độc lập [`src/evaluation/experiments.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/evaluation/experiments.py) (`run_development_experiments()`).
+- Cho phép chạy khảo sát kiểm toán trên tập phát triển (Train & Validation) qua nhiều seed ngẫu nhiên (`seeds=(17, 42, 73)`), xuất manifest metadata và split JSON.
+- **Nguyên tắc bất biến:** Tuyệt đối bảo lưu tập Test độc lập (`reserved_test_source_ids`), không dùng cho bất kỳ lượt chạy chẩn đoán phát triển nào để phòng chống rò rỉ dữ liệu (Data Leakage).

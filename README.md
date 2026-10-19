@@ -4,7 +4,7 @@ Dự án Học Máy (Machine Learning) cho bài **“Practice 1: Classifying Spa
 
 > **Cách triển khai:** tự cài đặt các mô hình LR, Linear SVM, Naive Bayes và các chỉ số đánh giá bằng Python, NumPy/SciPy; dùng pandas để xử lý bảng và joblib để lưu model.
 >
-> **Kiểm chứng ngày 18/10/2026:** **40/40 tests pass**, bao gồm kiểm thử tích hợp. Kết quả chạy lại `main.py` được đối chiếu từ artifacts trong `results/`. Năm notebook đã được kiểm tra cú pháp 31 code cell, chưa chạy lại toàn bộ trong đợt cập nhật này.
+> **Kiểm chứng ngày 19/10/2026:** **51/51 tests pass**, bao gồm kiểm thử tích hợp và kiểm thử hồi quy. Kết quả chạy lại `main.py` được đối chiếu từ artifacts trong `results/`. Chuỗi 5 Jupyter Notebooks đã được đồng bộ hóa cấu hình với `src/`, chạy lại toàn bộ (Restart & Run All) và cập nhật artifacts vào `notebooks/results/`.
 >
 > **Kết quả tham chiếu:** Linear SVM (Tuned), Test Accuracy **70,85%**, Recall **85,47%**, F1 **71,46%**. Tỷ lệ chặn nhầm email hợp lệ còn cao; đây là dự án thực nghiệm phục vụ học tập.
 
@@ -276,6 +276,10 @@ spam_classifier/
 ├── data/
 │   ├── raw/spam.csv                   # Dữ liệu đầu vào
 │   └── processed/                     # CSV, ma trận, nhãn và marker của notebooks
+├── docs/                              # Tài liệu kỹ thuật và đặc tả dự án
+│   ├── ML project_ Classifying Spam Emails.pdf  # Đề bài gốc môn học
+│   ├── Algorithms/                    # Tài liệu chuyên sâu 4 thuật toán From-Scratch
+│   └── description_for_AI_working/    # Kịch bản kỹ thuật theo 4 giai đoạn và 37 bản tiến hóa
 ├── notebooks/
 │   ├── 01_eda.ipynb
 │   ├── 02_preprocessing_and_features.ipynb
@@ -424,7 +428,7 @@ Pipeline sẽ thực hiện bốn giai đoạn ở mục 5, ghi log, tạo bản
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Lần kiểm chứng ngày **18/10/2026** có **40/40 tests pass**. Phạm vi gồm dữ liệu/encoding/CSV lỗi; chia tập; TF-IDF/scaler/Top-K; mô hình, voting và threshold; AUC đồng hạng và metrics; lưu/nạp và inference; tích hợp toàn pipeline. Các test mới kiểm tra đầu vào tuning, phân xử hòa/fallback, đường dẫn bundle mặc định và tính nhất quán URL giữa EDA với processor.
+Lần kiểm chứng ngày **19/10/2026** có **51/51 tests pass**. Phạm vi gồm dữ liệu/encoding/CSV lỗi; chia tập; TF-IDF/scaler/Top-K; mô hình, voting và threshold; AUC đồng hạng và metrics; lưu/nạp và inference; tích hợp toàn pipeline. Các test mới kiểm tra đầu vào tuning, phân xử hòa/fallback, đường dẫn bundle mặc định và tính nhất quán URL giữa EDA với processor.
 
 Kiểm thử hồi quy còn kiểm tra LR/SVM học được tín hiệu nhỏ trên ma trận thưa, tránh lặp lại lỗi hội tụ hoặc phân kỳ khi thay `C`. Tests xác nhận hành vi phần mềm; chất lượng dự đoán vẫn cần đánh giá trên dữ liệu có nhãn.
 
@@ -470,8 +474,8 @@ Các khác biệt hiện tại cần lưu ý:
 | Thành phần                            | `main.py`                    | Notebooks                                                                    |
 | --------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
 | EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                             |
-| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `1.0 / 150`                                                                |
-| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.5 / 100`                                                                |
+| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                                    |
+| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                                   |
 | Grid Search                             | Lưới tại mục 4.4           | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
 | Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5`  |
 

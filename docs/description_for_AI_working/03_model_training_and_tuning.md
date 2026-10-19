@@ -87,8 +87,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   7. `Complement Naive Bayes (Tuned)`: Accuracy $63.66\%$, Recall $85.23\%$, F1 $66.69\%$ (Hạng 7).
   8. `Complement Naive Bayes (Default)`: Accuracy $63.42\%$, Recall $85.07\%$, F1 $66.50\%$ (Hạng 8).
 
-### Bước 9. Chốt mô hình vô địch (Winner Selection)
+### Bước 9. Chốt mô hình vô địch (Winner Selection) & Xuất Báo Cáo Ngưỡng
 - Căn cứ theo tiêu chí đạt Recall $\ge 0.85$ và có Validation Accuracy cao nhất: **Linear SVM (Tuned)** đạt $70.07\%$, vượt qua toàn bộ các ứng viên còn lại.
 - Hệ thống chính thức chọn Linear SVM (Tuned) làm **Selected Final Model** với ngưỡng quyết định chốt là **$\tau^* = 0.465$**.
-- Xuất toàn bộ bảng kết quả so sánh ra file [`results/metrics/validation_model_selection.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_model_selection.csv).
+- Xuất toàn bộ bảng kết quả so sánh ứng viên ra file [`results/metrics/validation_model_selection.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_model_selection.csv).
+- Xuất bảng quét 200 mốc ngưỡng đánh đổi (Threshold Tradeoffs) của mô hình winner ra [`results/metrics/validation_threshold_tradeoffs.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_threshold_tradeoffs.csv) và vẽ biểu đồ đường cong độ nhạy ngưỡng tại [`results/figures/threshold_sensitivity.png`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/figures/threshold_sensitivity.png).
 - Giai đoạn 3 kết thúc thành công với mô hình chiến thắng và ngưỡng tối ưu sẵn sàng chuyển giao cho Giai đoạn 4 đánh giá độc lập và đóng gói triển khai.

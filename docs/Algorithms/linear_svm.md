@@ -1,7 +1,7 @@
 # 🛡️ Linear Support Vector Machine (Linear SVM From-Scratch)
 
 > **Vị trí trong dự án:** Mô hình phân loại cốt lõi và là **Mô hình chiến thắng (Selected Winner)** trong pipeline tham chiếu [`main.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/main.py).  
-> **Mã nguồn triển khai:** Class [`LinearSVMFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L182) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
+> **Mã nguồn triển khai:** Class [`LinearSVMFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L218) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
 ---
 
@@ -46,7 +46,7 @@ Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Ma trận đặc trưng $X$:** Định dạng thưa [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L16) hoặc `scipy.sparse.csr_matrix` kích thước $(N, 4318)$.
+- **Ma trận đặc trưng $X$:** Định dạng thưa [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix` kích thước $(N, 4318)$.
   - Các giá trị biểu diễn trọng số TF-IDF và tần suất chuẩn hóa, thỏa mãn $x_{ij} \ge 0$.
 - **Vector nhãn $y$:** Mảng NumPy nhị phân $N$ phần tử, $y \in \{0, 1\}$ (trong đó $0$: Ham, $1$: Spam).
 
@@ -54,9 +54,9 @@ Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($
 - **Điểm quyết định khoảng cách (Decision Score):**
   $$z_i = w^\top x_i + b \in (-\infty, +\infty)$$
   Đại diện cho khoảng cách đại số từ mẫu $x_i$ đến siêu phẳng phân cách.
-- **Xác suất giả lập (Pseudo-probability) qua Sigmoid:**
+- **Điểm phân loại / Xác suất giả lập qua Sigmoid (`spam_score`):**
   $$p_i = \sigma(z_i) = \frac{1}{1 + \exp(-z_i)} \in [0, 1]$$
-  Dùng để tương thích giao diện thống nhất với bộ dò ngưỡng và Voting Ensemble.
+  Đây là điểm lề chuyển đổi qua Sigmoid phục vụ tương thích giao diện thống nhất với bộ dò ngưỡng và Voting Ensemble (`is_calibrated=False`, không phải xác suất hậu nghiệm đã cân chuẩn).
 - **Nhãn dự đoán nhị phân ($\hat{y}$):**
   $$\hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge \tau^* \\ 0 & \text{nếu } p_i < \tau^* \end{cases}$$
   Với $\tau^* = 0.465$ là ngưỡng quyết định tối ưu được chốt từ tập Validation.
@@ -78,12 +78,12 @@ Dữ liệu được làm sạch thông qua quy trình kiểm toán không chồ
 | **Test set** | $10\%$ | **2.902** | 1.663 | 1.239 | Đánh giá kiểm chứng độc lập cuối cùng |
 
 ### 3.3. Không gian đặc trưng đầu vào ($4.318$ chiều)
-Mô hình nhận đầu vào từ bộ ghép đặc trưng lai [`HybridFeatureBuilderScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L484):
+Mô hình nhận đầu vào từ bộ ghép đặc trưng lai [`HybridFeatureBuilderScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L528):
 1. **Word TF-IDF:** $3.000$ chiều (từ đơn có sublinear scaling và smooth IDF).
 2. **Word Bigram TF-IDF:** $800$ chiều (cặp từ liên tiếp nắm bắt ngữ cảnh).
 3. **Character n-gram TF-IDF:** $500$ chiều (chuỗi con ký tự độ dài 3–5).
 4. **Keyword binary features:** $10$ chiều (từ khóa nhạy cảm: `free`, `win`, `prize`, `claim`, `urgent`, `call`, `cash`, `guarantee`, `offer`, `click`).
-5. **Numeric/Structural features:** $8$ chiều co dãn bằng [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L295) (`has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`).
+5. **Numeric/Structural features:** $8$ chiều co dãn bằng [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L239) (`has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`).
 
 ---
 
@@ -93,7 +93,7 @@ Mô hình nhận đầu vào từ bộ ghép đặc trưng lai [`HybridFeatureBu
 Dự án áp dụng quy tắc thực nghiệm ưu tiên bắt trúng thư rác với ràng buộc:
 $$\text{Recall} \ge 0.85$$
 
-Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L26) quét qua 200 mốc ngưỡng phân vị xác suất từ $0.005$ đến $1.0$ trên tập Validation:
+Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27) quét qua 200 mốc ngưỡng phân vị xác suất từ $0.005$ đến $1.0$ trên tập Validation:
 - Nhóm ngưỡng khả thi ($\text{Recall} \ge 0.85$) được xếp hạng ưu tiên theo: **Accuracy $\rightarrow$ F1-Score $\rightarrow$ Precision $\rightarrow$ FPR**.
 - Nếu không có ngưỡng nào thỏa mãn, hệ thống fallback về tối đa hóa Recall.
 
@@ -111,8 +111,8 @@ Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScra
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Đã hoàn thiện $100\%$ From-Scratch, tuân thủ thuần Python/NumPy, không sử dụng `sklearn.svm.LinearSVC`.
-- **Kiểm thử tự động:** Vượt qua toàn bộ $40/40$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests), bao gồm kiểm thử hội tụ gradient, kiểm thử ma trận thưa và kiểm thử tích hợp đầu cuối.
-- **Vị trí trong hệ thống:** **Mô hình vô địch (Rank 1 / Selected Final Model)** được chọn tự động từ quy trình [`ModelSelectionWorkflow`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L252) trên tập Validation và lưu thành artifact bundle tại [`results/saved_models/spam_pipeline.joblib`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/saved_models/spam_pipeline.joblib).
+- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests), bao gồm kiểm thử hội tụ gradient, kiểm thử ma trận thưa, kiểm thử phân xử hòa và kiểm thử tích hợp đầu cuối.
+- **Vị trí trong hệ thống:** **Mô hình vô địch (Rank 1 / Selected Final Model)** được chọn tự động từ quy trình [`ModelSelectionWorkflow`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L235) trên tập Validation và lưu thành artifact bundle tại [`results/saved_models/spam_pipeline.joblib`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/saved_models/spam_pipeline.joblib).
 - **Mức độ sẵn sàng vận hành:** Đạt chỉ tiêu nghiệp vụ Recall ($85.47\%$), tuy nhiên tỷ lệ chặn nhầm (FPR $\approx 40.05\%$) còn cao. Khuyến nghị triển khai ở chế độ gắn cờ cảnh báo (Flagging/Warning) thay vì tự động xóa email.
 
 ---

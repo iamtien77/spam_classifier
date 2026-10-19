@@ -1,7 +1,7 @@
 # 🎲 Naive Bayes Classifier (From-Scratch)
 
 > **Vị trí trong dự án:** Mô hình phân loại xác suất cơ sở (Baseline) và là công cụ đánh giá trung gian (Proxy Model) dùng cho lựa chọn đặc trưng Top-K và phân tích thành phần (Ablation Study).  
-> **Mã nguồn triển khai:** Class [`NaiveBayesClassifier`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L267) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
+> **Mã nguồn triển khai:** Class [`NaiveBayesClassifier`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L330) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
 ---
 
@@ -59,7 +59,7 @@ $$
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L16).
+- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45).
   - **Ràng buộc toán học nghiêm ngặt:** Toàn bộ các giá trị $x_{ij} \ge 0$ (không chấp nhận giá trị âm vì Naive Bayes xem đặc trưng như tần suất xuất hiện).
 - **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $y \in \{0, 1\}$.
 
@@ -81,14 +81,14 @@ $$
 
 ### 3.2. Không gian đặc trưng ($4.318$ chiều)
 - Sử dụng toàn bộ ma trận thưa ghép nối từ Word TF-IDF ($3.000$), Bigram TF-IDF ($800$), Char n-gram ($500$), Keyword features ($10$) và Numeric features ($8$).
-- Đặc trưng số được chuẩn hóa qua `MaxAbsScalerScratch` đưa về đoạn $[0, 1]$, bảo toàn tính không âm bắt buộc của Naive Bayes.
+- Đặc trưng số được chuẩn hóa qua [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L239) đưa về đoạn $[0, 1]$, bảo toàn tính không âm bắt buộc của Naive Bayes.
 
 ---
 
 ## 4. Evaluation (Phương pháp đánh giá & Tiêu chí)
 
 ### 4.1. Tiêu chí chọn ngưỡng
-Dò quét ngưỡng bằng [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L26) với 200 mốc từ $0.005$ đến $1.0$:
+Dò quét ngưỡng bằng [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27) với 200 mốc từ $0.005$ đến $1.0$:
 - Ràng buộc: $\text{Recall} \ge 0.85$.
 - Do xác suất của Complement Naive Bayes thường tập trung ở các dải giá trị thấp hơn so với Logistic Regression, ngưỡng tối ưu $\tau^*$ được chọn nằm ở khoảng $0.215 - 0.220$.
 
@@ -100,7 +100,7 @@ Theo dõi: Accuracy, Precision, Recall, F1, F2, ROC-AUC và Ma trận nhầm l�
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Đã cài đặt hoàn chỉnh From-Scratch thuần Python/NumPy, không dùng `sklearn.naive_bayes`.
-- **Kiểm thử tự động:** Vượt qua toàn bộ $40/40$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests).
+- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests).
 - **Vị trí trong dự án:** 
   - Đóng vai trò **Mô hình cơ sở (Baseline)**.
   - Được chọn làm **Proxy Model** trong `ManualFeatureSelectorScratch` để thử nghiệm độ quan trọng của đặc trưng Top-K và chạy thử nghiệm Ablation 5 tổ hợp đặc trưng trong Notebook 02.

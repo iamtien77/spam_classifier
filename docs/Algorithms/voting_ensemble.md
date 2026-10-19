@@ -1,7 +1,7 @@
 # 🤝 Voting Ensemble (From-Scratch)
 
 > **Vị trí trong dự án:** Phương pháp học kết hợp (Ensemble Learning) đa mô hình, đánh giá khả năng cải thiện độ ổn định và giảm phương sai dự đoán.  
-> **Mã nguồn triển khai:** Class [`SpamVotingEnsemble`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py#L17) trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
+> **Mã nguồn triển khai:** Class [`SpamVotingEnsemble`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py#L25) trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
 
 ---
 
@@ -46,8 +46,8 @@ $$
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L95), [`LinearSVMFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L182) và [`NaiveBayesClassifier`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L267).
-- **Ma trận đặc trưng $X$:** Kích thước $(N, 4318)$ thuộc lớp `CSRMatrixScratch` hoặc ma trận thưa chuẩn.
+- **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L142), [`LinearSVMFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L218) và [`NaiveBayesClassifier`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L330).
+- **Ma trận đặc trưng $X$:** Kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45) hoặc ma trận thưa chuẩn.
 - **Nhãn mục tiêu $y$:** Vector nhãn nhị phân $\{0, 1\}$.
 
 ### 2.2. Output
@@ -69,7 +69,7 @@ $$
 
 ## 4. Evaluation (Phương pháp đánh giá)
 
-- Tối ưu hóa ngưỡng qua [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L26) với điều kiện tiên quyết $\text{Recall} \ge 0.85$.
+- Tối ưu hóa ngưỡng qua [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27) với điều kiện tiên quyết $\text{Recall} \ge 0.85$.
 - Do xác suất tổng hợp là trung bình của SVM, LR và CNB, phân phối xác suất có xu hướng co cụm về trung tâm, dẫn đến việc ngưỡng tối ưu $\tau^*$ rơi vào khoảng $0.365 - 0.385$.
 
 ---
@@ -77,7 +77,7 @@ $$
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy trong module `src/models/ensemble.py`.
-- **Kiểm thử tự động:** Vượt qua $40/40$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests).
+- **Kiểm thử tự động:** Vượt qua $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests).
 - **Vị trí xếp hạng:** Xếp hạng 5 (nhánh Tuned) và hạng 6 (nhánh Default) trên tập Validation.
 - **Kết luận kiến trúc:** Mô hình Ensemble được đưa vào quy trình so sánh công bằng như mọi ứng viên độc lập khác. Vì không đạt điểm Validation Accuracy cao hơn Linear SVM, Ensemble không được chọn làm mô hình cuối cùng để triển khai, đảm bảo tính thực nghiệm khách quan và tiết kiệm tài nguyên tính toán.
 

@@ -1,7 +1,7 @@
 # 📈 Logistic Regression (From-Scratch)
 
 > **Vị trí trong dự án:** Mô hình phân loại tuyến tính xác suất cốt lõi, ứng viên cạnh tranh trực tiếp với Linear SVM.  
-> **Mã nguồn triển khai:** Class [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L95) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
+> **Mã nguồn triển khai:** Class [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L142) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
 ---
 
@@ -52,7 +52,7 @@ Trong đó:
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L16) hoặc `scipy.sparse.csr_matrix`.
+- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix`.
 - **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $y_i \in \{0, 1\}$.
 
 ### 2.2. Output
@@ -73,19 +73,19 @@ Dữ liệu sạch sau kiểm toán ($29.028$ mẫu) được chia phân tầng 
 - **Test set:** $2.902$ mẫu ($1.663$ Ham, $1.239$ Spam) - Dùng để đánh giá độc lập năng lực tổng quát hóa.
 
 ### 3.2. Cấu trúc ma trận đặc trưng ($4.318$ chiều)
-Tất cả các đặc trưng được ghép nối qua [`HybridFeatureBuilderScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L484):
+Tất cả các đặc trưng được ghép nối qua [`HybridFeatureBuilderScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L528):
 - **Word TF-IDF:** $3.000$ chiều (từ vựng đơn phân tích tần suất).
 - **Word Bigram TF-IDF:** $800$ chiều (ngữ cảnh 2 từ liền kề).
 - **Character n-gram TF-IDF:** $500$ chiều (chuỗi con ký tự 3–5).
 - **Keyword Binary:** $10$ chiều (từ khóa spam đặc trưng).
-- **Numeric/Structural:** $8$ chiều chuẩn hóa qua [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L295).
+- **Numeric/Structural:** $8$ chiều chuẩn hóa qua [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L239).
 
 ---
 
 ## 4. Evaluation (Phương pháp đánh giá & Tiêu chí nghiệp vụ)
 
 ### 4.1. Tiêu chí lựa chọn trên Validation
-Tương tự Linear SVM, Logistic Regression được đánh giá thông qua bộ dò ngưỡng [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L26):
+Tương tự Linear SVM, Logistic Regression được đánh giá thông qua bộ dò ngưỡng [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27):
 1. **Ràng buộc cứng:** $\text{Recall} \ge 0.85$ trên tập Validation để bảo vệ mục tiêu phát hiện đa số thư rác.
 2. **Tiêu chí tối ưu:** Trong các mốc ngưỡng đạt Recall $\ge 0.85$, chọn ngưỡng mang lại $\text{Accuracy}$ cao nhất, phân xử hòa bằng $\text{F1-score}$, $\text{Precision}$ và tối thiểu hóa $\text{FPR}$.
 
@@ -100,7 +100,7 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy, không dùng `sklearn.linear_model.LogisticRegression`.
-- **Kiểm thử tự động:** Vượt qua toàn bộ $40/40$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests), đảm bảo tính nhất quán ma trận thưa và khả năng tối ưu gradient không phụ thuộc thư viện ngoài.
+- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests), đảm bảo tính nhất quán ma trận thưa và khả năng tối ưu gradient không phụ thuộc thư viện ngoài.
 - **Vị trí xếp hạng:** **Xếp hạng 3 trên Validation** (sau Linear SVM Tuned và Linear SVM Default) và đạt **kết quả cao thứ 2 trên Test Set** (F1 đạt $71.42\%$, sát nút $71.46\%$ của Linear SVM).
 - **Khả năng ứng dụng:** Rất phù hợp làm mô hình baseline mạnh hoặc mô hình suy luận nhẹ trong môi trường yêu cầu xuất xác suất thực tế.
 
