@@ -75,7 +75,14 @@ notebooks/results/metrics/*
 !notebooks/results/metrics/.gitkeep
 
 # Tài liệu và báo cáo cá nhân (Docs, PDF, Word, Notebook gốc lớn)
-docs/
+docs/*
+
+# Theo dõi tài liệu đề bài và thư mục thuật toán
+!docs/Algorithms/
+!docs/Algorithms/**
+!docs/ML project_ Classifying Spam Emails.pdf
+
+
 # Cho phép theo dõi cấu hình agent
 !docs/agents/
 !docs/agents/**
