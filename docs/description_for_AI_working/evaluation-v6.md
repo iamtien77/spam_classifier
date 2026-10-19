@@ -1,0 +1,33 @@
+Phiên bản v6. Đóng gói mô hình (Model Persistence) và kiểm toán toàn vẹn mã nguồn (21 SHA-256)
+Mục tiêu của bản này là ứng dụng module persistence.py để đóng gói mô hình đã fit, các bộ vector hóa, danh sách đặc trưng đã chọn và ngưỡng tối ưu thành một artifact duy nhất bằng joblib, đồng thời tính toán 21 mã băm SHA-256 đối chiếu toàn vẹn mã nguồn.
+
+Bước 1. Thiết kế cấu trúc gói suy luận (Persistence Bundle)
+Gói triển khai phải chứa đầy đủ mọi thành phần cần thiết để suy luận độc lập trên văn bản thô mới mà không cần nạp lại dữ liệu huấn luyện:
+bundle = {
+    "model": winner_model,               # Đối tượng LinearSVMFromScratch đã huấn luyện
+    "feature_builder": feature_builder,   # HybridFeatureBuilderScratch đã fit (TF-IDF, Scaler, vocab)
+    "selected_indices": selected_indices, # Danh sách chỉ số 4.318 cột
+    "threshold": 0.465,                   # Ngưỡng phân loại đã chốt
+    "metrics": test_metrics,              # Các chỉ số đánh giá Test
+    "config": experiment_config           # Cấu hình thực nghiệm
+}
+
+Bước 2. Lưu trữ artifact bằng thư viện joblib
+Sử dụng hàm save_model_bundle() trong src/models/persistence.py:
+Ghi bundle ra file: results/saved_models/spam_pipeline.joblib.
+Kiểm tra tính toàn vẹn của file: Kích thước file hợp lý (~115 KB), có thể nạp lại và thực hiện dự đoán thành công bằng hàm load_model_bundle().
+
+Bước 3. Kiểm toán toàn vẹn mã nguồn (Source Integrity Audit)
+Tự động quét và tính toán mã băm SHA-256 cho 21 file mã nguồn chính trong src/ và main.py:
+- main.py: d87164f8...
+- src/config.py: cf5a9691...
+- src/data/loader.py: 339e15f8...
+- src/data/preprocessing.py: 6de56096...
+- src/features/feature_engineering.py: e6e3331b...
+- src/models/classifiers.py: abb2c336...
+- src/models/ensemble.py: caf40c35...
+- src/models/tuning.py: 95bb8d42...
+- src/evaluation/metrics.py: 027a797b...
+- src/deployment/predictor.py: bf88cde3...
+Lưu toàn bộ metadata thực nghiệm, chỉ số Test, ma trận nhầm lẫn và 21 mã hash vào file results/metrics/run_summary.json.
+Bước này bảo đảm tính minh bạch, khả năng tái lập 100% và phòng chống gian lận mã nguồn.
