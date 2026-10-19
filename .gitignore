@@ -81,6 +81,8 @@ docs/*
 !docs/Algorithms/
 !docs/Algorithms/**
 !docs/ML project_ Classifying Spam Emails.pdf
+!docs/description_for_AI_working/
+!docs/description_for_AI_working/**
 
 
 # Cho phép theo dõi cấu hình agent

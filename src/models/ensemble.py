@@ -26,6 +26,8 @@ class SpamVotingEnsemble:
     """
     BỘ KẾT HỢP BIỂU QUYẾT (VOTING ENSEMBLE) CHO BÀI TOÁN PHÂN LOẠI EMAIL SPAM:
     --------------------------------------------------------------------------
+    Tài liệu kỹ thuật: [docs/Algorithms/voting_ensemble.md](../../docs/Algorithms/voting_ensemble.md)
+
     Kết hợp dự đoán xác suất giữa Logistic Regression, SVM và Naive Bayes.
     """
 

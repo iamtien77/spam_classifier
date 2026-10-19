@@ -96,6 +96,8 @@ class LogisticRegressionFromScratch:
     """
     1. LOGISTIC REGRESSION TỰ CÀI ĐẶT TỪ ĐẦU (FROM SCRATCH):
     --------------------------------------------------------
+    Tài liệu kỹ thuật: [docs/Algorithms/logistic_regression.md](../../docs/Algorithms/logistic_regression.md)
+
     Phân loại nhị phân dựa trên hàm Logistic/Sigmoid và tối ưu hóa bằng Gradient Descent.
     Hỗ trợ cả ma trận thưa CSRMatrixScratch, scipy.sparse.csr_matrix và mảng numpy.
     """
@@ -167,6 +169,8 @@ class LinearSVMFromScratch:
     """
     2. SUPPORT VECTOR MACHINES (SVM) TỰ CÀI ĐẶT TỪ ĐẦU (FROM SCRATCH):
     -----------------------------------------------------------------
+    Tài liệu kỹ thuật: [docs/Algorithms/linear_svm.md](../../docs/Algorithms/linear_svm.md)
+
     Tìm siêu phẳng phân tách lề cực đại (Maximum Margin) bằng giải thuật Gradient Descent
     với hàm mất mát Squared Hinge Loss hoặc Hinge Loss, kết hợp điều chuẩn L2.
     """
@@ -272,6 +276,8 @@ class NaiveBayesClassifier:
     """
     3. NAIVE BAYES CLASSIFIER (MULTINOMIAL & COMPLEMENT) TỰ CÀI ĐẶT (FROM SCRATCH):
     --------------------------------------------------------------------------------
+    Tài liệu kỹ thuật: [docs/Algorithms/naive_bayes.md](../../docs/Algorithms/naive_bayes.md)
+
     Phân loại xác suất dựa trên định lý Bayes, hỗ trợ làm mịn Laplace và giải thuật Complement NB
     chuyên trị tập dữ liệu văn bản mất cân bằng nhãn cao.
     """
