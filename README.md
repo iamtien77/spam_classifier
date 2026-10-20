@@ -25,7 +25,7 @@ Với đầu vào là nội dung một email hoặc tin nhắn, hệ thống tr�
 
 ### 1.2. Nạp dữ liệu & chuẩn hóa schema
 
-File dữ liệu mặc định là [`data/raw/spam.csv`](data/raw/spam.csv). Hàm `load_raw_data()` trong [`src/data/loader.py`](src/data/loader.py):
+File dữ liệu mặc định là [`data/raw/spam.csv`](data/raw/spam.csv), có nguồn gốc từ tập [SMS Spam Collection Dataset (Kaggle/UCI)](https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset). Hàm `load_raw_data()` trong [`src/data/loader.py`](src/data/loader.py):
 
 - Thử đọc bằng `utf-8-sig`, sau đó dùng `latin-1` nếu gặp lỗi giải mã.
 - Nhận các tên cột nhãn `label`, `category`, `v1`; cột nội dung `text`, `message`, `v2`, `body`.
@@ -33,7 +33,7 @@ File dữ liệu mặc định là [`data/raw/spam.csv`](data/raw/spam.csv). Hà
 - Giữ nội dung gốc trong `raw_text`; dùng `source_id` để theo dõi bản ghi và thứ tự hàng.
 - Báo lỗi khi CSV thiếu cột bắt buộc, trùng tên cột sau chuẩn hóa hoặc sai số trường. Đường dẫn tùy chỉnh không tồn tại cũng được báo lỗi.
 
-Dữ liệu hiện tại cung cấp **nhãn và nội dung văn bản**. Pipeline chưa khai thác các trường metadata riêng như địa chỉ người gửi, người nhận hoặc tiêu đề email.
+Dữ liệu hiện tại cung cấp **nhãn và nội dung văn bản tin nhắn ngắn (SMS)**. Pipeline chưa khai thác các trường metadata riêng của email chuẩn như địa chỉ người gửi, người nhận, tiêu đề email hoặc mã HTML.
 
 ### 1.3. Kiểm toán chất lượng dữ liệu (Data Quality Audit)
 
@@ -474,8 +474,8 @@ Các khác biệt hiện tại cần lưu ý:
 | Thành phần                            | `main.py`                    | Notebooks                                                                    |
 | --------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
 | EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                             |
-| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                                    |
-| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                                   |
+| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                              |
+| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                             |
 | Grid Search                             | Lưới tại mục 4.4           | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
 | Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5`  |
 
@@ -526,14 +526,15 @@ Model trung gian gồm `feature_artifacts.joblib`, `baseline_models.joblib` và 
 
 ## 12. Giới Hạn Hiện Tại & Hướng Phát Triển
 
-| Giới hạn đã biết                                        | Hướng phát triển phù hợp                                                                   |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| FPR Test còn **40,05%**                               | Phân tích nguyên nhân FP, cải thiện đặc trưng và đánh giá lại trên tập ngoài    |
-| Một split cố định                                        | Đánh giá độ ổn định qua nhiều seed hoặc cross-validation                               |
-| Test đã được quan sát trong vòng phát triển         | Dùng holdout mới hoặc dữ liệu ngoài để đánh giá độc lập các cải tiến tiếp theo |
-| Sigmoid SVM và voting chưa được calibration             | Thực nghiệm calibration trên dữ liệu phát triển được tách đúng vai trò             |
-| Tuning nhiều lần trên cùng Validation có thể overfit   | Giới hạn việc dò tham số, dùng quy trình đánh giá phù hợp khi mở rộng thí nghiệm |
-| Stop words tiếng Anh; chưa có đánh giá theo ngôn ngữ | Bổ sung dữ liệu và quy trình riêng nếu muốn hỗ trợ tiếng Việt                        |
-| Chưa có metadata sender/recipient/subject riêng           | Bổ sung khi có nguồn dữ liệu phù hợp và nhãn đáng tin cậy                            |
+| Giới hạn đã biết                                        | Hướng phát triển phù hợp                                                                                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| FPR Test còn **40,05%**                               | Phân tích nguyên nhân FP, cải thiện đặc trưng và đánh giá lại trên tập ngoài                           |
+| Một split cố định                                        | Đánh giá độ ổn định qua nhiều seed hoặc cross-validation                                                      |
+| Test đã được quan sát trong vòng phát triển         | Dùng holdout mới hoặc dữ liệu ngoài để đánh giá độc lập các cải tiến tiếp theo                        |
+| Sigmoid SVM và voting chưa được calibration             | Thực nghiệm calibration trên dữ liệu phát triển được tách đúng vai trò                                    |
+| Tuning nhiều lần trên cùng Validation có thể overfit   | Giới hạn việc dò tham số, dùng quy trình đánh giá phù hợp khi mở rộng thí nghiệm                        |
+| Stop words tiếng Anh; chưa có đánh giá theo ngôn ngữ | Bổ sung dữ liệu và quy trình riêng nếu muốn hỗ trợ tiếng Việt                                               |
+| Lệch miền dữ liệu (SMS Spam thay vì Email Spam chuẩn)  | Dữ liệu huấn luyện là tin nhắn SMS ngắn; cần mở rộng kiểm thử trên tập email hoàn chỉnh (headers, HTML) |
+| Chưa có metadata sender/recipient/subject riêng           | Bổ sung khi có nguồn dữ liệu phù hợp và nhãn đáng tin cậy                                                   |
 
 Dữ liệu mâu thuẫn nhãn đã được xử lý theo nhóm nội dung, nhưng điều đó không chứng minh mọi nhãn còn lại đều đúng. Việc cải thiện chất lượng cần giữ nguyên nguyên tắc đối chiếu dữ liệu: không đổi nhãn hay loại mẫu chỉ vì mô hình dự đoán sai.
