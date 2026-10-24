@@ -1,4 +1,4 @@
-"""TF-IDF, scaler, CSR và hybrid tự viết, chỉ dùng thư viện chuẩn Python.
+"""TF-IDF, scaler, CSR và hybrid tự viết.
 
 CSR lưu các phần tử khác 0 theo hàng, không tạo bảng đặc trưng đặc lớn.
 Task 2 dùng iter_row(), dot() và transpose_dot() để huấn luyện mô hình.
