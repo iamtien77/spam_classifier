@@ -14,10 +14,10 @@ from src.data.preprocessing import SpamTextProcessor
 
 
 class FittedFeatureTransform:
-    """Fitted builder and ordered column selection shared by train and inference.
+    """Dùng chung builder đã fit và thứ tự các cột được chọn cho huấn luyện và suy luận.
 
-    The builder remains unchanged, so legacy bundles/notebooks can still access
-    full-width features. This object never fits on incoming records.
+    Giữ nguyên builder để các bundle/notebook cũ vẫn truy cập được
+    đầy đủ các đặc trưng. Đối tượng này không bao giờ fit trên dữ liệu đầu vào mới.
     """
 
     def __init__(self, builder, selected_indices=None):
