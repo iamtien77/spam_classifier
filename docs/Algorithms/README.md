@@ -2,6 +2,8 @@
 
 Thư mục này chứa toàn bộ tài liệu kỹ thuật chuyên sâu về các thuật toán phân loại email spam được triển khai trong dự án **Spam Classifier (Practice 1: Classifying Spam Emails)**.
 
+Xem [design.md](./design.md) để nắm thiết kế theo **5W1H**, luồng Train → Validation → Test → suy luận và **cấu trúc thư mục của toàn dự án**. Tài liệu này là bản đồ kiến trúc; các trang bên dưới giải thích từng thuật toán.
+
 Tất cả các thuật toán đều được **tự xây dựng từ đầu (From-Scratch)** bằng Python và NumPy/SciPy, tuân thủ nguyên tắc không sử dụng mô hình học máy hộp đen có sẵn từ scikit-learn.
 
 ---
@@ -12,10 +14,10 @@ Mỗi thuật toán được trình bày độc lập theo cấu trúc chuẩn m
 
 | Tài liệu | Thuật toán | Vai trò trong hệ thống | Trạng thái / Thứ hạng |
 | :--- | :--- | :--- | :---: |
-| 🛡️ [linear_svm.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/Algorithms/linear_svm.md) | **Linear Support Vector Machine** | Tìm siêu phẳng phân cách lề cực đại với Squared Hinge Loss | 🥇 **Winner (Mô hình triển khai)** |
-| 📈 [logistic_regression.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/Algorithms/logistic_regression.md) | **Logistic Regression** | Phân loại xác suất nhị phân với Binary Cross-Entropy & Armijo | 🥈 **Hạng 2 trên Test (F1: 71.42%)** |
-| 🎲 [naive_bayes.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/Algorithms/naive_bayes.md) | **Complement & Multinomial Naive Bayes** | Đường cơ sở xác suất và Proxy Model cho Top-K Feature Selection | 🥉 **Baseline thực nghiệm** |
-| 🤝 [voting_ensemble.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/Algorithms/voting_ensemble.md) | **Spam Voting Ensemble** | Kết hợp Soft/Hard Voting đa mô hình để kiểm soát phương sai | 🏅 **Mô hình nghiên cứu thực nghiệm** |
+| 🛡️ [linear_svm.md](./linear_svm.md) | **Linear Support Vector Machine** | Tìm siêu phẳng phân cách lề cực đại với Squared Hinge Loss | 🥇 **Winner (Mô hình triển khai)** |
+| 📈 [logistic_regression.md](./logistic_regression.md) | **Logistic Regression** | Phân loại xác suất nhị phân với Binary Cross-Entropy & Armijo | 🥈 **Hạng 2 trên Test (F1: 71.42%)** |
+| 🎲 [naive_bayes.md](./naive_bayes.md) | **Complement & Multinomial Naive Bayes** | Đường cơ sở xác suất và Proxy Model cho Top-K Feature Selection | 🥉 **Baseline thực nghiệm** |
+| 🤝 [voting_ensemble.md](./voting_ensemble.md) | **Spam Voting Ensemble** | Kết hợp Soft/Hard Voting và so sánh với mô hình đơn lẻ | 🏅 **Mô hình nghiên cứu thực nghiệm** |
 
 ---
 
@@ -23,7 +25,7 @@ Mỗi thuật toán được trình bày độc lập theo cấu trúc chuẩn m
 
 Quá trình lựa chọn mô hình được thực hiện trên tập **Validation** ($2.903$ mẫu) với ràng buộc nghiệp vụ: $\text{Recall} \ge 0.85$, sau đó ưu tiên **Accuracy $\rightarrow$ F1-Score $\rightarrow$ Precision $\rightarrow$ FPR**:
 
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_model_selection.csv))*
+*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 
 | Thứ hạng | Mô hình ứng viên | Nhánh tham số | Ngưỡng ($\tau^*$) | Thỏa mãn Recall $\ge 85\%$ | Validation Accuracy | Validation Recall | Validation F1 | Đạt chuẩn chọn |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -42,7 +44,7 @@ Quá trình lựa chọn mô hình được thực hiện trên tập **Validati
 
 Đánh giá khách quan trên tập **Test** ($2.902$ mẫu) tại các ngưỡng tối ưu đã được chốt từ Validation set:
 
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/test_models_comparison.csv))*
+*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
 
 | Mô hình | Accuracy | Precision | Recall | F1-Score | F2-Score | ROC-AUC | Trạng thái |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -59,6 +61,19 @@ Quá trình lựa chọn mô hình được thực hiện trên tập **Validati
 
 ## 4. Tổng Kết Kiến Trúc & Quyết Định Kỹ Thuật
 
-1. **Hiệu năng của mô hình tuyến tính:** Cả Linear SVM và Logistic Regression đều hoạt động rất tốt trên không gian đặc trưng thưa $4.318$ chiều, vượt trội hơn mô hình xác suất Naive Bayes xấp xỉ $+6\%$ về Accuracy và $+4\%$ về F1-Score.
-2. **Lý do chọn Linear SVM:** Linear SVM (Tuned) mang lại Accuracy cao nhất ($70.07\%$ trên Validation và $70.85\%$ trên Test) trong khi vẫn bảo toàn mục tiêu bắt trúng trên $85\%$ email rác. Ranh giới lề cực đại (Maximum Margin) giúp mô hình chống chịu tốt trước các biến thể văn bản spam gây nhiễu.
+1. **Hiệu năng của mô hình tuyến tính:** Trong lần chạy tham chiếu, Linear SVM và Logistic Regression có Accuracy và F1 cao hơn Complement Naive Bayes trên cùng Validation/Test split; $4.318$ là số cột được giữ sau Top-K của lần chạy này.
+2. **Lý do chọn Linear SVM:** Linear SVM (Tuned) có Validation Accuracy cao nhất ($70.07\%$) trong nhóm đạt Validation Recall $\ge 85\%$. Test Accuracy $70.85\%$ và Recall $85.47\%$ chỉ được dùng để đánh giá sau khi đã chốt winner; một split chưa đủ để kết luận khả năng chống nhiễu.
 3. **Thực tế vận hành:** Mặc dù mô hình đạt Recall cao ($85.47\%$), tỷ lệ chặn nhầm thư hợp lệ vẫn ở mức $40.05\%$. Vì vậy, pipeline này được định vị là hệ thống thực nghiệm học tập và phù hợp để **cảnh báo / đưa thư vào hòm thư rác tạm thời** thay vì tự động xóa vĩnh viễn.
+
+---
+
+## 5. Quy Trình Chọn Ngưỡng, Tham Số Và Mô Hình
+
+Đây là bài toán **binary text classification** với nhãn Spam = 1. `RECALL_TARGET = 0.85` là mục tiêu thực nghiệm của dự án trên **Validation**, không phải mức bảo đảm cho Test hay dữ liệu thực tế. Baseline là Complement Naive Bayes (`alpha=1.0`); Linear SVM, Logistic Regression và Voting Ensemble được so sánh với baseline bằng cùng split và bộ chỉ số Accuracy, Precision, Recall, F1, F2, ROC-AUC, FPR và confusion matrix.
+
+1. **Train:** Fit từ vựng, IDF, scaler, xếp hạng đặc trưng và trọng số mô hình. `HybridFeatureBuilderScratch` tạo tối đa số cột theo cấu hình; `ManualFeatureSelectorScratch` chọn Top-K trên Train/Validation. Lần chạy tham chiếu có $4.318$ cột trước và sau chọn lọc.
+2. **Tuning trên Validation:** Với mỗi cấu hình hyperparameter, [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27) quét 200 ngưỡng cách đều từ $0.005$ đến $1.0$. Trong nhóm đạt Recall $\ge 0.85$, chọn Accuracy cao nhất, rồi phân xử bằng F1, Precision và FPR thấp hơn. Nếu không ngưỡng nào đạt, ưu tiên Recall, sau đó Accuracy và F1.
+3. **Chọn cấu hình và winner:** [`tune_model_hyperparameters`](../../src/models/tuning.py#L159) so sánh các cấu hình theo điều kiện đạt Recall, rồi Accuracy/F1. [`ModelSelectionWorkflow`](../../src/models/tuning.py#L235) quét ngưỡng cho cả nhánh Default, Tuned và Ensemble, xếp hạng theo điều kiện đạt Recall, điểm mục tiêu, Accuracy và F1. Thứ tự ứng viên ban đầu được giữ nếu hòa hoàn toàn.
+4. **Test:** Khóa cấu hình, winner và ngưỡng từ Validation trước khi tính chỉ số trên Test. Vì vậy Test Recall $84.99\%$ của CNB Tuned và Voting Tuned là thấp hơn $85\%$, dù cả hai đạt mục tiêu trên Validation. Không chọn lại model/ngưỡng dựa trên Test.
+
+Các điểm sigmoid của SVM và điểm Voting chưa được calibration; ngay cả điểm LR/CNB cũng chưa có báo cáo calibration trong lần chạy này. Dùng chúng để xếp hạng và chọn ngưỡng, không diễn giải trực tiếp thành xác suất rủi ro thực tế. Dữ liệu hiện là SMS ngắn, chưa kiểm chứng trên email có metadata/HTML; đánh giá nhiều split và kiểm tra calibration là bước tiếp theo nếu muốn kết luận về độ ổn định hoặc vận hành.

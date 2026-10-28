@@ -1,7 +1,7 @@
 # 🤝 Voting Ensemble (From-Scratch)
 
-> **Vị trí trong dự án:** Phương pháp học kết hợp (Ensemble Learning) đa mô hình, đánh giá khả năng cải thiện độ ổn định và giảm phương sai dự đoán.  
-> **Mã nguồn triển khai:** Class [`SpamVotingEnsemble`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py#L25) trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
+> **Vị trí trong dự án:** Phương pháp học kết hợp (Ensemble Learning) đa mô hình, dùng để kiểm tra khả năng cải thiện kết quả so với từng mô hình đơn lẻ.
+> **Mã nguồn triển khai:** Class [`SpamVotingEnsemble`](../../src/models/ensemble.py#L25) trong [`src/models/ensemble.py`](../../src/models/ensemble.py).
 
 ---
 
@@ -15,19 +15,19 @@ Mục đích của phương pháp **Voting Ensemble** trong dự án:
   1. **Linear SVM:** Tối ưu hóa siêu phẳng lề cực đại dựa trên các điểm hỗ trợ (Support Vectors).
   2. **Logistic Regression:** Ước lượng xác suất log-odds toàn cục trên toàn bộ mẫu dữ liệu.
   3. **Complement Naive Bayes:** Phân tích tần suất từ vựng trên tập phần bù của lớp.
-- Giảm phương sai sai số (Variance Reduction), hạn chế rủi ro phụ thuộc vào một kiến trúc phân loại đơn lẻ.
+- Kiểm tra liệu việc kết hợp các mô hình có giảm sai số trên tập Validation hay không; hiệu quả giảm phương sai cần được xác minh qua nhiều lần chia dữ liệu.
 
 ### 1.2. Cơ chế hoạt động & Toán học kết hợp
 Lớp `SpamVotingEnsemble` hỗ trợ hai cơ chế kết hợp:
 
 #### A. Soft Voting (Bỏ phiếu mềm - Mặc định trong pipeline tham chiếu)
-Mô hình tính trung bình cộng có trọng số của các phân phối xác suất dự đoán từ $M$ mô hình thành phần:
+Mô hình tính trung bình có trọng số của điểm số trong $[0,1]$ từ $M$ mô hình thành phần:
 
 $$
-P_{\text{ensemble}}(y = 1 \mid x) = \sum_{m=1}^{M} w_m \cdot P_m(y = 1 \mid x)
+s_{\text{ensemble}}(x) = \sum_{m=1}^{M} w_m \cdot s_m(x)
 $$
 
-Với $\sum_{m=1}^{M} w_m = 1$. Trong cấu hình mặc định của pipeline tham chiếu, trọng số được phân bổ đồng đều ($w_m = \frac{1}{3}$). Sau khi có xác suất tổng hợp, hệ thống áp dụng ngưỡng tối ưu $\tau^*$ được chọn từ tập Validation để ra quyết định nhị phân.
+Với $\sum_{m=1}^{M} w_m = 1$ sau chuẩn hóa. Trong pipeline tham chiếu, nhánh **Default** đặt trọng số thô LR:SVM:CNB = $1:1:1.2$ (sau chuẩn hóa là $1/3.2:1/3.2:1.2/3.2$); nhánh **Tuned** dùng trọng số đều $1:1:1$. Điểm SVM là sigmoid của margin chưa được calibration, nên điểm tổng hợp cũng không được diễn giải là xác suất hậu nghiệm đã calibration. Hệ thống chọn ngưỡng $\tau^*$ trên Validation để phân loại.
 
 #### B. Hard Voting (Bỏ phiếu cứng theo đa số)
 Mỗi mô hình đưa ra dự đoán nhãn rời rạc $\hat{y}_m \in \{0, 1\}$. Nhãn cuối cùng là nhãn nhận được đa số phiếu bầu:
@@ -37,21 +37,21 @@ $$
 $$
 
 ### 1.3. Đánh đổi & Failure Modes
-- **Trade-offs:** Soft Voting tận dụng được mức độ tin cậy (Confidence score) của từng mô hình, giúp đường biên xác suất mượt mà hơn. Tuy nhiên, thời gian huấn luyện và suy luận tăng gấp 3 lần do phải thực thi toàn bộ 3 mô hình nền tảng.
+- **Trade-offs:** Soft Voting sử dụng điểm số của ba mô hình; thang điểm chưa calibration có thể khiến một thành viên ảnh hưởng quá mức. Chi phí suy luận gồm ba lần dự đoán; chi phí huấn luyện tăng nếu phải fit cả ba mô hình.
 - **Failure Modes:** 
-  - **Hiệu ứng kéo tụt (Dragging Down Effect):** Mô hình Ensemble chỉ đạt hiệu quả tối ưu khi các mô hình thành phần có sức mạnh tương đương. Khi một mô hình thành phần có độ chính xác yếu hơn đáng kể (ở đây là Complement Naive Bayes với Accuracy $64.71\%$), việc lấy trung bình đồng đều làm suy giảm độ chính xác của hai mô hình mạnh (Linear SVM $70.85\%$ và Logistic Regression $70.74\%$).
+  - **Hiệu ứng kéo tụt (Dragging Down Effect):** CNB có Test Accuracy $64.71\%$, thấp hơn Linear SVM ($70.85\%$) và LR ($70.74\%$); điểm Ensemble cũng thấp hơn winner trong lần chạy tham chiếu. Chưa có ablation về trọng số/calibration để kết luận riêng CNB là nguyên nhân.
 
 ---
 
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L142), [`LinearSVMFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L218) và [`NaiveBayesClassifier`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L330).
-- **Ma trận đặc trưng $X$:** Kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45) hoặc ma trận thưa chuẩn.
+- **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](../../src/models/classifiers.py#L142), [`LinearSVMFromScratch`](../../src/models/classifiers.py#L218) và [`NaiveBayesClassifier`](../../src/models/classifiers.py#L330).
+- **Ma trận đặc trưng $X$:** Kích thước $(N, D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc ma trận thưa chuẩn; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
 - **Nhãn mục tiêu $y$:** Vector nhãn nhị phân $\{0, 1\}$.
 
 ### 2.2. Output
-- **Xác suất trung bình Soft Voting ($\hat{p}_{\text{soft}}$):** Vector $N$ phần tử trong đoạn $[0, 1]$.
+- **Điểm Soft Voting ($\hat{p}_{\text{soft}}$):** Vector $N$ phần tử trong đoạn $[0, 1]$; tên biến giữ theo API, giá trị chưa calibration.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
   $$\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_{\text{soft}, i} \ge \tau^* \\ 0 & \text{nếu } \hat{p}_{\text{soft}, i} < \tau^* \end{cases}$$
   Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
@@ -61,23 +61,23 @@ $$
 ## 3. Data used (Dữ liệu sử dụng)
 
 - **Train set:** $23.223$ mẫu ($13.309$ Ham, $9.914$ Spam) - Dùng huấn luyện độc lập cho cả 3 mô hình thành phần.
-- **Validation set:** $2.903$ mẫu ($1.664$ Ham, $1.239$ Spam) - Dùng tổng hợp xác suất và quét lưới ngưỡng $\tau^*$.
+- **Validation set:** $2.903$ mẫu ($1.664$ Ham, $1.239$ Spam) - Dùng tổng hợp điểm số và quét lưới ngưỡng $\tau^*$.
 - **Test set:** $2.902$ mẫu ($1.663$ Ham, $1.239$ Spam) - Dùng đánh giá kiểm chứng độc lập.
-- **Không gian đặc trưng:** Thống nhất $4.318$ đặc trưng lai chuẩn hóa.
+- **Không gian đặc trưng:** $4.318$ cột trong lần chạy tham chiếu; số cột của lần chạy khác phụ thuộc builder và Top-K.
 
 ---
 
 ## 4. Evaluation (Phương pháp đánh giá)
 
-- Tối ưu hóa ngưỡng qua [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27) với điều kiện tiên quyết $\text{Recall} \ge 0.85$.
-- Do xác suất tổng hợp là trung bình của SVM, LR và CNB, phân phối xác suất có xu hướng co cụm về trung tâm, dẫn đến việc ngưỡng tối ưu $\tau^*$ rơi vào khoảng $0.365 - 0.385$.
+- Tối ưu hóa ngưỡng qua [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27) với điều kiện tiên quyết $\text{Recall} \ge 0.85$.
+- Trong lần chạy tham chiếu, ngưỡng chọn trên Validation là $0.365$ (Default) và $0.385$ (Tuned); các giá trị này phụ thuộc thang điểm và trọng số từng nhánh.
 
 ---
 
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy trong module `src/models/ensemble.py`.
-- **Kiểm thử tự động:** Vượt qua $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests).
+- **Kiểm thử tự động:** Vượt qua $51/51$ tests trong thư mục [`tests/`](../../tests).
 - **Vị trí xếp hạng:** Xếp hạng 5 (nhánh Tuned) và hạng 6 (nhánh Default) trên tập Validation.
 - **Kết luận kiến trúc:** Mô hình Ensemble được đưa vào quy trình so sánh công bằng như mọi ứng viên độc lập khác. Vì không đạt điểm Validation Accuracy cao hơn Linear SVM, Ensemble không được chọn làm mô hình cuối cùng để triển khai, đảm bảo tính thực nghiệm khách quan và tiết kiệm tài nguyên tính toán.
 
@@ -86,7 +86,7 @@ $$
 ## 6. Results (Kết quả thực nghiệm định lượng)
 
 ### 6.1. Kết quả trên tập Validation
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_model_selection.csv))*
+*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 
 | Cấu hình Ensemble | Ngưỡng ($\tau^*$) | Accuracy | Precision | Recall | F1-Score | F2-Score | Thứ hạng |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -94,7 +94,7 @@ $$
 | **SpamVotingEnsemble (Default)**| **$0.365$** | **$68.72\%$** | $59.15\%$ | $86.36\%$ | **$70.21\%$** | $79.08\%$ | **6 / 8** |
 
 ### 6.2. Kết quả trên tập Test
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/test_models_comparison.csv))*
+*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
 
 | Chỉ số đánh giá | Voting Ensemble (Tuned) | Voting Ensemble (Default) | So sánh với Linear SVM (Winner) |
 | :--- | :---: | :---: | :---: |
@@ -106,4 +106,4 @@ $$
 | **ROC-AUC** | **$80.26\%$** | $79.98\%$ | $-1.18\%$ |
 
 ### 6.3. Bài học thực nghiệm rút ra
-Kết quả thực nghiệm cho thấy kết hợp Ensemble không phải lúc nào cũng mang lại hiệu năng cao hơn mô hình đơn lẻ tốt nhất. Trong bài toán này, Linear SVM tự thân đã tạo ra mặt phân cách lề cực đại vượt trội trên không gian đặc trưng thưa; việc hòa trộn xác suất của Naive Bayes đã làm giảm độ sắc bén của ranh giới quyết định. Do đó, quyết định chọn Linear SVM làm mô hình triển khai duy nhất là hoàn toàn có cơ sở khoa học và tối ưu về mặt chi phí vận hành.
+Kết quả trên split tham chiếu cho thấy cả hai nhánh Ensemble có Validation Accuracy thấp hơn Linear SVM (Tuned), nên quy tắc chọn mô hình đã chọn SVM. Test Recall của Ensemble (Tuned) là $84.99\%$, thấp hơn mốc $85\%$ dù Validation Recall đạt $85.47\%$. Để xác định nguyên nhân chênh lệch hoặc kết luận về độ ổn định, cần thêm ablation trọng số, calibration và đánh giá qua nhiều split; Test không được dùng để chọn lại mô hình.

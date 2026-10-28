@@ -1,7 +1,7 @@
 # 📈 Logistic Regression (From-Scratch)
 
 > **Vị trí trong dự án:** Mô hình phân loại tuyến tính xác suất cốt lõi, ứng viên cạnh tranh trực tiếp với Linear SVM.  
-> **Mã nguồn triển khai:** Class [`LogisticRegressionFromScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py#L142) trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
+> **Mã nguồn triển khai:** Class [`LogisticRegressionFromScratch`](../../src/models/classifiers.py#L142) trong [`src/models/classifiers.py`](../../src/models/classifiers.py).
 
 ---
 
@@ -11,7 +11,7 @@
 Logistic Regression là một trong những thuật toán học máy có giám sát kinh điển và hiệu quả nhất cho bài toán phân loại văn bản nhị phân (Binary Text Classification). 
 
 Mục đích của thuật toán trong dự án:
-- Ước lượng trực tiếp xác suất hậu nghiệm $P(y = 1 \mid x)$ rằng một email là Spam dựa trên tổ hợp tuyến tính của các đặc trưng văn bản và tín hiệu cấu trúc: $z = w^\top x + b$.
+- Tạo điểm sigmoid cho lớp Spam từ tổ hợp tuyến tính của đặc trưng văn bản và tín hiệu cấu trúc: $z = w^\top x + b$. Điểm chưa được kiểm tra calibration nên không mặc nhiên là xác suất hậu nghiệm chính xác.
 - Cung cấp một mô hình có tính diễn giải cao (Explainable Model), trong đó mỗi trọng số $w_j$ phản ánh trực tiếp mức độ đóng góp (log-odds) của từ khóa hoặc đặc trưng tương ứng vào việc làm tăng hay giảm nguy cơ là thư rác.
 
 ### 1.2. Cơ sở toán học & Hàm mục tiêu
@@ -39,25 +39,26 @@ Trong đó:
 - **Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
   Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
   $$\Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}$$
-  Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ, đảm bảo tốc độ hội tụ nhanh và ổn định.
+  Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
 
 ### 1.4. Đánh đổi & Failure Modes
-- **Trade-offs:** Hội tụ nhanh, suy luận cực kỳ nhẹ nhàng, xuất ra xác suất mượt mà. Tuy nhiên, giả định ranh giới quyết định tuyến tính (Linear Decision Boundary) trong không gian log-odds khiến mô hình không tự học được các tương tác phi tuyến phức tạp nếu không có n-gram hỗ trợ.
+- **Trade-offs:** Dự đoán bằng tích vô hướng và sigmoid nên chi phí suy luận thấp; điểm đầu ra liên tục nhưng chưa được kiểm tra calibration. Ranh giới quyết định tuyến tính trong không gian log-odds không tự học được tương tác phi tuyến phức tạp nếu thiếu đặc trưng hỗ trợ.
 - **Failure Modes:** 
   - Nhạy cảm với các mẫu văn bản chứa nhiều từ khóa trung lập xuất hiện dày đặc làm loãng tín hiệu spam.
-  - Khi gặp các từ hoàn toàn mới chưa xuất hiện trong từ điển Train, vector đặc trưng bằng 0 khiến mô hình phụ thuộc hoàn toàn vào bias $b$.
+  - Token mới ngoài từ điển Word TF-IDF không đóng góp ở khối đó; toàn vector chỉ bằng 0 nếu các khối character n-gram, keyword và numeric cũng không tạo tín hiệu. Khi đó dự đoán phụ thuộc vào bias $b$.
 
 ---
 
 ## 2. Input / Output (Đặc tả dữ liệu vào / ra)
 
 ### 2.1. Input
-- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, 4318)$ thuộc lớp [`CSRMatrixScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix`.
+- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N,D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix`; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
 - **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $y_i \in \{0, 1\}$.
 
 ### 2.2. Output
-- **Xác suất dự đoán Spam ($\hat{p}$):**
-  $$\hat{p}_i = P(y_i = 1 \mid x_i) = \sigma(w^\top x_i + b) \in [0, 1]$$
+- **Điểm sigmoid cho Spam ($\hat{p}$):**
+  $$\hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]$$
+  Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
   $$\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}$$
   Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
@@ -73,26 +74,26 @@ Dữ liệu sạch sau kiểm toán ($29.028$ mẫu) được chia phân tầng 
 - **Test set:** $2.902$ mẫu ($1.663$ Ham, $1.239$ Spam) - Dùng để đánh giá độc lập năng lực tổng quát hóa.
 
 ### 3.2. Cấu trúc ma trận đặc trưng ($4.318$ chiều)
-Tất cả các đặc trưng được ghép nối qua [`HybridFeatureBuilderScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L528):
+Lần chạy tham chiếu giữ toàn bộ $4.318$ cột sau Top-K; các cột được ghép nối qua [`HybridFeatureBuilderScratch`](../../src/features/feature_engineering.py#L528):
 - **Word TF-IDF:** $3.000$ chiều (từ vựng đơn phân tích tần suất).
 - **Word Bigram TF-IDF:** $800$ chiều (ngữ cảnh 2 từ liền kề).
 - **Character n-gram TF-IDF:** $500$ chiều (chuỗi con ký tự 3–5).
 - **Keyword Binary:** $10$ chiều (từ khóa spam đặc trưng).
-- **Numeric/Structural:** $8$ chiều chuẩn hóa qua [`MaxAbsScalerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py#L239).
+- **Numeric/Structural:** $8$ chiều chuẩn hóa qua [`MaxAbsScalerScratch`](../../src/features/feature_engineering.py#L239).
 
 ---
 
 ## 4. Evaluation (Phương pháp đánh giá & Tiêu chí nghiệp vụ)
 
 ### 4.1. Tiêu chí lựa chọn trên Validation
-Tương tự Linear SVM, Logistic Regression được đánh giá thông qua bộ dò ngưỡng [`ThresholdOptimizerScratch`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py#L27):
+Tương tự Linear SVM, Logistic Regression được đánh giá thông qua bộ dò ngưỡng [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27):
 1. **Ràng buộc cứng:** $\text{Recall} \ge 0.85$ trên tập Validation để bảo vệ mục tiêu phát hiện đa số thư rác.
 2. **Tiêu chí tối ưu:** Trong các mốc ngưỡng đạt Recall $\ge 0.85$, chọn ngưỡng mang lại $\text{Accuracy}$ cao nhất, phân xử hòa bằng $\text{F1-score}$, $\text{Precision}$ và tối thiểu hóa $\text{FPR}$.
 
 ### 4.2. Chỉ số theo dõi
 Đánh giá đa chiều qua bộ chỉ số:
 - $\text{Accuracy}, \text{Precision}, \text{Recall}, \text{F1-score}, \text{F2-score}$
-- $\text{ROC-AUC}$ (Đánh giá chất lượng phân phối xác suất dự đoán)
+- $\text{ROC-AUC}$ (Đánh giá khả năng xếp hạng theo điểm dự đoán, không đo calibration)
 - Ma trận nhầm lẫn ($TP, FP, TN, FN$) và Tỷ lệ chặn nhầm thư hợp lệ ($FPR$).
 
 ---
@@ -100,9 +101,9 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 ## 5. Status (Trạng thái triển khai trong dự án)
 
 - **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy, không dùng `sklearn.linear_model.LogisticRegression`.
-- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/tests), đảm bảo tính nhất quán ma trận thưa và khả năng tối ưu gradient không phụ thuộc thư viện ngoài.
+- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](../../tests), đảm bảo tính nhất quán ma trận thưa và khả năng tối ưu gradient không phụ thuộc thư viện ngoài.
 - **Vị trí xếp hạng:** **Xếp hạng 3 trên Validation** (sau Linear SVM Tuned và Linear SVM Default) và đạt **kết quả cao thứ 2 trên Test Set** (F1 đạt $71.42\%$, sát nút $71.46\%$ của Linear SVM).
-- **Khả năng ứng dụng:** Rất phù hợp làm mô hình baseline mạnh hoặc mô hình suy luận nhẹ trong môi trường yêu cầu xuất xác suất thực tế.
+- **Khả năng ứng dụng:** Có thể làm baseline tuyến tính hoặc mô hình suy luận nhẹ; nếu cần xác suất rủi ro thực tế, phải đánh giá và cân chuẩn điểm dự đoán trước.
 
 ---
 
@@ -116,7 +117,7 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 - Ngưỡng phân loại tối ưu: $\tau^* = 0.415$
 
 ### 6.2. Kết quả trên tập Validation
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/validation_model_selection.csv))*
+*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 - **Validation Accuracy:** **$69.96\%$** ($0.69962$)
 - **Validation Recall:** **$85.39\%$** ($0.85391$) *(Đạt mục tiêu $\ge 85\%$)*
 - **Validation Precision:** **$60.49\%$** ($0.60492$)
@@ -125,7 +126,7 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 - **Thứ hạng trên Validation:** Hạng 3 / 8 ứng viên.
 
 ### 6.3. Kết quả trên tập Test
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/test_models_comparison.csv))*
+*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
 
 | Chỉ số đánh giá | Logistic Regression (Tuned) | Logistic Regression (Default: C=1.0) | Mức cải thiện |
 | :--- | :---: | :---: | :---: |
@@ -137,4 +138,4 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 | **ROC-AUC** | **$81.38\%$** | $81.32\%$ | $+0.06\%$ |
 | **Ngưỡng sử dụng ($\tau^*$)** | **$0.415$** | $0.410$ | — |
 
-Logistic Regression thể hiện phong độ đặc biệt ổn định: độ chênh lệch F1 giữa tập Validation ($70.82\%$) và tập Test ($71.42\%$) rất nhỏ, chứng minh mô hình không bị quá khớp và tổng quát hóa tốt.
+F1 của LR (Tuned) là $70.82\%$ trên Validation và $71.42\%$ trên Test của lần chia tham chiếu. Chênh lệch nhỏ ở một split chưa đủ để kết luận không overfitting; cần thêm nhiều split hoặc cross-validation để đánh giá độ ổn định.
