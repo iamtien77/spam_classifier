@@ -8,6 +8,19 @@ Tất cả các thuật toán đều được **tự xây dựng từ đầu (Fr
 
 ---
 
+## 📌 Đặc Tả Kỹ Thuật Chuyên Sâu 4 Giai Đoạn Pipeline (Stage Specifications)
+
+Toàn bộ lập luận logic, bóc tách chức năng từng lớp/hàm và bảng phân tích đối kháng kỹ thuật 4 chiều được trình bày chi tiết tại bộ 4 tài liệu giai đoạn:
+
+| Giai đoạn | Tài liệu đặc tả kỹ thuật chuyên sâu | Module mã nguồn chính | Trọng tâm logic nghiệp vụ & Đối kháng giải pháp |
+| :---: | :--- | :--- | :--- |
+| **Giai đoạn 1** | 📥 [01_data_preprocessing_and_audit.md](../description_for_AI_working/01_data_preprocessing_and_audit.md) | `loader.py`, `preprocessing.py` | Bóc tách HTML dòng sự kiện, khử trùng & xóa nhóm mâu thuẫn toàn cục, phân chia phân tầng Hamilton 80/10/10 chống rò rỉ. |
+| **Giai đoạn 2** | ⚙️ [02_feature_engineering_and_selection.md](../description_for_AI_working/02_feature_engineering_and_selection.md) | `feature_engineering.py` | Cấu trúc ma trận thưa nén hàng `CSRMatrixScratch`, Sublinear TF-IDF, Char n-gram 3-5, `MaxAbsScalerScratch` bảo toàn độ thưa, Top-K 4.318 chiều. |
+| **Giai đoạn 3** | 🧠 [03_model_training_and_tuning.md](../description_for_AI_working/03_model_training_and_tuning.md) | `classifiers.py`, `tuning.py`, `ensemble.py` | 3 mô hình cốt lõi From-Scratch (Balanced BCE, Squared Hinge $C^1$, Complement NB), Barzilai-Borwein + Armijo Line Search, dò ngưỡng sàn Recall $\ge 85\%$. |
+| **Giai đoạn 4** | 🚀 [04_evaluation_and_deployment.md](../description_for_AI_working/04_evaluation_and_deployment.md) | `metrics.py`, `error_analysis.py`, `persistence.py`, `predictor.py` | Kiểm chứng độc lập Test (Mann-Whitney U ROC-AUC), mổ xẻ 846 ca lỗi, Joblib Atomic Bundle, dịch vụ suy luận `SpamInferenceService` (< 2.5 ms SLA, XAI). |
+
+---
+
 ## 1. Danh Mục Tài Liệu Kỹ Thuật
 
 Mỗi thuật toán được trình bày độc lập theo cấu trúc chuẩn mực gồm 6 phần: **Purpose**, **Input / Output**, **Data used**, **Evaluation**, **Status** và **Results**:
