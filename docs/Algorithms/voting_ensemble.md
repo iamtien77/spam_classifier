@@ -30,7 +30,7 @@ $$
 Với $\sum_{m=1}^{M} w_m = 1$ sau chuẩn hóa. Trong pipeline tham chiếu, nhánh **Default** đặt trọng số thô LR:SVM:CNB = $1:1:1.2$ (sau chuẩn hóa là $1/3.2:1/3.2:1.2/3.2$); nhánh **Tuned** dùng trọng số đều $1:1:1$. Điểm SVM là sigmoid của margin chưa được calibration, nên điểm tổng hợp cũng không được diễn giải là xác suất hậu nghiệm đã calibration. Hệ thống chọn ngưỡng $\tau^*$ trên Validation để phân loại.
 
 #### B. Hard Voting (Bỏ phiếu cứng theo đa số)
-Mỗi mô hình đưa ra dự đoán nhãn rời rạc $\hat{y}_m \in \{0, 1\}$. Nhãn cuối cùng là nhãn nhận được đa số phiếu bầu:
+Mỗi mô hình đưa ra dự đoán nhãn rời rạc $`\hat{y}_m \in \{0, 1\}`$. Nhãn cuối cùng là nhãn nhận được đa số phiếu bầu:
 
 $$
 \hat{y}_{\text{ensemble}} = \operatorname{mode}\left( \{\hat{y}_1, \hat{y}_2, \dots, \hat{y}_M\} \right)
@@ -48,12 +48,16 @@ $$
 ### 2.1. Input
 - **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](../../src/models/classifiers.py#L142), [`LinearSVMFromScratch`](../../src/models/classifiers.py#L218) và [`NaiveBayesClassifier`](../../src/models/classifiers.py#L330).
 - **Ma trận đặc trưng $X$:** Kích thước $(N, D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc ma trận thưa chuẩn; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
-- **Nhãn mục tiêu $y$:** Vector nhãn nhị phân $\{0, 1\}$.
+- **Nhãn mục tiêu $y$:** Vector nhãn nhị phân $`\{0, 1\}`$.
 
 ### 2.2. Output
 - **Điểm Soft Voting ($\hat{p}_{\text{soft}}$):** Vector $N$ phần tử trong đoạn $[0, 1]$; tên biến giữ theo API, giá trị chưa calibration.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
-  $$\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_{\text{soft}, i} \ge \tau^* \\ 0 & \text{nếu } \hat{p}_{\text{soft}, i} < \tau^* \end{cases}$$
+
+  $$
+  \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_{\text{soft}, i} \ge \tau^* \\ 0 & \text{nếu } \hat{p}_{\text{soft}, i} < \tau^* \end{cases}
+  $$
+
   Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 
 ---

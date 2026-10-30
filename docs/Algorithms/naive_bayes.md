@@ -18,14 +18,17 @@ Mục đích của thuật toán trong dự án:
 Mô hình hỗ trợ hai biến thể chính, trong đó **Complement Naive Bayes (CNB)** được chọn làm cấu hình tham chiếu:
 
 #### A. Multinomial Naive Bayes (MNB)
-Dựa trên giả định độc lập có điều kiện giữa các từ khi biết nhãn lớp $c \in \{0, 1\}$:
+Dựa trên giả định độc lập có điều kiện giữa các từ khi biết nhãn lớp $`c \in \{0, 1\}`$:
 
 $$
 P(x \mid c) = \prod_{j=1}^{D} P(w_j \mid c)^{x_j}
 $$
 
 Xác suất từ $w_j$ trong lớp $c$ được ước lượng bằng làm mịn Laplace:
-$$\theta_{c, j} = \frac{N_{c, j} + \alpha}{N_c + \alpha D}$$
+
+$$
+\theta_{c, j} = \frac{N_{c, j} + \alpha}{N_c + \alpha D}
+$$
 
 Ở đây $N_c=\sum_j N_{c,j}$ là tổng trọng số đặc trưng của lớp $c$, không phải số văn bản thuộc lớp.
 
@@ -33,13 +36,28 @@ $$\theta_{c, j} = \frac{N_{c, j} + \alpha}{N_c + \alpha D}$$
 MNB có thể bị ảnh hưởng khi phân bố lớp hoặc độ dài văn bản khác nhau. Complement Naive Bayes học từ **phần bù của lớp** (Complement Set $\setminus c$) để giảm một số thiên lệch, nhưng không bảo đảm khắc phục hoàn toàn mất cân bằng:
 
 1. Với mỗi lớp $c$, tính tổng trọng số đặc trưng trên tất cả các mẫu **không thuộc lớp $c$**:
-   $$N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}$$
+
+   $$
+   N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
+   $$
+
 2. Áp dụng hệ số làm mịn Laplace/Lidstone $\alpha$:
-   $$\hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}$$
+
+   $$
+   \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
+   $$
+
 3. Trọng số đóng góp của từ $j$ được gán bằng nghịch đảo log-weight:
-   $$w_{c, j} = - \ln \hat{\theta}_{\setminus c, j}$$
+
+   $$
+   w_{c, j} = - \ln \hat{\theta}_{\setminus c, j}
+   $$
+
 4. Điểm số quyết định cho văn bản $x$:
-   $$z_c(x) = \ln P(c) - \sum_{j=1}^{D} x_j \ln \hat{\theta}_{\setminus c, j}$$
+
+   $$
+   z_c(x) = \ln P(c) - \sum_{j=1}^{D} x_j \ln \hat{\theta}_{\setminus c, j}
+   $$
 
 Văn bản được phân vào lớp $c$ có điểm số cao nhất.
 
@@ -63,13 +81,17 @@ $$
 ### 2.1. Input
 - **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N, D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45); $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
   - **Ràng buộc toán học nghiêm ngặt:** Toàn bộ các giá trị $x_{ij} \ge 0$ (không chấp nhận giá trị âm vì Naive Bayes xem đặc trưng như tần suất xuất hiện).
-- **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $y \in \{0, 1\}$.
+- **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $`y \in \{0, 1\}`$.
 
 ### 2.2. Output
 - **Điểm quyết định:** `decision_scores(X)` trả ma trận $(N,2)$ gồm điểm theo từng lớp; `feature_log_prob_` là ma trận tham số $(2,D)$, không phải output log probabilities cho từng mẫu.
 - **Điểm Softmax cho Spam ($\hat{p}$):** Cột lớp $1$ từ `predict_proba(X)`, $\hat{p}_i \in [0, 1]$; chưa có kiểm tra calibration để diễn giải như xác suất rủi ro thực tế.
 - **Nhãn dự đoán nhị phân ($\hat{y}$):**
-  $$\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}$$
+
+  $$
+  \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
+  $$
+
   Với $\tau^* = 0.220$ cho mô hình Tuned (và $\tau^* = 0.215$ cho mô hình Default).
 
 ---

@@ -37,7 +37,7 @@ Mỗi tài liệu được chuẩn hóa thành các hành động kỹ thuật c
 ### ⚙️ Nhóm 3: Kỹ Thuật Biểu Diễn Đặc Trưng (Feature Engineering - 8 bản)
 - [feature-engineering-v1.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v1.md): Cài đặt cấu trúc ma trận thưa tự viết `CSRMatrixScratch` (`iter_row`, `dot`, `transpose_dot`).
 - [feature-engineering-v2.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v2.md): Tự cài đặt thuật toán TF-IDF (`TfidfVectorizerScratch`) với sublinear TF và smooth IDF.
-- [feature-engineering-v3.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v3.md): Trích xuất khối đặc trưng Word Unigram ($3.000$ từ vựng, $\text{min\_df}=2$).
+- [feature-engineering-v3.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v3.md): Trích xuất khối đặc trưng Word Unigram ($3.000$ từ vựng, `min_df = 2`).
 - [feature-engineering-v4.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v4.md): Trích xuất khối đặc trưng Word Bigram ($800$ cặp từ ngữ cảnh).
 - [feature-engineering-v5.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v5.md): Trích xuất khối đặc trưng Character n-gram ($500$ chuỗi ký tự 3-5).
 - [feature-engineering-v6.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v6.md): Trích xuất 10 từ khóa nhạy cảm và 8 đặc trưng số co dãn bằng `MaxAbsScalerScratch`.

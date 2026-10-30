@@ -22,7 +22,7 @@ J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_
 $$
 
 Trong đó:
-- Nhãn toán học có dấu: $\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}$ (với nhãn gốc $y_i \in \{0, 1\}$).
+- Nhãn toán học có dấu: $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$ (với nhãn gốc $`y_i \in \{0, 1\}`$).
 - $a_i$ là hệ số trọng số mẫu theo lớp (Class Weight): $a_i = \frac{N}{2 \times N_{\widetilde{y}_i}}$, giúp cân bằng ảnh hưởng khi phân bố mẫu giữa Ham và Spam bị lệch.
 - Hệ số điều chuẩn $\lambda = \frac{1}{\max(10^{-5}, C \cdot N)}$, với $C$ là siêu tham số kiểm soát mức độ phạt vi phạm lề (Margin violation penalty).
 - Bias $b$ không bị điều chuẩn để tránh làm lệch siêu phẳng về gốc tọa độ.
@@ -30,9 +30,16 @@ Trong đó:
 ### 1.3. Phương pháp tối ưu hóa
 Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($C^1$), cho phép tối ưu trực tiếp bằng **Gradient Descent kết hợp Armijo Backtracking Line Search** (hàm `_gradient_descent_backtracking`):
 - Đạo hàm riêng theo tham số:
-  $$\frac{\partial J}{\partial w} = \lambda w - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right) x_i$$
-  $$\frac{\partial J}{\partial b} = - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right)$$
-  (với $\mathcal{V} = \{i \mid 1 - \widetilde{y}_i (w^\top x_i + b) > 0\}$ là tập các mẫu vi phạm lề).
+
+  $$
+  \frac{\partial J}{\partial w} = \lambda w - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right) x_i
+  $$
+
+  $$
+  \frac{\partial J}{\partial b} = - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right)
+  $$
+
+  (với $`\mathcal{V} = \{i \mid 1 - \widetilde{y}_i (w^\top x_i + b) > 0\}`$ là tập các mẫu vi phạm lề).
 - Bước học $\eta$ được cập nhật thích ứng theo độ cong Barzilai-Borwein và co nếu không thỏa mãn điều kiện Armijo; cách này giảm rủi ro bước học không phù hợp, không bảo đảm hội tụ trong mọi cấu hình.
 
 ### 1.4. Đánh đổi & Failure Modes
@@ -48,17 +55,29 @@ Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($
 ### 2.1. Input
 - **Ma trận đặc trưng $X$:** Định dạng thưa [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix` kích thước $(N,D_{\text{selected}})$; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
   - Các giá trị biểu diễn trọng số TF-IDF và tần suất chuẩn hóa, thỏa mãn $x_{ij} \ge 0$.
-- **Vector nhãn $y$:** Mảng NumPy nhị phân $N$ phần tử, $y \in \{0, 1\}$ (trong đó $0$: Ham, $1$: Spam).
+- **Vector nhãn $y$:** Mảng NumPy nhị phân $N$ phần tử, $`y \in \{0, 1\}`$ (trong đó $0$: Ham, $1$: Spam).
 
 ### 2.2. Output
 - **Điểm quyết định khoảng cách (Decision Score):**
-  $$z_i = w^\top x_i + b \in (-\infty, +\infty)$$
+
+  $$
+  z_i = w^\top x_i + b \in (-\infty, +\infty)
+  $$
+
   Đại diện cho khoảng cách đại số từ mẫu $x_i$ đến siêu phẳng phân cách.
 - **Điểm phân loại / Xác suất giả lập qua Sigmoid (`spam_score`):**
-  $$p_i = \sigma(z_i) = \frac{1}{1 + \exp(-z_i)} \in [0, 1]$$
+
+  $$
+  p_i = \sigma(z_i) = \frac{1}{1 + \exp(-z_i)} \in [0, 1]
+  $$
+
   Đây là điểm lề chuyển đổi qua Sigmoid để dùng chung giao diện với bộ dò ngưỡng và Voting Ensemble; trường `is_calibrated=False` trong kết quả inference cho biết đây không phải xác suất hậu nghiệm đã cân chuẩn.
 - **Nhãn dự đoán nhị phân ($\hat{y}$):**
-  $$\hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge \tau^* \\ 0 & \text{nếu } p_i < \tau^* \end{cases}$$
+
+  $$
+  \hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge \tau^* \\ 0 & \text{nếu } p_i < \tau^* \end{cases}
+  $$
+
   Với $\tau^* = 0.465$ là ngưỡng quyết định tối ưu được chốt từ tập Validation.
 
 ---
@@ -91,7 +110,10 @@ Mô hình nhận đầu vào từ bộ ghép đặc trưng lai [`HybridFeatureBu
 
 ### 4.1. Ràng buộc tối ưu hóa nghiệp vụ (Constrained Selection)
 Dự án áp dụng quy tắc thực nghiệm ưu tiên bắt trúng thư rác với ràng buộc:
-$$\text{Recall} \ge 0.85$$
+
+$$
+\text{Recall} \ge 0.85
+$$
 
 Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27) quét 200 mốc cách đều từ $0.005$ đến $1.0$ trên tập Validation:
 - Nhóm ngưỡng khả thi ($\text{Recall} \ge 0.85$) được xếp hạng ưu tiên theo: **Accuracy $\rightarrow$ F1-Score $\rightarrow$ Precision $\rightarrow$ FPR**.
@@ -122,10 +144,10 @@ Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScra
 ### 6.1. Siêu tham số tối ưu (Hyperparameters)
 Qua quét lưới tham số (Grid Search):
 - Hệ số phạt $C = 2.0$
-- Tốc độ học ban đầu $\text{learning\_rate} = 0.05$
-- Số vòng lặp tối đa $\text{max\_iter} = 150$
-- Hàm mất mát: $\text{squared\_hinge}$
-- Trọng số lớp: $\text{class\_weight} = \text{'balanced'}$
+- Tốc độ học ban đầu `learning_rate = 0.05`
+- Số vòng lặp tối đa `max_iter = 150`
+- Hàm mất mát: `squared_hinge`
+- Trọng số lớp: `class_weight = 'balanced'`
 - Ngưỡng quyết định tối ưu: $\tau^* = 0.465$
 
 ### 6.2. Kết quả trên tập Validation (Chọn mô hình)

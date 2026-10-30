@@ -28,17 +28,25 @@ J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 
 $$
 
 Trong đó:
-- $y_i \in \{0, 1\}$ là nhãn thực tế ($0$: Ham, $1$: Spam).
+- $`y_i \in \{0, 1\}`$ là nhãn thực tế ($0$: Ham, $1$: Spam).
 - $a_i$ là trọng số mẫu cân bằng lớp (`class_weight='balanced'`): $a_i = \frac{N}{2 \times N_{y_i}}$.
 - Hệ số điều chuẩn $\lambda = \frac{1}{\max(10^{-5}, C \cdot N)}$, tương đương $\lambda = \frac{1}{C \cdot N}$ với cấu hình dự án, nhằm kiểm soát độ lớn trọng số $w$, tránh hiện tượng các từ vựng hiếm bị gán trọng số cực đoan dẫn đến overfitting.
 - Hệ số chặn (bias) $b$ không bị phạt điều chuẩn.
 
 ### 1.3. Cơ chế tối ưu hóa số học ổn định
 - **Ổn định số học (Numerical Stability):** Tránh lỗi tràn số (overflow/underflow) khi tính log xác suất bằng cách sử dụng `np.logaddexp`:
-  $$\ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)$$
+
+  $$
+  \ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)
+  $$
+
 - **Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
   Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
-  $$\Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}$$
+
+  $$
+  \Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}
+  $$
+
   Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
 
 ### 1.4. Đánh đổi & Failure Modes
@@ -53,14 +61,22 @@ Trong đó:
 
 ### 2.1. Input
 - **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N,D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix`; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
-- **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $y_i \in \{0, 1\}$.
+- **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $`y_i \in \{0, 1\}`$.
 
 ### 2.2. Output
 - **Điểm sigmoid cho Spam ($\hat{p}$):**
-  $$\hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]$$
+
+  $$
+  \hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]
+  $$
+
   Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
-  $$\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}$$
+
+  $$
+  \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
+  $$
+
   Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
 
 ---
@@ -111,9 +127,9 @@ Tương tự Linear SVM, Logistic Regression được đánh giá thông qua b�
 
 ### 6.1. Cấu hình siêu tham số tối ưu
 - Hệ số điều chuẩn: $C = 0.5$ ($\lambda = \frac{1}{0.5 \times 23223} \approx 8.61 \times 10^{-5}$)
-- Tốc độ học ban đầu: $\text{learning\_rate} = 0.1$
-- Số vòng lặp tối đa: $\text{max\_iter} = 200$
-- Trọng số lớp: $\text{class\_weight} = \text{'balanced'}$
+- Tốc độ học ban đầu: `learning_rate = 0.1`
+- Số vòng lặp tối đa: `max_iter = 200`
+- Trọng số lớp: `class_weight = 'balanced'`
 - Ngưỡng phân loại tối ưu: $\tau^* = 0.415$
 
 ### 6.2. Kết quả trên tập Validation

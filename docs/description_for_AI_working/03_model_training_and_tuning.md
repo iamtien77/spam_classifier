@@ -8,12 +8,16 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Nạp ma trận đặc trưng $X_{\text{train}} \in \mathbb{R}^{23223 \times 4318}$, $X_{\text{val}} \in \mathbb{R}^{2903 \times 4318}$ và vector nhãn tương ứng $y_{\text{train}}, y_{\text{val}}$.
 - Kiểm tra tính tương thích số chiều: số cột đặc trưng của $X_{\text{train}}$ và $X_{\text{val}}$ phải bằng đúng $4.318$.
 - Kiểm tra miền giá trị: không chứa giá trị `NaN`, `Inf`, và toàn bộ phần tử phải không âm ($x_{ij} \ge 0$).
-- Vector nhãn phải là nhị phân thuần túy $y \in \{0, 1\}$.
+- Vector nhãn phải là nhị phân thuần túy $`y \in \{0, 1\}`$.
 
 ### Bước 2. Huấn luyện Logistic Regression From-Scratch
 - Triển khai lớp `LogisticRegressionFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 - **Hàm mục tiêu:** Binary Cross-Entropy (BCE) có điều chuẩn $L_2$ và trọng số lớp cân bằng (`class_weight='balanced'`):
-  $$J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2$$
+
+  $$
+  J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2
+  $$
+
   Trong đó:
   - $p_i = \sigma(w^\top x_i + b) = \frac{1}{1 + \exp(-(w^\top x_i + b))}$.
   - $a_i = \frac{N}{2 \times N_{y_i}}$ (bù trừ chênh lệch phân bố lớp).
@@ -27,9 +31,13 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 
 ### Bước 3. Huấn luyện Linear Support Vector Machine From-Scratch
 - Triển khai lớp `LinearSVMFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
-- **Chuyển đổi nhãn:** Chuyển đổi nhãn $y_i \in \{0, 1\}$ sang nhãn có dấu $\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}$.
+- **Chuyển đổi nhãn:** Chuyển đổi nhãn $`y_i \in \{0, 1\}`$ sang nhãn có dấu $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$.
 - **Hàm mục tiêu:** Squared Hinge Loss kết hợp điều chuẩn $L_2$ và trọng số lớp:
-  $$J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_i \left[ \max\left(0,\, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2$$
+
+  $$
+  J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_i \left[ \max\left(0,\, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2
+  $$
+
 - **Ưu điểm toán học:** Hàm Squared Hinge có đạo hàm bậc nhất liên tục trơn ($C^1$), giúp giải thuật Gradient Descent có backtracking hội tụ mượt mà, không bị dao động như hàm Hinge Loss bậc một cổ điển.
 - **Dự đoán:**
   - `decision_function(X)` trả về khoảng cách có dấu $z = w^\top x + b$.
@@ -39,10 +47,18 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Triển khai lớp `NaiveBayesClassifier` với cấu hình `kind='complement'` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 - **Quy trình học không lặp (Closed-form training):**
   1. Tính xác suất tiên nghiệm của từng lớp: $P(c) = \frac{N_c}{N_{\text{train}}}$, lưu dưới dạng log-prior $\ln P(c)$.
-  2. Với từng lớp $c \in \{0, 1\}$, tính tổng tần suất đặc trưng trên các mẫu **không thuộc lớp $c$** (Complement set):
-     $$N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}$$
+  2. Với từng lớp $`c \in \{0, 1\}`$, tính tổng tần suất đặc trưng trên các mẫu **không thuộc lớp $c$** (Complement set):
+
+     $$
+     N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
+     $$
+
   3. Cộng hệ số làm mịn Laplace $\alpha$:
-     $$\hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}$$
+
+     $$
+     \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
+     $$
+
   4. Lưu ma trận log xác suất `feature_log_prob_` với trọng số $w_{c, j} = -\ln \hat{\theta}_{\setminus c, j}$.
 - **Xuất xác suất:** Đưa tổng điểm log-score qua hàm Softmax có kỹ thuật trừ max để bảo đảm an toàn số học.
 
@@ -50,7 +66,11 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Triển khai lớp `SpamVotingEnsemble` trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
 - Khởi tạo ensemble với bộ ba mô hình: Logistic Regression, Linear SVM và Complement Naive Bayes.
 - **Cơ chế Soft Voting:**
-  $$P_{\text{ensemble}}(y=1 \mid x) = \frac{1}{3} P_{\text{LR}}(y=1 \mid x) + \frac{1}{3} P_{\text{SVM}}(y=1 \mid x) + \frac{1}{3} P_{\text{CNB}}(y=1 \mid x)$$
+
+  $$
+  P_{\text{ensemble}}(y=1 \mid x) = \frac{1}{3} P_{\text{LR}}(y=1 \mid x) + \frac{1}{3} P_{\text{SVM}}(y=1 \mid x) + \frac{1}{3} P_{\text{CNB}}(y=1 \mid x)
+  $$
+
 - Hỗ trợ cả chế độ Hard Voting (bỏ phiếu đa số nhãn rời rạc) để phục vụ phân tích so sánh chuyên sâu trong Notebooks.
 
 ### Bước 6. Thuật toán tối ưu hóa ngưỡng quyết định (ThresholdOptimizerScratch)
@@ -58,7 +78,11 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Triển khai lớp `ThresholdOptimizerScratch` trong [`src/models/tuning.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py).
 - **Lưới quét ngưỡng:** Tạo $200$ mốc ngưỡng đều nhau từ $0.005$ đến $1.0$ trên tập Validation: $\text{grid} = \text{np.linspace}(0.005, 1.0, 200)$.
 - **Chiến lược tối ưu hóa có ràng buộc nghiệp vụ (Constrained Objective):**
-  $$\text{Điều kiện bắt buộc: } \text{Recall} \ge 0.85$$
+
+  $$
+  \text{Điều kiện bắt buộc: } \text{Recall} \ge 0.85
+  $$
+
   1. Lọc tập hợp các ngưỡng thỏa mãn $\text{Recall} \ge 0.85$ trên Validation set.
   2. Sắp xếp thứ tự ưu tiên: **Accuracy cao nhất $\rightarrow$ F1-score cao nhất $\rightarrow$ Precision cao nhất $\rightarrow$ False Positive Rate (FPR) thấp nhất**.
   3. **Cơ chế Fallback:** Nếu trong toàn bộ 200 ngưỡng không có ngưỡng nào đạt Recall $\ge 0.85$, hệ thống tự động fallback về chọn ngưỡng có Recall cao nhất.
@@ -66,9 +90,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 ### Bước 7. Quét lưới siêu tham số (Hyperparameter Grid Search)
 - Sử dụng hàm `tune_model_hyperparameters()` trong [`src/models/tuning.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py).
 - Thiết lập lưới tìm kiếm cho từng thuật toán:
-  - **Logistic Regression:** $C \in \{0.5, 1.0, 2.0\}$, cố định `learning_rate=0.1`, `max_iter=200`, `class_weight='balanced'`.
-  - **Linear SVM:** $C \in \{0.5, 1.0, 2.0\}$, cố định `learning_rate=0.05`, `max_iter=150`, `loss='squared_hinge'`, `class_weight='balanced'`.
-  - **Complement Naive Bayes:** $\alpha \in \{0.5, 1.0, 2.0\}$, `kind='complement'`.
+  - **Logistic Regression:** $`C \in \{0.5, 1.0, 2.0\}`$, cố định `learning_rate=0.1`, `max_iter=200`, `class_weight='balanced'`.
+  - **Linear SVM:** $`C \in \{0.5, 1.0, 2.0\}`$, cố định `learning_rate=0.05`, `max_iter=150`, `loss='squared_hinge'`, `class_weight='balanced'`.
+  - **Complement Naive Bayes:** $`\alpha \in \{0.5, 1.0, 2.0\}`$, `kind='complement'`.
 - Với mỗi bộ siêu tham số: huấn luyện trên Train set, sau đó đưa xác suất dự đoán trên Validation set vào `ThresholdOptimizerScratch` để tìm ngưỡng $\tau^*$ tối ưu tương ứng.
 - **Kết quả siêu tham số tốt nhất:**
   - Logistic Regression: $C = 0.5$, ngưỡng tối ưu $\tau^* = 0.415$.

@@ -30,18 +30,30 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Xây dựng lớp `TfidfVectorizerScratch` trong [`src/features/feature_engineering.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py).
 - **Quy tắc fit (chỉ học trên Train set):**
   1. Duyệt qua tập văn bản huấn luyện, đếm tần suất xuất hiện trong tài liệu (Document Frequency - $\text{df}(t)$) cho từng token.
-  2. Lọc bỏ các token có $\text{df}(t) < \text{min\_df}$ ($\text{min\_df} = 2$).
+  2. Lọc bỏ các token có $\text{df}(t)$ nhỏ hơn `min_df` (`min_df = 2`).
   3. Chọn ra tối đa $K$ token có tần suất cao nhất để xây dựng từ vựng `vocabulary_` cố định.
   4. Tính toán trọng số nghịch đảo tần suất văn bản mượt (Smooth IDF) theo công thức toán học:
-     $$\text{IDF}(t) = \ln\left(\frac{1 + N_{\text{train}}}{1 + \text{df}(t)}\right) + 1$$
+
+     $$
+     \text{IDF}(t) = \ln\left(\frac{1 + N_{\text{train}}}{1 + \text{df}(t)}\right) + 1
+     $$
+
      Trong đó $N_{\text{train}} = 23.223$ là số tài liệu của tập Train.
 - **Quy tắc transform (áp dụng cho mọi tập dữ liệu):**
   1. Với mỗi tài liệu $d$, đếm số lần xuất hiện $c(t, d)$ của token $t$. Bỏ qua các token không nằm trong `vocabulary_`.
   2. Áp dụng tần suất từ cận tuyến tính (Sublinear Term Frequency) để giảm sự chi phối quá mức của các từ lặp lại nhiều lần trong cùng một email:
-     $$\text{TF}(t, d) = \begin{cases} 1 + \ln c(t, d) & \text{nếu } c(t, d) > 0 \\ 0 & \text{nếu } c(t, d) = 0 \end{cases}$$
+
+     $$
+     \text{TF}(t, d) = \begin{cases} 1 + \ln c(t, d) & \text{nếu } c(t, d) > 0 \\ 0 & \text{nếu } c(t, d) = 0 \end{cases}
+     $$
+
   3. Tính giá trị đặc trưng thô: $v(t, d) = \text{TF}(t, d) \times \text{IDF}(t)$.
   4. Chuẩn hóa vector theo chuẩn Euclidean ($L_2$ Normalization):
-     $$x_{t, d} = \frac{v(t, d)}{\sqrt{\sum_j v(j, d)^2}}$$
+
+     $$
+     x_{t, d} = \frac{v(t, d)}{\sqrt{\sum_j v(j, d)^2}}
+     $$
+
      Nếu toàn bộ vector là 0 thì giữ nguyên vector 0.
 
 ### Bước 4. Xây dựng 3 khối đặc trưng văn bản TF-IDF
@@ -59,7 +71,11 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Sử dụng danh sách 10 từ khóa nhạy cảm đặc trưng cho email spam được định nghĩa trong cấu hình:
   `['free', 'win', 'prize', 'claim', 'urgent', 'call', 'cash', 'guarantee', 'offer', 'click']`
 - Trích xuất trực tiếp từ văn bản gốc `raw_text` bằng biểu thức chính quy có biên từ (`\b`):
-  $$x_{\text{keyword}, k} = \begin{cases} 1.0 & \text{nếu từ khóa } k \text{ xuất hiện trong email} \\ 0.0 & \text{ngược lại} \end{cases}$$
+
+  $$
+  x_{\text{keyword}, k} = \begin{cases} 1.0 & \text{nếu từ khóa } k \text{ xuất hiện trong email} \\ 0.0 & \text{ngược lại} \end{cases}
+  $$
+
 - Khối này tạo ra **10 đặc trưng nhị phân**.
 
 ### Bước 6. Trích xuất khối đặc trưng cấu trúc & thống kê số (Numeric & Structural Signals)
@@ -76,13 +92,21 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 ### Bước 7. Co dãn đặc trưng số an toàn bằng MaxAbsScalerScratch
 - Không sử dụng MinMaxScaler tiêu chuẩn vì việc trừ đi giá trị nhỏ nhất $\min(x)$ sẽ làm các phần tử giá trị 0 biến thành số khác không, phá vỡ cấu trúc ma trận thưa và làm bùng nổ bộ nhớ.
 - Triển khai lớp `MaxAbsScalerScratch` trong [`src/features/feature_engineering.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py):
-  $$x_{\text{scaled}} = \frac{x}{\max(|x_{\text{train}}|)}$$
+
+  $$
+  x_{\text{scaled}} = \frac{x}{\max(|x_{\text{train}}|)}
+  $$
+
 - **Nguyên tắc chống rò rỉ dữ liệu:** Giá trị cực đại $\max(|x_{\text{train}}|)$ chỉ được học từ tập **Train**. Tập Validation và Test chỉ áp dụng phép chia cho vector cực đại này.
 - Kết quả đưa 8 đặc trưng số về đoạn $[0, 1]$, bảo toàn tính không âm bắt buộc để tương thích với Naive Bayes.
 
 ### Bước 8. Ghép ngang thành ma trận đặc trưng lai (Hybrid Feature Matrix)
 - Sử dụng lớp `HybridFeatureBuilderScratch` để ghép ngang toàn bộ 5 khối đặc trưng theo đúng thứ tự:
-  $$\text{Tổng số chiều } D = 3000 + 800 + 500 + 10 + 8 = \mathbf{4.318\text{ đặc trưng}}$$
+
+  $$
+  \text{Tổng số chiều } D = 3000 + 800 + 500 + 10 + 8 = \mathbf{4.318\text{ đặc trưng}}
+  $$
+
 - Quản lý metadata vị trí thông qua từ điển `feature_slices_`:
   - `word`: $[0, 3000)$
   - `bigram`: $[3000, 3800)$
@@ -97,7 +121,7 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 ### Bước 9. Thử nghiệm lựa chọn đặc trưng Top-K (Feature Selection)
 - Triển khai `ManualFeatureSelectorScratch`:
   1. Xếp hạng tầm quan trọng của $4.318$ cột trên tập Train bằng tiêu chí thông tin tương hỗ hoặc tần suất xuất hiện.
-  2. Thử nghiệm các mức cắt $K \in \{1000, 2000, 3000, 4000, 4318\}$.
+  2. Thử nghiệm các mức cắt $`K \in \{1000, 2000, 3000, 4000, 4318\}`$.
   3. Đánh giá nhanh F1-score của từng mức $K$ trên tập Validation bằng mô hình đại diện Complement Naive Bayes.
 - **Kết luận thực nghiệm:** Mức $K = 4.318$ (giữ lại toàn bộ 100% đặc trưng) mang lại F1-score và ROC-AUC cao nhất, do các mô hình tuyến tính có điều chuẩn lề (SVM, Logistic Regression) có khả năng tự gán trọng số nhỏ cho các đặc trưng không quan trọng mà không sợ quá khớp.
 - Danh sách chỉ số cột `selected_indices` được chốt và khóa chặt để dùng đồng nhất cho Train, Validation, Test và Inference.
