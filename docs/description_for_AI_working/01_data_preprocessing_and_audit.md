@@ -74,9 +74,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Sử dụng tham số `cap_quantile = 0.99` (phân vị 99%).
 - **Nguyên tắc chống rò rỉ dữ liệu bắt buộc:** Ngưỡng cắt độ dài `cap_word_limit_` chỉ được học duy nhất trên tập **Train**:
 
-  $$
+  ```math
   \text{cap\_word\_limit} = \text{Quantile}_{0.99}(\text{Train lengths}) = \mathbf{1.361\text{ từ}}
-  $$
+  ```
 
 - Tập Validation và tập Test không được tính lại ngưỡng này mà phải dùng lại đúng ngưỡng $1.361$ từ đã fit từ Train để cắt ngắn văn bản.
 

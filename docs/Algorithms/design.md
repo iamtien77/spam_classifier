@@ -1,97 +1,216 @@
-# Thiết kế dự án Spam Classifier theo 5W1H
+# Thiết kế Spam Classifier trước triển khai — 5W1H & Target Structure
 
-Tài liệu này mô tả **thiết kế hiện có** của dự án và cấu trúc thư mục mục tiêu để người học, người bảo trì và người đánh giá biết mỗi thành phần thuộc đâu, đi qua luồng nào và được kiểm chứng ra sao. Nó không yêu cầu di chuyển hay tạo thêm module. Chi tiết thuật toán và số liệu của lần chạy tham chiếu nằm trong [Algorithms README](./README.md) và [README dự án](../../README.md).
+**Trạng thái:** Bản thiết kế để định hướng xây dựng dự án từ đầu. Các module, cấu hình và luồng xử lý dưới đây là phương án dự kiến, không phải xác nhận đã cài đặt hoặc đã đạt kết quả thực nghiệm.
 
-## 1. What — Dự án giải quyết việc gì?
+Tài liệu phục vụ người học, người phát triển và người đánh giá thống nhất phạm vi trước khi viết code. Baseline, tỷ lệ chia tập và Recall mục tiêu là lựa chọn thiết kế; không mặc định coi chúng là yêu cầu bắt buộc của đề bài nếu chưa đối chiếu tài liệu gốc.
 
-Đây là bài toán **binary text classification**: từ nội dung văn bản, dự đoán `ham = 0` hoặc `spam = 1`. Đầu vào thực nghiệm hiện tại là các tin nhắn ngắn trong `data/raw/spam.csv`; dự án chưa dùng metadata của email chuẩn như người gửi, tiêu đề hoặc HTML. Đầu ra của pipeline là nhãn dự đoán, điểm số Spam trong `[0, 1]`, các bảng/biểu đồ đánh giá và bundle để suy luận lại trên văn bản mới.
+## 1. What — Cần xây dựng hệ thống gì?
 
-Phạm vi thuật toán gồm **Complement Naive Bayes làm baseline**, Logistic Regression, Linear SVM và Voting Ensemble để so sánh. Ba mô hình phân loại cốt lõi được tự cài đặt; điểm sigmoid của SVM và điểm Voting chưa được calibration nên không được hiểu trực tiếp là xác suất rủi ro thực tế.
+### Bài toán và phạm vi
 
-## 2. Why — Vì sao thiết kế như vậy?
+Xây dựng hệ thống **supervised binary text classification**: từ nội dung văn bản, dự đoán `ham = 0` hoặc `spam = 1`. Dữ liệu dự kiến là CSV có nội dung và nhãn. Nếu dùng tập SMS, kết luận chỉ áp dụng trong phạm vi tin nhắn đó; khả năng phân loại email thực cần dữ liệu kiểm chứng phù hợp.
 
-- **Baseline trước:** Complement Naive Bayes cho mốc đối chứng đơn giản, nhanh và dễ giải thích trước khi đánh giá các mô hình tối ưu lặp.
-- **Đặc trưng thưa:** Word/bigram/character TF-IDF kết hợp keyword và numeric signals biểu diễn văn bản mà không cần mô hình ngôn ngữ lớn. Linear SVM và Logistic Regression phù hợp để thử trên ma trận thưa và có trọng số đặc trưng có thể phân tích.
-- **Validation riêng:** Dùng Validation để chọn Top-K, hyperparameter, threshold và winner; Test chỉ đo hiệu năng sau khi chốt quyết định, nhằm tránh dùng cùng dữ liệu để chọn và báo cáo kết quả.
-- **Ưu tiên Recall có giới hạn:** `RECALL_TARGET = 0.85` là mục tiêu thực nghiệm trên Validation. Accuracy, Precision, F1/F2, ROC-AUC, FPR và confusion matrix cho thấy chi phí chặn nhầm. Lần chạy tham chiếu của winner có Test FPR khoảng `40.05%`, nên kết quả hiện phù hợp cho học tập/cảnh báo hơn là tự động xóa thư.
+Phạm vi ban đầu gồm kiểm toán dữ liệu, tiền xử lý, trích xuất đặc trưng, baseline, so sánh mô hình, đánh giá và demo suy luận. Web UI, tích hợp hộp thư thật, tự động xóa email và phục vụ production nằm ngoài phạm vi ban đầu.
+
+### Hợp đồng đầu vào / đầu ra dự kiến
+
+| Thành phần | Đầu vào | Đầu ra / yêu cầu |
+| :--- | :--- | :--- |
+| Nạp và audit | CSV có nội dung và nhãn | Schema `source_id`, `raw_text`, `label`; báo rõ lỗi thiếu cột, nhãn không hợp lệ và nội dung rỗng |
+| Làm sạch và chia tập | Bản ghi đã chuẩn hóa | Train/Validation/Test và báo cáo số lượng, lý do xử lý; đối chiếu được với nguồn |
+| Đặc trưng | Văn bản và trạng thái fit trên Train | Ma trận thưa, cùng thứ tự cột trên mọi tập |
+| Huấn luyện / lựa chọn | Train và Validation | Model, cấu hình đặc trưng, hyperparameter và threshold đã khóa |
+| Đánh giá | Model đã khóa và Test giữ riêng | Metrics, confusion matrix, biểu đồ và phân tích FP/FN |
+| Suy luận | Văn bản mới hoặc batch | Nhãn, score và threshold; đầu vào rỗng/không hợp lệ được từ chối rõ ràng |
+| Lưu trữ | Model và các phép biến đổi đã fit | Bundle đủ để nạp lại và tái tạo dự đoán |
+
+Score thể hiện mức độ model nghiêng về Spam. Nếu chuyển margin SVM qua sigmoid để đưa score về `[0, 1]`, không diễn giải đó là xác suất đã calibration.
+
+## 2. Why — Vì sao chọn hướng thiết kế này?
+
+Mục tiêu là hiểu toàn bộ vòng đời phân loại văn bản, tạo kết quả có thể tái lập và giải thích được lựa chọn. Thiết kế ưu tiên baseline đơn giản, module rõ trách nhiệm và đánh giá độc lập với bước tuning.
+
+| Lựa chọn dự kiến | Lý do | Đánh đổi / giới hạn |
+| :--- | :--- | :--- |
+| Word TF-IDF + Complement Naive Bayes làm baseline | Chi phí thấp, phù hợp đặc trưng văn bản không âm | Giả định đơn giản, hạn chế về ngữ cảnh và tương tác giữa từ |
+| Logistic Regression / Linear SVM sau baseline | Thử ranh giới tuyến tính trên ma trận thưa, có thể phân tích trọng số | Cần tuning, kiểm tra hội tụ; không bảo đảm tốt hơn baseline |
+| Validation và Test riêng | Tách lựa chọn khỏi đánh giá cuối | Ít mẫu Train hơn; một split có thể chưa phản ánh độ ổn định |
+| Ưu tiên Recall có kiểm soát | Giảm bỏ sót spam | Có thể tăng chặn nhầm ham; phải theo dõi Precision/FPR |
+| Lưu cả phép biến đổi và model | Nhất quán giữa training và inference | Cần metadata và kiểm tra tương thích bundle |
+
+Định hướng học tập là tự cài đặt các thành phần cốt lõi bằng Python và phép toán NumPy/SciPy. Đây là lựa chọn thiết kế, chưa được xác nhận là yêu cầu của PDF đề bài. Danh sách dependency cần được thống nhất trước khi bổ sung.
 
 ## 3. Who — Ai sử dụng và chịu trách nhiệm?
 
-| Vai trò | Nhu cầu chính | Nơi bắt đầu |
+| Vai trò | Nhu cầu | Trách nhiệm dự kiến |
 | :--- | :--- | :--- |
-| Người học/đánh giá | Hiểu công thức, baseline, trade-offs và số liệu có nguồn | [Algorithms README](./README.md), các trang thuật toán trong thư mục này |
-| Người phát triển pipeline | Thay đổi logic đúng module, kiểm tra luồng Train/Validation/Test | [`main.py`](../../main.py), [`src/`](../../src) |
-| Người chạy thực nghiệm | Chạy lại pipeline, kiểm tra cấu hình và artifact | [README dự án](../../README.md), [`src/config.py`](../../src/config.py), [`results/`](../../results) |
-| Người dùng suy luận | Nạp bundle đã lưu và dự đoán văn bản mới | [`src/deployment/predictor.py`](../../src/deployment/predictor.py) |
+| Người học / phát triển | Hiểu và xây dựng pipeline | Xác định I/O, triển khai module, giải thích lựa chọn và viết kiểm thử |
+| Người chạy thực nghiệm | So sánh phương án công bằng | Quản lý split, cấu hình, seed và artifact; không tuning trên Test |
+| Người đánh giá | Kiểm tra tính đúng và bằng chứng | Đối chiếu thiết kế, metrics, phân tích lỗi và khả năng tái lập |
+| Người chạy demo | Dự đoán văn bản mới | Cung cấp đầu vào hợp lệ, đọc nhãn/score cùng giới hạn của model |
 
-## 4. When — Thành phần được dùng ở giai đoạn nào?
+Một người có thể đảm nhiệm nhiều vai trò. Metric chính, Recall mục tiêu và quy tắc lựa chọn phải được ghi lại trước khi huấn luyện để so sánh.
 
-1. **Chuẩn bị dữ liệu:** `loader.py` đọc và chuẩn hóa schema; `preprocessing.py` audit, làm sạch, chia phân tầng và chuẩn hóa văn bản.
-2. **Fit trên Train:** `feature_engineering.py` học từ vựng, IDF, giới hạn độ dài, scaler và thứ tự cột; `classifiers.py` học tham số mô hình. Thông tin được fit không lấy từ Validation/Test.
-3. **Chọn trên Validation:** Top-K, hyperparameter, threshold và winner được so sánh theo quy tắc Recall mục tiêu rồi Accuracy/F1. Voting là một ứng viên trong bước này.
-4. **Đánh giá trên Test:** Tính metrics, vẽ biểu đồ và phân tích FP/FN bằng cấu hình/ngưỡng đã khóa. Không chọn lại mô hình theo Test.
-5. **Suy luận:** `persistence.py` lưu/nạp bundle gồm model và phép biến đổi đã fit; `predictor.py` dùng lại bundle cho văn bản mới.
+## 4. When — Triển khai theo thứ tự nào?
 
-## 5. Where — Thành phần nằm ở đâu?
+| Milestone | Công việc dự kiến | Đầu ra và điều kiện chuyển bước |
+| :--- | :--- | :--- |
+| 0. Chốt thiết kế | Thống nhất phạm vi, schema, metrics và chính sách dữ liệu | Cấu hình thực nghiệm và tiêu chí lựa chọn được duyệt trước training |
+| 1. Audit và split | Kiểm tra rỗng, nhãn, trùng/mâu thuẫn; chia tập | Báo cáo audit; split tái lập; nhóm trùng không đi qua nhiều tập |
+| 2. Baseline | Fit word TF-IDF và Complement Naive Bayes | Pipeline đầu cuối chạy được; có metrics và phân tích lỗi Validation |
+| 3. Cải tiến | Thử LR/SVM, đặc trưng bổ sung và tuning giới hạn | So sánh cùng split/quy tắc; ghi rõ chi phí và thay đổi so với baseline |
+| 4. Khóa và đánh giá | Chốt model/threshold bằng Validation, sau đó đánh giá Test | Báo cáo Test và giới hạn; không chọn lại theo Test |
+| 5. Đóng gói và demo | Lưu/nạp pipeline, suy luận văn bản mới | Dự đoán nhất quán sau nạp lại; có hướng dẫn và artifact |
 
-`main.py` là điểm điều phối bốn giai đoạn; `src/config.py` giữ cấu hình tập trung. Logic nghiệp vụ nằm trong `src/`, notebook phục vụ diễn giải/thực nghiệm, `tests/` kiểm tra hành vi, còn `results/` và `logs/` là đầu ra. Các trang trong `docs/Algorithms/` giải thích thuật toán, không là mã thực thi.
+Nếu Test gợi ý thay đổi thiết kế, đó là một vòng nghiên cứu mới cần holdout mới hoặc kế hoạch đánh giá độc lập phù hợp. Không tiếp tục xem Test đã quan sát là bằng chứng chưa thiên lệch.
 
-Ranh giới cần giữ: `data/` không huấn luyện model; `features/` không chọn winner; `models/` không dùng Test để tuning; `evaluation/` không fit lại phép biến đổi; `deployment/` dùng lại bundle và thứ tự cột đã lưu.
+## 5. Where — Hệ thống chạy và các trách nhiệm nằm ở đâu?
 
-## 6. How — Pipeline hoạt động và được kiểm chứng thế nào?
+Thiết kế ban đầu hướng tới batch và demo trên máy local. Script điều phối pipeline; notebook phục vụ EDA, giải thích và thử nghiệm. Không giả định cần GPU, cloud hoặc API production.
+
+| Vị trí dự kiến | Trách nhiệm | Ranh giới |
+| :--- | :--- | :--- |
+| `src/data/` | Nạp, audit, làm sạch, chuẩn hóa văn bản, split | Không huấn luyện hoặc chọn model |
+| `src/features/` | Fit/transform, scaler và lựa chọn đặc trưng | Thống kê học được chỉ fit trên Train |
+| `src/models/` | Huấn luyện, tuning, ensemble tùy chọn, lưu/nạp | Không dùng Test để chọn cấu hình/threshold |
+| `src/evaluation/` | Metrics, biểu đồ và phân tích lỗi | Không fit lại model/phép biến đổi |
+| `src/deployment/` | Suy luận từ bundle | Giữ đúng schema và thứ tự cột |
+| `data/raw/`, `data/processed/` | Dữ liệu nguồn và dữ liệu/cache trung gian | Giữ nguồn để đối chiếu, không sửa đè |
+| `results/`, `logs/` | Artifact và trạng thái từng lần chạy | Tránh trộn lần chạy; không log toàn bộ văn bản nhạy cảm mặc định |
+
+## 6. How — Xây dựng và kiểm chứng bằng cách nào?
+
+### 6.1. Luồng dữ liệu dự kiến
 
 ```mermaid
-flowchart LR
-    A[data/raw] --> B[src/data]
-    B --> C[Train / Validation / Test]
-    C --> D[src/features]
-    D --> E[src/models/classifiers + ensemble]
-    E --> F[src/models/tuning trên Validation]
-    F --> G[src/evaluation trên Test]
-    G --> H[src/models/persistence]
-    H --> I[src/deployment/predictor]
+flowchart TD
+    A[CSV có nội dung và nhãn] --> B[Audit và xử lý nhóm trùng]
+    B --> C[Chia Train / Validation / Test]
+    C --> D[Train: fit đặc trưng và model]
+    C --> E[Validation: transform và so sánh]
+    D --> E
+    E --> F[Khóa model, đặc trưng và threshold]
+    C --> G[Test giữ riêng]
+    F --> H[Đánh giá cuối]
+    G --> H
+    F --> I[Lưu bundle đã khóa]
+    I --> J[Văn bản mới: transform và predict]
 ```
 
-`main.py` gọi lần lượt `step_data_preprocessing()`, `step_model_training()`, `step_evaluation_and_tuning()` và `step_deployment_and_demo()`. Chi tiết quy tắc chọn ngưỡng và winner có trong [Algorithms README](./README.md). Các kết quả định lượng trong tài liệu thuật toán là **ảnh chụp lần chạy tham chiếu**, không phải thuộc tính cố định của kiến trúc; khi đổi dữ liệu hoặc cấu hình cần tạo và kiểm tra artifact mới.
+### 6.2. Dữ liệu và chống leakage
 
-Kiểm chứng thiết kế bằng ba lớp: kiểm tra hành vi module trong `tests/`, kiểm tra tích hợp `main.py` và đối chiếu `results/metrics/` với cấu hình/split của cùng lần chạy. Không dùng kết quả Test để sửa ngưỡng rồi tiếp tục báo cáo trên chính Test đó.
+1. Kiểm tra schema, encoding, nhãn, nội dung rỗng và bản ghi không hợp lệ; giữ `source_id` để đối chiếu.
+2. Tạo khóa nhóm nội dung theo quy tắc cố định. Xử lý bản lặp/nhóm có nhãn mâu thuẫn **trước khi chia tập**; ghi số lượng và lý do, không tự gán nhãn theo dự đoán model.
+3. Đề xuất chia phân tầng **80% Train / 10% Validation / 10% Test**, **seed 42**. Đây là cấu hình khởi đầu cần kiểm tra theo số mẫu mỗi lớp sau audit và chốt trước training, không phải tỷ lệ bắt buộc của đề bài.
+4. Fit từ vựng, IDF, scaler, ngưỡng cắt độ dài và điểm chọn đặc trưng trên Train. Validation/Test chỉ `transform()` bằng trạng thái đó.
+5. Chọn số đặc trưng, hyperparameter và threshold bằng Validation; giữ Test ngoài vòng lặp lựa chọn.
+6. Lưu định danh dữ liệu/split và cấu hình. Nếu mẫu phụ thuộc theo nguồn, người gửi hoặc thời gian, cần cân nhắc split theo nhóm/thời gian trước thực nghiệm.
 
-## 7. Target project structure — Cấu trúc dự án mục tiêu
+### 6.3. Chiến lược đặc trưng và mô hình
 
-Cây dưới đây thể hiện **vị trí và trách nhiệm mong muốn trong cấu trúc hiện có**; các file sinh ra như CSV, biểu đồ, model và log có thể khác nhau giữa các lần chạy.
+**Baseline đề xuất:** chuẩn hóa văn bản bằng quy tắc cố định → word unigram TF-IDF → Complement Naive Bayes. Bảo đảm đặc trưng không âm, xử lý token chưa gặp và vector rỗng, tránh lỗi số học khi tính log/xác suất.
+
+Sau khi có baseline và phân tích lỗi Validation:
+
+- Thử **Logistic Regression** và **Linear SVM** trên cùng đặc trưng/split để xác định ảnh hưởng của thuật toán.
+- Thử riêng bigram, character n-gram, keyword hoặc numeric signals; dùng ablation để phân biệt tác dụng từng thay đổi.
+- Giới hạn không gian tuning; ghi rõ cấu hình thất bại hoặc không hội tụ.
+- Xem **Voting Ensemble** là mở rộng tùy chọn khi lỗi các model có tính bổ sung; so sánh lại chất lượng và chi phí, không mặc định tốt hơn model đơn.
+
+Không chốt trước winner, số chiều cuối cùng, threshold hoặc hyperparameter tốt nhất. Những giá trị đó phải đến từ thực nghiệm trên dữ liệu phát triển.
+
+### 6.4. Metrics và quy tắc lựa chọn trước training
+
+| Metrics / bằng chứng | Mục đích |
+| :--- | :--- |
+| Recall | Đo tỷ lệ spam được phát hiện |
+| Precision, FPR và số FP | Đánh giá chặn nhầm tin nhắn hợp lệ |
+| F1, F2, Accuracy | Đánh giá tổng hợp; không chỉ dựa vào Accuracy |
+| ROC-AUC và PR curve khi phù hợp | Đánh giá xếp hạng score ngoài một threshold |
+| Confusion matrix và nhóm FP/FN | Xác định tình huống model thất bại |
+| Thời gian fit/predict, kích thước đặc trưng/bundle | So sánh lợi ích với chi phí |
+
+**Quy tắc đề xuất:** trên Validation, ưu tiên ứng viên đạt `Recall >= 0.85`; trong nhóm đó tối đa Accuracy, dùng F1 để phân xử. Nếu không ứng viên nào đạt, báo rõ chưa đạt mục tiêu và ưu tiên Recall rồi Accuracy/F1 để chọn ứng viên nghiên cứu tiếp. Cách xử lý hòa hoàn toàn cũng cần được chốt trước so sánh.
+
+Mốc `0.85` là mục tiêu thực nghiệm đề xuất, không phải hiệu năng cam kết hoặc điều kiện đủ để tự động chặn thư. Luôn báo Precision/FPR; mức FPR có thể chấp nhận cho ứng dụng thực cần được xác định riêng với người dùng.
+
+### 6.5. Kiểm thử và nghiệm thu dự kiến
+
+- **Dữ liệu/split:** kiểm tra schema và các ca rỗng/trùng/mâu thuẫn; số dòng đối chiếu được; cùng seed tạo cùng split; nhóm trùng không giao nhau giữa tập.
+- **Đặc trưng:** `transform()` không thay đổi từ vựng/IDF; giữ thứ tự cột; xử lý token mới, vector rỗng và ma trận thưa.
+- **Mô hình/metrics:** dùng ví dụ nhỏ tính tay; kiểm tra gradient khi có tối ưu gradient, mẫu số bằng 0 và lỗi hội tụ.
+- **Lựa chọn:** thay đổi nhãn Test không làm thay đổi model/threshold được chọn; mọi quyết định chỉ dựa trên Train/Validation.
+- **Tích hợp:** pipeline chạy trên fixture nhỏ, tạo đủ artifact; nạp lại bundle cho cùng nhãn và score trong sai số số học cho phép.
+- **Tái lập:** báo cáo gắn với cấu hình, seed, định danh dữ liệu/split và phiên bản mã nguồn.
+
+Hoàn thành chức năng và đạt chất lượng mô hình là hai tiêu chí riêng. Chất lượng cần bằng chứng Test; nếu chưa đạt phải báo cáo trung thực, không sửa tiêu chí sau khi xem kết quả.
+
+### 6.6. Failure modes và giới hạn
+
+| Rủi ro | Cách đánh giá dự kiến |
+| :--- | :--- |
+| Spam viết né tránh hoặc dùng token mới | Phân nhóm lỗi Validation; thử character n-gram có đối chứng |
+| Ham có từ quảng cáo bị chặn nhầm | Phân tích FP và trọng số đặc trưng; theo dõi Precision/FPR khi đổi threshold |
+| Mất cân bằng lớp | Báo phân bố và metrics theo lớp; so sánh trọng số có kiểm soát |
+| Khác miền/ngôn ngữ SMS và email | Kiểm tra tập ngoài phù hợp; không suy rộng khi thiếu dữ liệu |
+| Overfit Validation do tuning nhiều lần | Giới hạn lượt thử, lưu lịch sử; cân nhắc cross-validation trên dữ liệu phát triển |
+| Score bị hiểu nhầm là xác suất | Ghi loại score; chỉ kết luận calibration sau đánh giá tương ứng |
+| Lộ nội dung nhạy cảm qua artifact | Giới hạn truy cập, ẩn thông tin cá nhân trước khi chia sẻ |
+
+Nếu có metadata nhóm được thu thập hợp lệ và đủ mẫu, có thể kiểm tra chênh lệch lỗi giữa các nhóm. Không suy đoán thuộc tính nhân khẩu học từ văn bản; khi thiếu dữ liệu, ghi rõ giới hạn đánh giá.
+
+## 7. Target Structure — Cấu trúc dự án mục tiêu
+
+Cây dưới đây là **blueprint triển khai**, không xác nhận file đã tồn tại và không yêu cầu tạo mọi file ngay. Mỗi thành phần được triển khai theo milestone khi trách nhiệm tương ứng phát sinh.
 
 ```text
 spam_classifier/
-├── AGENTS.md                         # Quy tắc cộng tác trong workspace
-├── README.md                         # Tổng quan, chạy dự án, kết quả tham chiếu
-├── requirements.txt                  # Dependency hiện có
-├── main.py                           # Điều phối pipeline đầu cuối
-├── .agents/                          # Rules và workflows của workspace
+├── README.md                         # Mục tiêu, thiết lập, cách chạy, giới hạn
+├── AGENTS.md                         # Quy tắc cộng tác
+├── requirements.txt                  # Dependency được thống nhất
+├── main.py                           # Điều phối pipeline
+├── .agents/                          # Rules và workflows
 ├── data/
-│   ├── raw/                          # Dữ liệu đầu vào gốc
-│   └── processed/                    # Dữ liệu và ma trận đã xử lý/cache
+│   ├── raw/                          # Dữ liệu nguồn
+│   └── processed/                    # Split và dữ liệu/ma trận trung gian
 ├── docs/
-│   ├── Algorithms/                   # Giải thích mô hình và thiết kế dự án
-│   │   ├── README.md                 # So sánh mô hình, quy tắc lựa chọn
-│   │   ├── design.md                 # 5W1H và cấu trúc dự án
-│   │   ├── naive_bayes.md            # Baseline và hai biến thể NB
-│   │   ├── logistic_regression.md    # LR
-│   │   ├── linear_svm.md             # Linear SVM
-│   │   └── voting_ensemble.md        # Voting Ensemble
-│   └── description_for_AI_working/   # Ghi chú kỹ thuật theo giai đoạn
-├── notebooks/                        # EDA, features, baseline, tuning, deployment
+│   ├── Algorithms/
+│   │   ├── design.md                 # Thiết kế trước triển khai
+│   │   ├── README.md                 # Bản đồ tài liệu thuật toán
+│   │   ├── naive_bayes.md            # Baseline
+│   │   ├── logistic_regression.md    # Phương án LR
+│   │   ├── linear_svm.md             # Phương án Linear SVM
+│   │   └── voting_ensemble.md        # Mở rộng tùy chọn
+│   └── description_for_AI_working/   # Đặc tả theo giai đoạn
+├── notebooks/                        # EDA và giải thích thực nghiệm
 │   └── results/                      # Artifact riêng của notebook
 ├── src/
-│   ├── config.py                     # Đường dẫn và cấu hình thực nghiệm
-│   ├── data/                         # loader.py, preprocessing.py
-│   ├── features/                     # feature_engineering.py
-│   ├── models/                       # classifiers.py, ensemble.py, tuning.py, persistence.py
-│   ├── evaluation/                   # metrics.py, experiments.py, visualization.py, error_analysis.py
-│   ├── deployment/                   # predictor.py
-│   └── utils/                        # logger.py
-├── tests/                             # Unit, regression và integration tests
-├── results/                           # figures/, metrics/, saved_models/ của main.py
-└── logs/                              # Log thực thi
+│   ├── config.py                     # Đường dẫn, seed, cấu hình
+│   ├── data/
+│   │   ├── loader.py                 # Nạp dữ liệu, chuẩn hóa schema
+│   │   └── preprocessing.py          # Audit, làm sạch, chuẩn hóa, split
+│   ├── features/
+│   │   └── feature_engineering.py    # Fit/transform, lựa chọn đặc trưng
+│   ├── models/
+│   │   ├── classifiers.py            # Baseline và mô hình đối chứng
+│   │   ├── tuning.py                 # Lựa chọn trên Validation
+│   │   ├── ensemble.py               # Voting khi cần thử nghiệm
+│   │   └── persistence.py            # Lưu/nạp bundle, metadata
+│   ├── evaluation/
+│   │   ├── metrics.py                # Chỉ số đánh giá
+│   │   ├── experiments.py            # So sánh và ablation
+│   │   ├── visualization.py          # Biểu đồ
+│   │   └── error_analysis.py         # Phân tích FP/FN
+│   ├── deployment/
+│   │   └── predictor.py              # Suy luận từ bundle
+│   └── utils/
+│       └── logger.py                 # Logging dùng chung
+├── tests/                            # Kiểm thử hành vi và tích hợp
+├── results/
+│   ├── figures/                      # Biểu đồ theo lần chạy
+│   ├── metrics/                      # Báo cáo/cấu hình theo lần chạy
+│   └── saved_models/                 # Bundle cùng metadata
+└── logs/                             # Log pipeline
 ```
 
-**Nguyên tắc mở rộng:** Thêm logic vào module đang sở hữu trách nhiệm tương ứng. Nếu đề xuất thay đổi cấu trúc, luồng chọn model hoặc dependency, cần đánh giá tác động đến `main.py`, notebook, test và bundle suy luận trước khi triển khai. Cấu trúc mục tiêu trên không hàm ý đã có web UI, dịch vụ email thật hoặc xác suất đã calibration.
+Notebook nên gọi lại logic trong `src/` để giảm sai khác với pipeline chính. Bắt đầu bằng luồng baseline tối thiểu có thể kiểm chứng; đánh giá ranh giới module và hợp đồng I/O trước khi mở rộng cấu trúc.

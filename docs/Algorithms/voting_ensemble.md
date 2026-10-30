@@ -54,9 +54,9 @@ $$
 - **Điểm Soft Voting ($\hat{p}_{\text{soft}}$):** Vector $N$ phần tử trong đoạn $[0, 1]$; tên biến giữ theo API, giá trị chưa calibration.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
 
-  $$
+  ```math
   \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_{\text{soft}, i} \ge \tau^* \\ 0 & \text{nếu } \hat{p}_{\text{soft}, i} < \tau^* \end{cases}
-  $$
+  ```
 
   Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 

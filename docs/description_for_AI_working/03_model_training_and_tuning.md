@@ -14,9 +14,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Triển khai lớp `LogisticRegressionFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 - **Hàm mục tiêu:** Binary Cross-Entropy (BCE) có điều chuẩn $L_2$ và trọng số lớp cân bằng (`class_weight='balanced'`):
 
-  $$
+  ```math
   J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2
-  $$
+  ```
 
   Trong đó:
   - $p_i = \sigma(w^\top x_i + b) = \frac{1}{1 + \exp(-(w^\top x_i + b))}$.
@@ -34,9 +34,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - **Chuyển đổi nhãn:** Chuyển đổi nhãn $`y_i \in \{0, 1\}`$ sang nhãn có dấu $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$.
 - **Hàm mục tiêu:** Squared Hinge Loss kết hợp điều chuẩn $L_2$ và trọng số lớp:
 
-  $$
+  ```math
   J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_i \left[ \max\left(0,\, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2
-  $$
+  ```
 
 - **Ưu điểm toán học:** Hàm Squared Hinge có đạo hàm bậc nhất liên tục trơn ($C^1$), giúp giải thuật Gradient Descent có backtracking hội tụ mượt mà, không bị dao động như hàm Hinge Loss bậc một cổ điển.
 - **Dự đoán:**
@@ -49,15 +49,15 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   1. Tính xác suất tiên nghiệm của từng lớp: $P(c) = \frac{N_c}{N_{\text{train}}}$, lưu dưới dạng log-prior $\ln P(c)$.
   2. Với từng lớp $`c \in \{0, 1\}`$, tính tổng tần suất đặc trưng trên các mẫu **không thuộc lớp $c$** (Complement set):
 
-     $$
+     ```math
      N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
-     $$
+     ```
 
   3. Cộng hệ số làm mịn Laplace $\alpha$:
 
-     $$
+     ```math
      \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
-     $$
+     ```
 
   4. Lưu ma trận log xác suất `feature_log_prob_` với trọng số $w_{c, j} = -\ln \hat{\theta}_{\setminus c, j}$.
 - **Xuất xác suất:** Đưa tổng điểm log-score qua hàm Softmax có kỹ thuật trừ max để bảo đảm an toàn số học.
@@ -67,9 +67,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Khởi tạo ensemble với bộ ba mô hình: Logistic Regression, Linear SVM và Complement Naive Bayes.
 - **Cơ chế Soft Voting:**
 
-  $$
+  ```math
   P_{\text{ensemble}}(y=1 \mid x) = \frac{1}{3} P_{\text{LR}}(y=1 \mid x) + \frac{1}{3} P_{\text{SVM}}(y=1 \mid x) + \frac{1}{3} P_{\text{CNB}}(y=1 \mid x)
-  $$
+  ```
 
 - Hỗ trợ cả chế độ Hard Voting (bỏ phiếu đa số nhãn rời rạc) để phục vụ phân tích so sánh chuyên sâu trong Notebooks.
 
@@ -79,9 +79,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - **Lưới quét ngưỡng:** Tạo $200$ mốc ngưỡng đều nhau từ $0.005$ đến $1.0$ trên tập Validation: $\text{grid} = \text{np.linspace}(0.005, 1.0, 200)$.
 - **Chiến lược tối ưu hóa có ràng buộc nghiệp vụ (Constrained Objective):**
 
-  $$
+  ```math
   \text{Điều kiện bắt buộc: } \text{Recall} \ge 0.85
-  $$
+  ```
 
   1. Lọc tập hợp các ngưỡng thỏa mãn $\text{Recall} \ge 0.85$ trên Validation set.
   2. Sắp xếp thứ tự ưu tiên: **Accuracy cao nhất $\rightarrow$ F1-score cao nhất $\rightarrow$ Precision cao nhất $\rightarrow$ False Positive Rate (FPR) thấp nhất**.

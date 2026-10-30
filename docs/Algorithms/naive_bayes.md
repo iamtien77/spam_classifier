@@ -37,27 +37,27 @@ MNB có thể bị ảnh hưởng khi phân bố lớp hoặc độ dài văn b�
 
 1. Với mỗi lớp $c$, tính tổng trọng số đặc trưng trên tất cả các mẫu **không thuộc lớp $c$**:
 
-   $$
+   ```math
    N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
-   $$
+   ```
 
 2. Áp dụng hệ số làm mịn Laplace/Lidstone $\alpha$:
 
-   $$
+   ```math
    \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
-   $$
+   ```
 
 3. Trọng số đóng góp của từ $j$ được gán bằng nghịch đảo log-weight:
 
-   $$
+   ```math
    w_{c, j} = - \ln \hat{\theta}_{\setminus c, j}
-   $$
+   ```
 
 4. Điểm số quyết định cho văn bản $x$:
 
-   $$
+   ```math
    z_c(x) = \ln P(c) - \sum_{j=1}^{D} x_j \ln \hat{\theta}_{\setminus c, j}
-   $$
+   ```
 
 Văn bản được phân vào lớp $c$ có điểm số cao nhất.
 
@@ -88,9 +88,9 @@ $$
 - **Điểm Softmax cho Spam ($\hat{p}$):** Cột lớp $1$ từ `predict_proba(X)`, $\hat{p}_i \in [0, 1]$; chưa có kiểm tra calibration để diễn giải như xác suất rủi ro thực tế.
 - **Nhãn dự đoán nhị phân ($\hat{y}$):**
 
-  $$
+  ```math
   \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
-  $$
+  ```
 
   Với $\tau^* = 0.220$ cho mô hình Tuned (và $\tau^* = 0.215$ cho mô hình Default).
 

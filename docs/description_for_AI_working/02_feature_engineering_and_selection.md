@@ -34,25 +34,25 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   3. Chọn ra tối đa $K$ token có tần suất cao nhất để xây dựng từ vựng `vocabulary_` cố định.
   4. Tính toán trọng số nghịch đảo tần suất văn bản mượt (Smooth IDF) theo công thức toán học:
 
-     $$
+     ```math
      \text{IDF}(t) = \ln\left(\frac{1 + N_{\text{train}}}{1 + \text{df}(t)}\right) + 1
-     $$
+     ```
 
      Trong đó $N_{\text{train}} = 23.223$ là số tài liệu của tập Train.
 - **Quy tắc transform (áp dụng cho mọi tập dữ liệu):**
   1. Với mỗi tài liệu $d$, đếm số lần xuất hiện $c(t, d)$ của token $t$. Bỏ qua các token không nằm trong `vocabulary_`.
   2. Áp dụng tần suất từ cận tuyến tính (Sublinear Term Frequency) để giảm sự chi phối quá mức của các từ lặp lại nhiều lần trong cùng một email:
 
-     $$
+     ```math
      \text{TF}(t, d) = \begin{cases} 1 + \ln c(t, d) & \text{nếu } c(t, d) > 0 \\ 0 & \text{nếu } c(t, d) = 0 \end{cases}
-     $$
+     ```
 
   3. Tính giá trị đặc trưng thô: $v(t, d) = \text{TF}(t, d) \times \text{IDF}(t)$.
   4. Chuẩn hóa vector theo chuẩn Euclidean ($L_2$ Normalization):
 
-     $$
+     ```math
      x_{t, d} = \frac{v(t, d)}{\sqrt{\sum_j v(j, d)^2}}
-     $$
+     ```
 
      Nếu toàn bộ vector là 0 thì giữ nguyên vector 0.
 
@@ -72,9 +72,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   `['free', 'win', 'prize', 'claim', 'urgent', 'call', 'cash', 'guarantee', 'offer', 'click']`
 - Trích xuất trực tiếp từ văn bản gốc `raw_text` bằng biểu thức chính quy có biên từ (`\b`):
 
-  $$
+  ```math
   x_{\text{keyword}, k} = \begin{cases} 1.0 & \text{nếu từ khóa } k \text{ xuất hiện trong email} \\ 0.0 & \text{ngược lại} \end{cases}
-  $$
+  ```
 
 - Khối này tạo ra **10 đặc trưng nhị phân**.
 
@@ -93,9 +93,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Không sử dụng MinMaxScaler tiêu chuẩn vì việc trừ đi giá trị nhỏ nhất $\min(x)$ sẽ làm các phần tử giá trị 0 biến thành số khác không, phá vỡ cấu trúc ma trận thưa và làm bùng nổ bộ nhớ.
 - Triển khai lớp `MaxAbsScalerScratch` trong [`src/features/feature_engineering.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py):
 
-  $$
+  ```math
   x_{\text{scaled}} = \frac{x}{\max(|x_{\text{train}}|)}
-  $$
+  ```
 
 - **Nguyên tắc chống rò rỉ dữ liệu:** Giá trị cực đại $\max(|x_{\text{train}}|)$ chỉ được học từ tập **Train**. Tập Validation và Test chỉ áp dụng phép chia cho vector cực đại này.
 - Kết quả đưa 8 đặc trưng số về đoạn $[0, 1]$, bảo toàn tính không âm bắt buộc để tương thích với Naive Bayes.
@@ -103,9 +103,9 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 ### Bước 8. Ghép ngang thành ma trận đặc trưng lai (Hybrid Feature Matrix)
 - Sử dụng lớp `HybridFeatureBuilderScratch` để ghép ngang toàn bộ 5 khối đặc trưng theo đúng thứ tự:
 
-  $$
+  ```math
   \text{Tổng số chiều } D = 3000 + 800 + 500 + 10 + 8 = \mathbf{4.318\text{ đặc trưng}}
-  $$
+  ```
 
 - Quản lý metadata vị trí thông qua từ điển `feature_slices_`:
   - `word`: $[0, 3000)$

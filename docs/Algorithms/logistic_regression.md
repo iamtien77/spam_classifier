@@ -36,16 +36,16 @@ Trong đó:
 ### 1.3. Cơ chế tối ưu hóa số học ổn định
 - **Ổn định số học (Numerical Stability):** Tránh lỗi tràn số (overflow/underflow) khi tính log xác suất bằng cách sử dụng `np.logaddexp`:
 
-  $$
+  ```math
   \ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)
-  $$
+  ```
 
 - **Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
   Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
 
-  $$
+  ```math
   \Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}
-  $$
+  ```
 
   Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
 
@@ -66,16 +66,16 @@ Trong đó:
 ### 2.2. Output
 - **Điểm sigmoid cho Spam ($\hat{p}$):**
 
-  $$
+  ```math
   \hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]
-  $$
+  ```
 
   Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
 - **Nhãn phân loại cuối cùng ($\hat{y}$):**
 
-  $$
+  ```math
   \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
-  $$
+  ```
 
   Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
 

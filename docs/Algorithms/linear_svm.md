@@ -31,13 +31,13 @@ Trong đó:
 Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($C^1$), cho phép tối ưu trực tiếp bằng **Gradient Descent kết hợp Armijo Backtracking Line Search** (hàm `_gradient_descent_backtracking`):
 - Đạo hàm riêng theo tham số:
 
-  $$
+  ```math
   \frac{\partial J}{\partial w} = \lambda w - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right) x_i
-  $$
+  ```
 
-  $$
+  ```math
   \frac{\partial J}{\partial b} = - \frac{2}{N} \sum_{i \in \mathcal{V}} a_i \widetilde{y}_i \left(1 - \widetilde{y}_i (w^\top x_i + b)\right)
-  $$
+  ```
 
   (với $`\mathcal{V} = \{i \mid 1 - \widetilde{y}_i (w^\top x_i + b) > 0\}`$ là tập các mẫu vi phạm lề).
 - Bước học $\eta$ được cập nhật thích ứng theo độ cong Barzilai-Borwein và co nếu không thỏa mãn điều kiện Armijo; cách này giảm rủi ro bước học không phù hợp, không bảo đảm hội tụ trong mọi cấu hình.
@@ -60,23 +60,23 @@ Hàm mục tiêu Squared Hinge có đạo hàm trơn liên tục bậc nhất ($
 ### 2.2. Output
 - **Điểm quyết định khoảng cách (Decision Score):**
 
-  $$
+  ```math
   z_i = w^\top x_i + b \in (-\infty, +\infty)
-  $$
+  ```
 
   Đại diện cho khoảng cách đại số từ mẫu $x_i$ đến siêu phẳng phân cách.
 - **Điểm phân loại / Xác suất giả lập qua Sigmoid (`spam_score`):**
 
-  $$
+  ```math
   p_i = \sigma(z_i) = \frac{1}{1 + \exp(-z_i)} \in [0, 1]
-  $$
+  ```
 
   Đây là điểm lề chuyển đổi qua Sigmoid để dùng chung giao diện với bộ dò ngưỡng và Voting Ensemble; trường `is_calibrated=False` trong kết quả inference cho biết đây không phải xác suất hậu nghiệm đã cân chuẩn.
 - **Nhãn dự đoán nhị phân ($\hat{y}$):**
 
-  $$
+  ```math
   \hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge \tau^* \\ 0 & \text{nếu } p_i < \tau^* \end{cases}
-  $$
+  ```
 
   Với $\tau^* = 0.465$ là ngưỡng quyết định tối ưu được chốt từ tập Validation.
 
