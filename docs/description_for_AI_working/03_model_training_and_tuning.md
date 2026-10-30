@@ -11,81 +11,112 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - Vector nhãn phải là nhị phân thuần túy $`y \in \{0, 1\}`$.
 
 ### Bước 2. Huấn luyện Logistic Regression From-Scratch
-- Triển khai lớp `LogisticRegressionFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
-- **Hàm mục tiêu:** Binary Cross-Entropy (BCE) có điều chuẩn $L_2$ và trọng số lớp cân bằng (`class_weight='balanced'`):
 
-  ```math
-  J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2
-  ```
+Triển khai lớp `LogisticRegressionFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
-  Trong đó:
-  - $p_i = \sigma(w^\top x_i + b) = \frac{1}{1 + \exp(-(w^\top x_i + b))}$.
-  - $a_i = \frac{N}{2 \times N_{y_i}}$ (bù trừ chênh lệch phân bố lớp).
-  - Hệ số điều chuẩn $\lambda = \frac{1}{C \cdot N}$ (bias $b$ không bị điều chuẩn).
-- **Giải thuật tối ưu:** Sử dụng hàm `_gradient_descent_backtracking` (Spectral Gradient Descent):
-  1. Khởi tạo trọng số $w = \mathbf{0}$, bias $b = 0$.
-  2. Tính gradient của hàm mất mát theo $w$ và $b$ trực tiếp qua phép toán thưa `transpose_dot`.
-  3. Cập nhật bước học thích ứng $\eta$ theo độ cong Barzilai-Borwein.
-  4. Thu hẹp bước học bằng Armijo Backtracking Line Search nếu hàm mục tiêu không giảm đủ $10^{-4} \eta \|g\|^2$.
-  5. Dừng khi độ dài gradient $\|g\| \le 10^{-7}$ hoặc đạt số vòng lặp tối đa `max_iter`.
+**Hàm mục tiêu:** Binary Cross-Entropy (BCE) có điều chuẩn $L_2$ và trọng số lớp cân bằng (`class_weight='balanced'`):
+
+$$
+J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2
+$$
+
+Trong đó:
+
+$p_i = \sigma(w^\top x_i + b) = \frac{1}{1 + \exp(-(w^\top x_i + b))}$.
+
+$a_i = \frac{N}{2 \times N_{y_i}}$ (bù trừ chênh lệch phân bố lớp).
+
+Hệ số điều chuẩn $\lambda = \frac{1}{C \cdot N}$ (bias $b$ không bị điều chuẩn).
+
+**Giải thuật tối ưu:** Sử dụng hàm `_gradient_descent_backtracking` (Spectral Gradient Descent):
+
+**1.** Khởi tạo trọng số $w = \mathbf{0}$, bias $b = 0$.
+
+**2.** Tính gradient của hàm mất mát theo $w$ và $b$ trực tiếp qua phép toán thưa `transpose_dot`.
+
+**3.** Cập nhật bước học thích ứng $\eta$ theo độ cong Barzilai-Borwein.
+
+**4.** Thu hẹp bước học bằng Armijo Backtracking Line Search nếu hàm mục tiêu không giảm đủ $10^{-4} \eta \|g\|^2$.
+
+**5.** Dừng khi độ dài gradient $\|g\| \le 10^{-7}$ hoặc đạt số vòng lặp tối đa `max_iter`.
 
 ### Bước 3. Huấn luyện Linear Support Vector Machine From-Scratch
-- Triển khai lớp `LinearSVMFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
-- **Chuyển đổi nhãn:** Chuyển đổi nhãn $`y_i \in \{0, 1\}`$ sang nhãn có dấu $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$.
-- **Hàm mục tiêu:** Squared Hinge Loss kết hợp điều chuẩn $L_2$ và trọng số lớp:
 
-  ```math
-  J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_i \left[ \max\left(0,\, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2
-  ```
+Triển khai lớp `LinearSVMFromScratch` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
-- **Ưu điểm toán học:** Hàm Squared Hinge có đạo hàm bậc nhất liên tục trơn ($C^1$), giúp giải thuật Gradient Descent có backtracking hội tụ mượt mà, không bị dao động như hàm Hinge Loss bậc một cổ điển.
-- **Dự đoán:**
-  - `decision_function(X)` trả về khoảng cách có dấu $z = w^\top x + b$.
-  - `predict_proba(X)` đưa điểm $z$ qua hàm Sigmoid $\sigma(z)$ để tạo xác suất giả lập, phục vụ bộ dò ngưỡng thống nhất.
+**Chuyển đổi nhãn:** Chuyển đổi nhãn $`y_i \in \{0, 1\}`$ sang nhãn có dấu $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$.
+
+**Hàm mục tiêu:** Squared Hinge Loss kết hợp điều chuẩn $L_2$ và trọng số lớp:
+
+$$
+J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_i \left[ \max\left(0,\, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2
+$$
+
+**Ưu điểm toán học:** Hàm Squared Hinge có đạo hàm bậc nhất liên tục trơn ($C^1$), giúp giải thuật Gradient Descent có backtracking hội tụ mượt mà, không bị dao động như hàm Hinge Loss bậc một cổ điển.
+
+**Dự đoán:**
+
+`decision_function(X)` trả về khoảng cách có dấu $z = w^\top x + b$.
+
+`predict_proba(X)` đưa điểm $z$ qua hàm Sigmoid $\sigma(z)$ để tạo xác suất giả lập, phục vụ bộ dò ngưỡng thống nhất.
 
 ### Bước 4. Huấn luyện Complement Naive Bayes From-Scratch
-- Triển khai lớp `NaiveBayesClassifier` với cấu hình `kind='complement'` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
-- **Quy trình học không lặp (Closed-form training):**
-  1. Tính xác suất tiên nghiệm của từng lớp: $P(c) = \frac{N_c}{N_{\text{train}}}$, lưu dưới dạng log-prior $\ln P(c)$.
-  2. Với từng lớp $`c \in \{0, 1\}`$, tính tổng tần suất đặc trưng trên các mẫu **không thuộc lớp $c$** (Complement set):
 
-     ```math
-     N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
-     ```
+Triển khai lớp `NaiveBayesClassifier` với cấu hình `kind='complement'` trong [`src/models/classifiers.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/classifiers.py).
 
-  3. Cộng hệ số làm mịn Laplace $\alpha$:
+**Quy trình học không lặp (Closed-form training):**
 
-     ```math
-     \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
-     ```
+**1.** Tính xác suất tiên nghiệm của từng lớp: $P(c) = \frac{N_c}{N_{\text{train}}}$, lưu dưới dạng log-prior $\ln P(c)$.
 
-  4. Lưu ma trận log xác suất `feature_log_prob_` với trọng số $w_{c, j} = -\ln \hat{\theta}_{\setminus c, j}$.
-- **Xuất xác suất:** Đưa tổng điểm log-score qua hàm Softmax có kỹ thuật trừ max để bảo đảm an toàn số học.
+**2.** Với từng lớp $`c \in \{0, 1\}`$, tính tổng tần suất đặc trưng trên các mẫu **không thuộc lớp $c$** (Complement set):
+
+$$
+N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
+$$
+
+**3.** Cộng hệ số làm mịn Laplace $\alpha$:
+
+$$
+\hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
+$$
+
+**4.** Lưu ma trận log xác suất `feature_log_prob_` với trọng số $w_{c, j} = -\ln \hat{\theta}_{\setminus c, j}$.
+
+**Xuất xác suất:** Đưa tổng điểm log-score qua hàm Softmax có kỹ thuật trừ max để bảo đảm an toàn số học.
 
 ### Bước 5. Xây dựng mô hình tổ hợp biểu quyết (SpamVotingEnsemble)
-- Triển khai lớp `SpamVotingEnsemble` trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
-- Khởi tạo ensemble với bộ ba mô hình: Logistic Regression, Linear SVM và Complement Naive Bayes.
-- **Cơ chế Soft Voting:**
 
-  ```math
-  P_{\text{ensemble}}(y=1 \mid x) = \frac{1}{3} P_{\text{LR}}(y=1 \mid x) + \frac{1}{3} P_{\text{SVM}}(y=1 \mid x) + \frac{1}{3} P_{\text{CNB}}(y=1 \mid x)
-  ```
+Triển khai lớp `SpamVotingEnsemble` trong [`src/models/ensemble.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/ensemble.py).
 
-- Hỗ trợ cả chế độ Hard Voting (bỏ phiếu đa số nhãn rời rạc) để phục vụ phân tích so sánh chuyên sâu trong Notebooks.
+Khởi tạo ensemble với bộ ba mô hình: Logistic Regression, Linear SVM và Complement Naive Bayes.
+
+**Cơ chế Soft Voting:**
+
+$$
+P_{\text{ensemble}}(y=1 \mid x) = \frac{1}{3} P_{\text{LR}}(y=1 \mid x) + \frac{1}{3} P_{\text{SVM}}(y=1 \mid x) + \frac{1}{3} P_{\text{CNB}}(y=1 \mid x)
+$$
+
+Hỗ trợ cả chế độ Hard Voting (bỏ phiếu đa số nhãn rời rạc) để phục vụ phân tích so sánh chuyên sâu trong Notebooks.
 
 ### Bước 6. Thuật toán tối ưu hóa ngưỡng quyết định (ThresholdOptimizerScratch)
-- Không áp dụng ngưỡng cố định $0.5$ vì bài toán email spam yêu cầu bắt trúng phần lớn thư rác mà không để lọt.
-- Triển khai lớp `ThresholdOptimizerScratch` trong [`src/models/tuning.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py).
-- **Lưới quét ngưỡng:** Tạo $200$ mốc ngưỡng đều nhau từ $0.005$ đến $1.0$ trên tập Validation: $\text{grid} = \text{np.linspace}(0.005, 1.0, 200)$.
-- **Chiến lược tối ưu hóa có ràng buộc nghiệp vụ (Constrained Objective):**
 
-  ```math
-  \text{Điều kiện bắt buộc: } \text{Recall} \ge 0.85
-  ```
+Không áp dụng ngưỡng cố định $0.5$ vì bài toán email spam yêu cầu bắt trúng phần lớn thư rác mà không để lọt.
 
-  1. Lọc tập hợp các ngưỡng thỏa mãn $\text{Recall} \ge 0.85$ trên Validation set.
-  2. Sắp xếp thứ tự ưu tiên: **Accuracy cao nhất $\rightarrow$ F1-score cao nhất $\rightarrow$ Precision cao nhất $\rightarrow$ False Positive Rate (FPR) thấp nhất**.
-  3. **Cơ chế Fallback:** Nếu trong toàn bộ 200 ngưỡng không có ngưỡng nào đạt Recall $\ge 0.85$, hệ thống tự động fallback về chọn ngưỡng có Recall cao nhất.
+Triển khai lớp `ThresholdOptimizerScratch` trong [`src/models/tuning.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py).
+
+**Lưới quét ngưỡng:** Tạo $200$ mốc ngưỡng đều nhau từ $0.005$ đến $1.0$ trên tập Validation: $\text{grid} = \text{np.linspace}(0.005, 1.0, 200)$.
+
+**Chiến lược tối ưu hóa có ràng buộc nghiệp vụ (Constrained Objective):**
+
+$$
+\text{Điều kiện bắt buộc: } \text{Recall} \ge 0.85
+$$
+
+**1.** Lọc tập hợp các ngưỡng thỏa mãn $\text{Recall} \ge 0.85$ trên Validation set.
+
+**2.** Sắp xếp thứ tự ưu tiên: **Accuracy cao nhất $\rightarrow$ F1-score cao nhất $\rightarrow$ Precision cao nhất $\rightarrow$ False Positive Rate (FPR) thấp nhất**.
+
+**3.** **Cơ chế Fallback:** Nếu trong toàn bộ 200 ngưỡng không có ngưỡng nào đạt Recall $\ge 0.85$, hệ thống tự động fallback về chọn ngưỡng có Recall cao nhất.
 
 ### Bước 7. Quét lưới siêu tham số (Hyperparameter Grid Search)
 - Sử dụng hàm `tune_model_hyperparameters()` trong [`src/models/tuning.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/models/tuning.py).

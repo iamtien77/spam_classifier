@@ -34,20 +34,21 @@ Trong đó:
 - Hệ số chặn (bias) $b$ không bị phạt điều chuẩn.
 
 ### 1.3. Cơ chế tối ưu hóa số học ổn định
-- **Ổn định số học (Numerical Stability):** Tránh lỗi tràn số (overflow/underflow) khi tính log xác suất bằng cách sử dụng `np.logaddexp`:
 
-  ```math
-  \ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)
-  ```
+**Ổn định số học (Numerical Stability):** Tránh lỗi tràn số (overflow/underflow) khi tính log xác suất bằng cách sử dụng `np.logaddexp`:
 
-- **Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
-  Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
+$$
+\ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)
+$$
 
-  ```math
-  \Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}
-  ```
+**Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
+Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
 
-  Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
+$$
+\Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}
+$$
+
+Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
 
 ### 1.4. Đánh đổi & Failure Modes
 - **Trade-offs:** Dự đoán bằng tích vô hướng và sigmoid nên chi phí suy luận thấp; điểm đầu ra liên tục nhưng chưa được kiểm tra calibration. Ranh giới quyết định tuyến tính trong không gian log-odds không tự học được tương tác phi tuyến phức tạp nếu thiếu đặc trưng hỗ trợ.
@@ -64,20 +65,22 @@ Trong đó:
 - **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $`y_i \in \{0, 1\}`$.
 
 ### 2.2. Output
-- **Điểm sigmoid cho Spam ($\hat{p}$):**
 
-  ```math
-  \hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]
-  ```
+**Điểm sigmoid cho Spam ($\hat{p}$):**
 
-  Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
-- **Nhãn phân loại cuối cùng ($\hat{y}$):**
+$$
+\hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]
+$$
 
-  ```math
-  \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
-  ```
+Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
 
-  Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
+**Nhãn phân loại cuối cùng ($\hat{y}$):**
+
+$$
+\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
+$$
+
+Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
 
 ---
 

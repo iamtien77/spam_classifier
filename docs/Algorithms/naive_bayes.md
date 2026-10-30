@@ -35,29 +35,29 @@ $$
 #### B. Complement Naive Bayes (CNB) - Lựa chọn tối ưu trong pipeline
 MNB có thể bị ảnh hưởng khi phân bố lớp hoặc độ dài văn bản khác nhau. Complement Naive Bayes học từ **phần bù của lớp** (Complement Set $\setminus c$) để giảm một số thiên lệch, nhưng không bảo đảm khắc phục hoàn toàn mất cân bằng:
 
-1. Với mỗi lớp $c$, tính tổng trọng số đặc trưng trên tất cả các mẫu **không thuộc lớp $c$**:
+**1.** Với mỗi lớp $c$, tính tổng trọng số đặc trưng trên tất cả các mẫu **không thuộc lớp $c$**:
 
-   ```math
-   N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
-   ```
+$$
+N_{\setminus c, j} = \sum_{i: y_i \neq c} x_{ij}
+$$
 
-2. Áp dụng hệ số làm mịn Laplace/Lidstone $\alpha$:
+**2.** Áp dụng hệ số làm mịn Laplace/Lidstone $\alpha$:
 
-   ```math
-   \hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
-   ```
+$$
+\hat{\theta}_{\setminus c, j} = \frac{N_{\setminus c, j} + \alpha}{\sum_{k=1}^{D} (N_{\setminus c, k} + \alpha)}
+$$
 
-3. Trọng số đóng góp của từ $j$ được gán bằng nghịch đảo log-weight:
+**3.** Trọng số đóng góp của từ $j$ được gán bằng nghịch đảo log-weight:
 
-   ```math
-   w_{c, j} = - \ln \hat{\theta}_{\setminus c, j}
-   ```
+$$
+w_{c, j} = - \ln \hat{\theta}_{\setminus c, j}
+$$
 
-4. Điểm số quyết định cho văn bản $x$:
+**4.** Điểm số quyết định cho văn bản $x$:
 
-   ```math
-   z_c(x) = \ln P(c) - \sum_{j=1}^{D} x_j \ln \hat{\theta}_{\setminus c, j}
-   ```
+$$
+z_c(x) = \ln P(c) - \sum_{j=1}^{D} x_j \ln \hat{\theta}_{\setminus c, j}
+$$
 
 Văn bản được phân vào lớp $c$ có điểm số cao nhất.
 
@@ -84,15 +84,18 @@ $$
 - **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $`y \in \{0, 1\}`$.
 
 ### 2.2. Output
-- **Điểm quyết định:** `decision_scores(X)` trả ma trận $(N,2)$ gồm điểm theo từng lớp; `feature_log_prob_` là ma trận tham số $(2,D)$, không phải output log probabilities cho từng mẫu.
-- **Điểm Softmax cho Spam ($\hat{p}$):** Cột lớp $1$ từ `predict_proba(X)`, $\hat{p}_i \in [0, 1]$; chưa có kiểm tra calibration để diễn giải như xác suất rủi ro thực tế.
-- **Nhãn dự đoán nhị phân ($\hat{y}$):**
 
-  ```math
-  \hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
-  ```
+**Điểm quyết định:** `decision_scores(X)` trả ma trận $(N,2)$ gồm điểm theo từng lớp; `feature_log_prob_` là ma trận tham số $(2,D)$, không phải output log probabilities cho từng mẫu.
 
-  Với $\tau^* = 0.220$ cho mô hình Tuned (và $\tau^* = 0.215$ cho mô hình Default).
+**Điểm Softmax cho Spam ($\hat{p}$):** Cột lớp $1$ từ `predict_proba(X)`, $\hat{p}_i \in [0, 1]$; chưa có kiểm tra calibration để diễn giải như xác suất rủi ro thực tế.
+
+**Nhãn dự đoán nhị phân ($\hat{y}$):**
+
+$$
+\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
+$$
+
+Với $\tau^* = 0.220$ cho mô hình Tuned (và $\tau^* = 0.215$ cho mô hình Default).
 
 ---
 

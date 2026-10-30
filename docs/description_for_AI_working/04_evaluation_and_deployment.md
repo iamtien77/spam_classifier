@@ -10,17 +10,18 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
 - **Quy tắc kiểm thử bất biến:** Tập Test tuyệt đối không được tham gia vào bất kỳ khâu huấn luyện, chọn siêu tham số hay tinh chỉnh ngưỡng nào trước đó. Ngưỡng $\tau^* = 0.465$ được giữ nguyên vẹn để bảo đảm tính khách quan 100%.
 
 ### Bước 2. Thực hiện dự đoán trên tập Test
-- Gọi hàm tính xác suất / điểm sigmoid xấp xỉ trên tập Test:
 
-  ```math
-  p_i = \sigma(w^\top x_{\text{test}, i} + b) = \frac{1}{1 + \exp(-(w^\top x_{\text{test}, i} + b))}
-  ```
+Gọi hàm tính xác suất / điểm sigmoid xấp xỉ trên tập Test:
 
-- Áp dụng ngưỡng phân loại $\tau^* = 0.465$ để xác định nhãn nhị phân:
+$$
+p_i = \sigma(w^\top x_{\text{test}, i} + b) = \frac{1}{1 + \exp(-(w^\top x_{\text{test}, i} + b))}
+$$
 
-  ```math
-  \hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge 0.465 \\ 0 & \text{nếu } p_i < 0.465 \end{cases}
-  ```
+Áp dụng ngưỡng phân loại $\tau^* = 0.465$ để xác định nhãn nhị phân:
+
+$$
+\hat{y}_i = \begin{cases} 1 & \text{nếu } p_i \ge 0.465 \\ 0 & \text{nếu } p_i < 0.465 \end{cases}
+$$
 
 ### Bước 3. Tính toán ma trận nhầm lẫn (Confusion Matrix)
 - Sử dụng hàm `compute_confusion_matrix()` trong lớp `SpamModelEvaluator` ([`src/evaluation/metrics.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/evaluation/metrics.py)).
@@ -32,58 +33,62 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   - **True Positives ($TP$):** **$1.059$ mẫu** (Email rác được phát hiện chính xác là Spam).
 
 ### Bước 4. Tính toán bộ chỉ số đánh giá toàn diện (Performance Metrics)
-- Tính toán đầy đủ các chỉ số theo công thức chuẩn:
-  1. **Accuracy (Độ chính xác toàn thể):**
 
-     ```math
-     \text{Accuracy} = \frac{TP + TN}{TP + FP + TN + FN} = \frac{1059 + 997}{2902} = \mathbf{70,85\%} \quad (0.70848)
-     ```
+Tính toán đầy đủ các chỉ số theo công thức chuẩn:
 
-  2. **Precision (Độ chuẩn xác trên lớp Spam):**
+**1.** **Accuracy (Độ chính xác toàn thể):**
 
-     ```math
-     \text{Precision} = \frac{TP}{TP + FP} = \frac{1059}{1059 + 666} = \mathbf{61,39\%} \quad (0.61391)
-     ```
+$$
+\text{Accuracy} = \frac{TP + TN}{TP + FP + TN + FN} = \frac{1059 + 997}{2902} = \mathbf{70,85\%} \quad (0.70848)
+$$
 
-  3. **Recall / Sensitivity (Độ nhạy phát hiện Spam):**
+**2.** **Precision (Độ chuẩn xác trên lớp Spam):**
 
-     ```math
-     \text{Recall} = \frac{TP}{TP + FN} = \frac{1059}{1059 + 180} = \mathbf{85,47\%} \quad (0.85472)
-     ```
+$$
+\text{Precision} = \frac{TP}{TP + FP} = \frac{1059}{1059 + 666} = \mathbf{61,39\%} \quad (0.61391)
+$$
 
-     *(Thỏa mãn chỉ tiêu nghiệp vụ đặt ra ban đầu $\text{Recall} \ge 0.85$)*.
-  4. **F1-Score (Trung bình điều hòa giữa Precision và Recall):**
+**3.** **Recall / Sensitivity (Độ nhạy phát hiện Spam):**
 
-     ```math
-     \text{F1} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}} = \mathbf{71,46\%} \quad (0.71457)
-     ```
+$$
+\text{Recall} = \frac{TP}{TP + FN} = \frac{1059}{1059 + 180} = \mathbf{85,47\%} \quad (0.85472)
+$$
 
-  5. **F2-Score ($\beta = 2.0$ - Đo lường ưu tiên bắt spam):**
+*(Thỏa mãn chỉ tiêu nghiệp vụ đặt ra ban đầu $\text{Recall} \ge 0.85$)*.
 
-     ```math
-     \text{F2} = (1 + 2^2) \times \frac{\text{Precision} \times \text{Recall}}{2^2 \times \text{Precision} + \text{Recall}} = \mathbf{79,25\%} \quad (0.79255)
-     ```
+**4.** **F1-Score (Trung bình điều hòa giữa Precision và Recall):**
 
-  6. **Specificity (Tỷ lệ nhận diện đúng email hợp lệ):**
+$$
+\text{F1} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}} = \mathbf{71,46\%} \quad (0.71457)
+$$
 
-     ```math
-     \text{Specificity} = \frac{TN}{TN + FP} = \frac{997}{997 + 666} = \mathbf{59,95\%} \quad (0.59952)
-     ```
+**5.** **F2-Score ($\beta = 2.0$ - Đo lường ưu tiên bắt spam):**
 
-  7. **False Positive Rate ($FPR$ - Tỷ lệ chặn nhầm):**
+$$
+\text{F2} = (1 + 2^2) \times \frac{\text{Precision} \times \text{Recall}}{2^2 \times \text{Precision} + \text{Recall}} = \mathbf{79,25\%} \quad (0.79255)
+$$
 
-     ```math
-     \text{FPR} = \frac{FP}{FP + TN} = \frac{666}{1663} = \mathbf{40,05\%} \quad (0.40048)
-     ```
+**6.** **Specificity (Tỷ lệ nhận diện đúng email hợp lệ):**
 
-  8. **ROC-AUC (Diện tích dưới đường cong ROC):**
-     - Tự cài đặt trong `compute_roc_auc()` dựa trên thống kê xếp hạng Wilcoxon-Mann-Whitney có xử lý điểm số đồng hạng (Ties handling):
+$$
+\text{Specificity} = \frac{TN}{TN + FP} = \frac{997}{997 + 666} = \mathbf{59,95\%} \quad (0.59952)
+$$
 
-         ```math
-         \text{ROC-AUC} = \mathbf{81,44\%} \quad (0.81436)
-         ```
+**7.** **False Positive Rate ($FPR$ - Tỷ lệ chặn nhầm):**
 
-     - Chứng minh năng lực phân tách thứ bậc điểm giữa hai lớp của Linear SVM là rất tốt.
+$$
+\text{FPR} = \frac{FP}{FP + TN} = \frac{666}{1663} = \mathbf{40,05\%} \quad (0.40048)
+$$
+
+**8.** **ROC-AUC (Diện tích dưới đường cong ROC):**
+
+Tự cài đặt trong `compute_roc_auc()` dựa trên thống kê xếp hạng Wilcoxon-Mann-Whitney có xử lý điểm số đồng hạng (Ties handling):
+
+$$
+\text{ROC-AUC} = \mathbf{81,44\%} \quad (0.81436)
+$$
+
+Chứng minh năng lực phân tách thứ bậc điểm giữa hai lớp của Linear SVM là rất tốt.
 
 ### Bước 5. Đối chiếu kết quả Test của tất cả các mô hình ứng viên
 - Nạp toàn bộ kết quả kiểm thử của 8 mô hình ứng viên vào bảng [`results/metrics/test_models_comparison.csv`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/results/metrics/test_models_comparison.csv):

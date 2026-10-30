@@ -70,15 +70,18 @@ Mục tiêu của tài liệu này là quy định chi tiết từng bước th�
   5. **Tính toán số lượng từ (word_count) và độ dài ký tự:** Lưu lại các trường thống kê `model_length` và `raw_length`.
 
 ### Bước 8. Học ngưỡng cắt độ dài văn bản (Length Capping) chống Data Leakage
-- Kiểm tra phân bố độ dài từ vựng của email để loại trừ ảnh hưởng tiêu cực của các email ngoại lai (outliers) quá dài làm phình ma trận TF-IDF.
-- Sử dụng tham số `cap_quantile = 0.99` (phân vị 99%).
-- **Nguyên tắc chống rò rỉ dữ liệu bắt buộc:** Ngưỡng cắt độ dài `cap_word_limit_` chỉ được học duy nhất trên tập **Train**:
 
-  ```math
-  \text{cap\_word\_limit} = \text{Quantile}_{0.99}(\text{Train lengths}) = \mathbf{1.361\text{ từ}}
-  ```
+Kiểm tra phân bố độ dài từ vựng của email để loại trừ ảnh hưởng tiêu cực của các email ngoại lai (outliers) quá dài làm phình ma trận TF-IDF.
 
-- Tập Validation và tập Test không được tính lại ngưỡng này mà phải dùng lại đúng ngưỡng $1.361$ từ đã fit từ Train để cắt ngắn văn bản.
+Sử dụng tham số `cap_quantile = 0.99` (phân vị 99%).
+
+**Nguyên tắc chống rò rỉ dữ liệu bắt buộc:** Ngưỡng cắt độ dài `cap_word_limit_` chỉ được học duy nhất trên tập **Train**:
+
+$$
+\text{cap\_word\_limit} = \text{Quantile}_{0.99}(\text{Train lengths}) = \mathbf{1.361\text{ từ}}
+$$
+
+Tập Validation và tập Test không được tính lại ngưỡng này mà phải dùng lại đúng ngưỡng $1.361$ từ đã fit từ Train để cắt ngắn văn bản.
 
 ### Bước 9. Lưu trữ dữ liệu sạch ra đệm (Cache Persistence)
 - Sử dụng hàm `export_processed_data()` trong [`src/features/feature_engineering.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src/features/feature_engineering.py).
