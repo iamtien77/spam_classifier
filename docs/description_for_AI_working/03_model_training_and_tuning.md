@@ -2,7 +2,7 @@
 
 > **Vị trí trong Pipeline:** Giai đoạn 3 / 4 (`step_model_training` & `step_evaluation_and_tuning` - Phần 1)
 > **Module nguồn:** [`src/models/classifiers.py`](../../src/models/classifiers.py), [`src/models/tuning.py`](../../src/models/tuning.py), [`src/models/ensemble.py`](../../src/models/ensemble.py)
-> **Báo cáo thực nghiệm liên kết:** [`GIAI_THICH_CHI_TIET_TASK_2_MODEL_TRAINING.docx`](../GIAI_THICH_CHI_TIET_TASK_2_MODEL_TRAINING.docx), [`GIAI_THICH_CHI_TIET_TASK_3_MODEL_EVALUATION_AND_TUNING.docx`](../GIAI_THICH_CHI_TIET_TASK_3_MODEL_EVALUATION_AND_TUNING.docx), [`validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv)
+> **Báo cáo thực nghiệm liên kết:** , [`validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv)
 
 ---
 
@@ -60,10 +60,12 @@ $$
 ### 2.1. Các Hàm Phụ Trợ Đại Số Tuyến Tính & Thuật Toán Tối Ưu Hóa Bậc Một
 
 #### Hàm `_safe_dot(X: Any, w: np.ndarray) -> np.ndarray`
+
 - **Mục đích:** Tính tích ma trận - vector $X \cdot w$; bias được cộng ở nơi gọi một cách đa hình và an toàn.
 - **Logic thực thi:** Tự động nhận diện cấu trúc của $X$: nếu là `CSRMatrixScratch`, gọi trực tiếp `.dot(w)`; nếu là `scipy.sparse.csr_matrix`, gọi `X.dot(w)`; nếu là `np.ndarray`, gọi `np.dot(X, w)`. Nhánh sparse xử lý theo số phần tử lưu trữ; nhánh dense phụ thuộc số ô của ma trận.
 
 #### Hàm `_safe_transpose_dot(X: Any, v: np.ndarray) -> np.ndarray`
+
 - **Mục đích:** Tính tích chuyển vị $g = X^\top \cdot v$ dùng để tính vector gradient của hàm mất mát.
 - **Lý do thiết kế:** Nhánh `CSRMatrixScratch` dùng `transpose_dot` để tránh tạo ma trận chuyển vị; nhánh SciPy dùng `X.T.dot(v)`, còn nhánh dense dùng `X.T @ v`. Chi phí phụ thuộc biểu diễn ma trận; chưa có benchmark để định lượng RAM tiết kiệm.
 
@@ -99,6 +101,7 @@ Thu hẹp bước học: $\eta \leftarrow 0.5 \times \eta$ (lặp lại tối đ
 ### 2.2. Lớp `LogisticRegressionFromScratch`
 
 #### Hàm khởi tạo `__init__(learning_rate=0.1, max_iter=200, C=1.0, tol=1e-7, class_weight='balanced')`
+
 - Kiểm định tính dương của $C > 0$ và tốc độ học `learning_rate > 0`. Khởi tạo hệ số điều chuẩn $\lambda = \frac{1}{C \cdot N}$.
 
 #### Phương thức `fit(X, y)`
@@ -127,6 +130,7 @@ $$
 *(Lưu ý: Hệ số bias $b$ không bị phạt điều chuẩn $L_2$ để ranh giới quyết định tự do dịch chuyển).*
 
 #### Phương thức `predict_proba(X) -> np.ndarray`
+
 - Tính khoảng cách $z = X \cdot w + b$. Kẹp giá trị $z$ trong đoạn an toàn $[-30, +30]$ trước khi đưa qua hàm Sigmoid $\sigma(z) = \frac{1}{1 + \exp(-z)}$:
   ```python
   z_clipped = np.clip(z, -30.0, 30.0)
@@ -139,6 +143,7 @@ $$
 ### 2.3. Lớp `LinearSVMFromScratch`
 
 #### Chuyển đổi nhãn đối xứng
+
 - Chuyển đổi nhãn nhị phân $`y_i \in \{0, 1\}`$ sang nhãn có dấu $`\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}`$.
 
 #### Phương thức `fit(X, y)` & Đạo hàm trơn $C^1$ của Squared Hinge Loss
@@ -161,6 +166,7 @@ $$
 $$
 
 #### Phương thức `decision_function(X)` & `predict_proba(X)`
+
 - `decision_function(X)`: Trả về điểm quyết định có dấu (functional margin), chưa chia cho chuẩn của vector trọng số $z = X \cdot w + b$. Điểm $z > 0$ biểu thị email nằm ở nửa không gian Spam; $z < 0$ nằm ở nửa không gian Ham.
 - `predict_proba(X)`: Ánh xạ khoảng cách lề $z$ qua hàm Sigmoid chưa calibration; không phải Platt Scaling đã fit $\sigma(z)$ với $z \in [-30, 30]$ để tạo ra phân phối xác suất giả lập, phục vụ bộ dò ngưỡng thống nhất.
 
@@ -169,6 +175,7 @@ $$
 ### 2.4. Lớp `NaiveBayesClassifier` (Complement Naive Bayes)
 
 #### Hàm khởi tạo `__init__(alpha=1.0, kind='complement')`
+
 - Khởi tạo hệ số làm mịn Laplace $\alpha = 1.0$ và cấu hình chuyên biệt `kind='complement'`.
 
 #### Phương thức `fit(X, y)`: Ước lượng Tham số trên Tập Bù (Complement Set)
@@ -214,6 +221,7 @@ Tự động chuẩn hóa trọng số mô hình và áp dụng ngưỡng phân 
 ### 2.6. Lớp `ThresholdOptimizerScratch`: Dò Ngưỡng Tối Ưu Có Ràng Buộc Nghiệp Vụ
 
 #### Lưới quét 200 điểm mốc
+
 - Tạo lưới quét cách đều 200 điểm từ $0.005$ đến $1.0$: `np.linspace(0.005, 1.0, 200)`.
 
 #### Bản chất Chỉ số $F_2$-Score ($\beta = 2.0$)
@@ -242,14 +250,14 @@ $$
 
 **I/O:** Train dùng học tham số; Validation dùng chọn hyperparameter, threshold và model. Output là model cùng cấu hình và threshold đã khóa. Test không được truyền vào quy trình lựa chọn.
 
-| Quyết định | Lý do | Phương án khác / trade-offs |
-| :--- | :--- | :--- |
-| CNB làm baseline đối chứng | Fit trực tiếp từ thống kê đặc trưng không âm, chi phí thấp | MNB cũng phù hợp văn bản; cần so sánh thay vì khẳng định CNB luôn tốt hơn |
-| Thử LR và Linear SVM | Trọng số có thể phân tích, thích hợp dữ liệu thưa | Đòi hỏi kiểm tra hội tụ; mô hình tuyến tính không mô tả mọi tương tác |
-| `class_weight='balanced'` cho LR/SVM | Điều chỉnh đóng góp loss theo tần số lớp Train | Không weighting là đối chứng cần có; weighting có thể tăng FP và không phải bắt buộc chỉ vì lớp lệch nhẹ |
-| Squared hinge + BB/Armijo | Loss có gradient liên tục, line search tìm bước giảm đủ | Hinge cần xử lý điểm không khả vi; SGD/L-BFGS là đối chứng chưa được benchmark. L-BFGS không lưu Hessian đầy đủ như Newton |
-| Soft Voting là ứng viên | Khảo sát kết hợp model có lỗi khác nhau | Có thêm chi phí, score chưa calibration có thể lệch thang; không mặc định vượt model đơn |
-| Recall target 0.85 rồi Accuracy/F1 | Thể hiện ưu tiên thực nghiệm bắt spam và phân xử trong nhóm đạt mục tiêu | Tối đa F1 hoặc chi phí FP/FN là lựa chọn khác; ngưỡng phải chốt theo Validation, không theo Test |
+| Quyết định                          | Lý do                                                                                  | Phương án khác / trade-offs                                                                                                                  |
+| :------------------------------------- | :-------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| CNB làm baseline đối chứng         | Fit trực tiếp từ thống kê đặc trưng không âm, chi phí thấp                  | MNB cũng phù hợp văn bản; cần so sánh thay vì khẳng định CNB luôn tốt hơn                                                          |
+| Thử LR và Linear SVM                 | Trọng số có thể phân tích, thích hợp dữ liệu thưa                            | Đòi hỏi kiểm tra hội tụ; mô hình tuyến tính không mô tả mọi tương tác                                                           |
+| `class_weight='balanced'` cho LR/SVM | Điều chỉnh đóng góp loss theo tần số lớp Train                                 | Không weighting là đối chứng cần có; weighting có thể tăng FP và không phải bắt buộc chỉ vì lớp lệch nhẹ                     |
+| Squared hinge + BB/Armijo              | Loss có gradient liên tục, line search tìm bước giảm đủ                        | Hinge cần xử lý điểm không khả vi; SGD/L-BFGS là đối chứng chưa được benchmark. L-BFGS không lưu Hessian đầy đủ như Newton |
+| Soft Voting là ứng viên             | Khảo sát kết hợp model có lỗi khác nhau                                          | Có thêm chi phí, score chưa calibration có thể lệch thang; không mặc định vượt model đơn                                          |
+| Recall target 0.85 rồi Accuracy/F1    | Thể hiện ưu tiên thực nghiệm bắt spam và phân xử trong nhóm đạt mục tiêu | Tối đa F1 hoặc chi phí FP/FN là lựa chọn khác; ngưỡng phải chốt theo Validation, không theo Test                                    |
 
 `RECALL_TARGET=0.85` nằm trong [config.py](../../src/config.py), không phải chứng nhận an ninh hay hiệu năng cam kết. Metric và quy tắc chọn phải được chốt trước chạy; không tự nâng/hạ mục tiêu sau khi thấy Test.
 

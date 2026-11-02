@@ -2,7 +2,7 @@
 
 > **Vị trí trong Pipeline:** Giai đoạn 1 / 4 (`step_data_preprocessing`)
 > **Module nguồn:** [`src/data/loader.py`](../../src/data/loader.py), [`src/data/preprocessing.py`](../../src/data/preprocessing.py), [`src/config.py`](../../src/config.py)
-> **Báo cáo thực nghiệm liên kết:** [`GIAI_THICH_CHI_TIET_TASK_1_DATA_PREPROCESSING.docx`](../GIAI_THICH_CHI_TIET_TASK_1_DATA_PREPROCESSING.docx), [`data_audit.json`](../../results/metrics/data_audit.json)
+> **Báo cáo thực nghiệm liên kết:** , [`data_audit.json`](../../results/metrics/data_audit.json)
 
 ---
 
@@ -29,12 +29,13 @@ Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán h
 ```
 
 ### Schema dữ liệu đầu vào và đầu ra
-| Tên trường | Kiểu dữ liệu | Yêu cầu và ý nghĩa của trường dữ liệu |
-| :--- | :--- | :--- |
-| `source_id` | `int64` | Chỉ số định danh bất biến nguyên thủy (bắt đầu từ 1 theo thứ tự bản ghi CSV), dùng để truy lại bản ghi gốc khi phân tích lỗi trong pipeline. |
-| `label` | `str` $`\in \{\text{'ham'}, \text{'spam'}\}`$ | Nhãn phân loại nhị phân. Tuyệt đối không chấp nhận giá trị rỗng hoặc nhãn lạ. |
-| `text` | `str` | Nội dung nạp từ CSV; văn bản dùng cho model được tạo sau đó ở trường `model_text`. |
-| `raw_text` | `str` | Bản sao nguyên vẹn của văn bản thô ban đầu, dùng để trích xuất tín hiệu cấu trúc (chữ hoa, dấu `!`, `$`). |
+
+| Tên trường | Kiểu dữ liệu                                   | Yêu cầu và ý nghĩa của trường dữ liệu                                                                                                                      |
+| :------------ | :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source_id` | `int64`                                         | Chỉ số định danh bất biến nguyên thủy (bắt đầu từ 1 theo thứ tự bản ghi CSV), dùng để truy lại bản ghi gốc khi phân tích lỗi trong pipeline. |
+| `label`     | `str` $`\in \{\text{'ham'}, \text{'spam'}\}`$ | Nhãn phân loại nhị phân. Tuyệt đối không chấp nhận giá trị rỗng hoặc nhãn lạ.                                                                       |
+| `text`      | `str`                                           | Nội dung nạp từ CSV; văn bản dùng cho model được tạo sau đó ở trường `model_text`.                                                                  |
+| `raw_text`  | `str`                                           | Bản sao nguyên vẹn của văn bản thô ban đầu, dùng để trích xuất tín hiệu cấu trúc (chữ hoa, dấu `!`, `$`).                                    |
 
 ---
 
@@ -43,12 +44,14 @@ Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán h
 ### 2.1. Module `src/data/loader.py`
 
 #### Hàm `resolve_data_path(custom_path: Optional[Path] = None) -> Path`
+
 - **Mục đích:** Phân giải và kiểm định tính hợp lệ của đường dẫn dữ liệu với nguyên tắc **Fail-Fast**.
 - **Logic thực thi:**
   1. Nếu người dùng truyền `custom_path`: Chuyển đổi sang `Path(custom_path)` và gọi `.is_file()`. Nếu không tìm thấy tệp, lập tức raise `FileNotFoundError` chỉ rõ đường dẫn lỗi. Tuyệt đối không tự ý fallback ngầm sang đường dẫn mặc định vì có thể khiến người dùng huấn luyện nhầm trên tập dữ liệu cũ.
   2. Nếu `custom_path` là `None`: Duyệt danh sách 4 vị trí tiêu chuẩn (`root / 'data/raw/spam.csv'`, `root / 'data/spam.csv'`, `Path('data/raw/spam.csv')`, `Path('../data/raw/spam.csv')`). Trả về đường dẫn đầu tiên tồn tại.
 
 #### Hàm `load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True)`
+
 - **Mục đích:** Đọc tệp CSV thô, hỗ trợ trường văn bản dài và giải mã theo hai encoding.
 - **Logic thực thi:**
   1. *Kiểm soát giới hạn trường an toàn:* Lưu giá trị `previous_limit = csv.field_size_limit()`. Đặt giới hạn đọc trường thành `max(previous_limit, min(path.stat().st_size, 2**31 - 1))`. Chặn trần ở $2^{31}-1$ (giá trị cực đại của số nguyên C long 32-bit có dấu) nhằm tránh giới hạn mới vượt phạm vi C long gây lỗi `OverflowError: Python int too large to convert to C long` trên hệ điều hành Windows 64-bit/32-bit.
@@ -61,6 +64,7 @@ Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán h
 ### 2.2. Module `src/data/preprocessing.py`
 
 #### Lớp `_EmailHTMLTextParser(HTMLParser)` & Hàm `_extract_html_text(text: str) -> str`
+
 - **Mục đích:** Trích xuất văn bản từ email HTML, tránh nguy cơ Catastrophic Backtracking khi dùng biểu thức chính quy.
 - **Logic thực thi:**
   - Kế thừa lớp `HTMLParser` của Python để xử lý theo sự kiện với `convert_charrefs=True`, tự động giải mã các thực thể HTML (`&amp;` $\rightarrow$ `&`, `&pound;` $\rightarrow$ `£`, `&quot;` $\rightarrow$ `"`).
@@ -89,6 +93,7 @@ $$
 **5.** *Retained Clean Rows (Mẫu sạch giữ lại):* **29.028 dòng** sau lọc theo chính sách đã nêu ($16.636$ Ham, $12.392$ Spam).
 
 #### Hàm `clean_email_split(df, ...) -> pd.DataFrame`
+
 - **Mục đích:** Làm sạch toàn bộ dữ liệu trước khi chia tập.
 - **Chính sách dữ liệu của dự án:** Loại toàn bộ các dòng thuộc nhóm mâu thuẫn nhãn vì chưa có căn cứ xác định nhãn đúng. Biểu quyết đa số có thể bị số bản lặp chi phối; thẩm định thủ công là phương án thay thế nếu có nguồn lực. Dữ liệu hiện tại không chứng minh nguyên nhân mâu thuẫn là botnet hay tấn công.
 
@@ -115,6 +120,7 @@ Tập Test (10%): **2.902 mẫu** ($1.663$ Ham, $1.239$ Spam).
 Tổng cộng: Đúng bằng $29.028$ mẫu, không mất hoặc thêm mẫu do làm tròn.
 
 #### Lớp `SpamTextProcessor`
+
 - **Mục đích:** Xử lý văn bản phi trạng thái (Stateless Text Processor) gồm 6 phương thức:
   1. `normalize_text(text)`: Thực thi chuỗi 7 bước chuẩn hóa (HTML $\rightarrow$ token URL `urltoken` $\rightarrow$ token tiền tệ `moneytoken` $\rightarrow$ token số `numbertoken` $\rightarrow$ lowercase/NFKC $\rightarrow$ loại bỏ ký tự lạ $\rightarrow$ lọc stop words tiếng Anh).
   2. `tokenize_words(text)`: Tách chuỗi theo khoảng trắng thành danh sách từ đơn `list[str]`.
@@ -127,14 +133,14 @@ Tổng cộng: Đúng bằng $29.028$ mẫu, không mất hoặc thêm mẫu do 
 
 ## 3. Lập luận quyết định và phương án thay thế
 
-| Quyết định | Lý do chọn trong pipeline | Phương án khác và đánh đổi |
-| :--- | :--- | :--- |
-| Báo lỗi khi đường dẫn tùy chỉnh sai | Tránh chạy nhầm dữ liệu mà người dùng không biết | Fallback giúp chạy tiếp nhưng làm mất tính minh bạch của input |
-| Giữ `raw_text`, tạo riêng `model_text` | Dấu câu/chữ hoa có thể hữu ích cho đặc trưng cấu trúc, dù bị bỏ khi vector hóa từ | Chỉ giữ văn bản sạch đơn giản hơn nhưng không thể khôi phục tín hiệu đã xóa |
+| Quyết định                                                                 | Lý do chọn trong pipeline                                                                                      | Phương án khác và đánh đổi                                                                                                        |
+| :---------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| Báo lỗi khi đường dẫn tùy chỉnh sai                                   | Tránh chạy nhầm dữ liệu mà người dùng không biết                                                      | Fallback giúp chạy tiếp nhưng làm mất tính minh bạch của input                                                                    |
+| Giữ `raw_text`, tạo riêng `model_text`                                 | Dấu câu/chữ hoa có thể hữu ích cho đặc trưng cấu trúc, dù bị bỏ khi vector hóa từ               | Chỉ giữ văn bản sạch đơn giản hơn nhưng không thể khôi phục tín hiệu đã xóa                                             |
 | Loại nhóm mâu thuẫn, giữ bản đầu của nhóm cùng nhãn trước split | Không tự đoán nhãn đúng từ số lượng bản lặp; ngăn cùng khóa nội dung xuất hiện ở nhiều tập | Gán nhãn thủ công có thể giữ dữ liệu tốt hơn nhưng cần người thẩm định; majority vote có thể bị bản trùng chi phối |
-| Chia phân tầng 80/10/10, seed 42 | Tách nơi học, nơi chọn và nơi đánh giá; giữ phân bố lớp tương đối | Cross-validation giảm phụ thuộc một split nhưng tăng chi phí; split theo nguồn/thời gian phù hợp hơn nếu có phụ thuộc đó |
-| Giữ từ phủ định trong stop words policy | Hạn chế mất dấu hiệu phủ định | Đây chưa phải bằng chứng tăng F1; cần ablation cùng split giữa giữ/bỏ stop words |
-| Cắt độ dài theo Train | Ngưỡng có thể thích ứng dữ liệu mà không học từ Test | Giữ toàn bộ tránh mất tín hiệu cuối câu nhưng tăng chi phí; ngưỡng cố định cần lý do lựa chọn |
+| Chia phân tầng 80/10/10, seed 42                                            | Tách nơi học, nơi chọn và nơi đánh giá; giữ phân bố lớp tương đối                              | Cross-validation giảm phụ thuộc một split nhưng tăng chi phí; split theo nguồn/thời gian phù hợp hơn nếu có phụ thuộc đó |
+| Giữ từ phủ định trong stop words policy                                  | Hạn chế mất dấu hiệu phủ định                                                                            | Đây chưa phải bằng chứng tăng F1; cần ablation cùng split giữa giữ/bỏ stop words                                               |
+| Cắt độ dài theo Train                                                     | Ngưỡng có thể thích ứng dữ liệu mà không học từ Test                                                 | Giữ toàn bộ tránh mất tín hiệu cuối câu nhưng tăng chi phí; ngưỡng cố định cần lý do lựa chọn                         |
 
 Mất cân bằng nhẹ không tự động bắt buộc `class_weight='balanced'`. Weighting là lựa chọn của training cần so sánh với không weighting trên Validation theo cùng metric và quy tắc chọn threshold.
 
@@ -160,16 +166,16 @@ transform validation/test bằng trạng thái đã fit
 
 Nguồn: [data_audit.json](../../results/metrics/data_audit.json), [loader.py](../../src/data/loader.py), [preprocessing.py](../../src/data/preprocessing.py).
 
-| Hạng mục tham chiếu | Số lượng |
-| :--- | ---: |
-| Input | 43.849 |
-| Nhãn không hợp lệ | 2.195 |
-| Nội dung rỗng | 2.192 |
-| Mâu thuẫn nhãn | 1.480 dòng / 738 nhóm |
-| Trùng cùng nhãn bị loại | 8.954 |
-| Giữ lại | 29.028 |
-| Train / Validation / Test | 23.223 / 2.903 / 2.902 |
-| Ham / Spam sau làm sạch | 16.636 / 12.392 |
+| Hạng mục tham chiếu       |             Số lượng |
+| :--------------------------- | ----------------------: |
+| Input                        |                  43.849 |
+| Nhãn không hợp lệ        |                   2.195 |
+| Nội dung rỗng              |                   2.192 |
+| Mâu thuẫn nhãn            | 1.480 dòng / 738 nhóm |
+| Trùng cùng nhãn bị loại |                   8.954 |
+| Giữ lại                    |                  29.028 |
+| Train / Validation / Test    |  23.223 / 2.903 / 2.902 |
+| Ham / Spam sau làm sạch    |         16.636 / 12.392 |
 
 [Test data](../../tests/test_data.py) kiểm tra nạp CSV, encoding, schema và split; [test features](../../tests/test_features.py) có ca ngưỡng độ dài chỉ fit trên Train. Các test chứng minh hành vi trên fixture, không chứng minh chất lượng mọi nhãn. Chưa có artifact ablation xác nhận mức tăng F1 do stop words, benchmark tốc độ HTMLParser hoặc đánh giá theo nhóm nhân khẩu học. Nếu có metadata nhóm hợp lệ, đủ mẫu, cần lập kế hoạch đo chênh lệch lỗi; không suy đoán nhóm từ văn bản.
 

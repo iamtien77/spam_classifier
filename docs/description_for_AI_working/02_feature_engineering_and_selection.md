@@ -2,7 +2,7 @@
 
 > **Vị trí trong Pipeline:** Giai đoạn 2 / 4 (`step_data_preprocessing` - Phần 2)
 > **Module nguồn:** [`src/features/feature_engineering.py`](../../src/features/feature_engineering.py), [`src/config.py`](../../src/config.py)
-> **Báo cáo thực nghiệm liên kết:** [`GIAI_THICH_CHI_TIET_TASK_1_DATA_PREPROCESSING.docx`](../GIAI_THICH_CHI_TIET_TASK_1_DATA_PREPROCESSING.docx), `eda_feature_selection_sweep.png` (chưa có tệp trong repository)
+> **Báo cáo thực nghiệm liên kết:** , `eda_feature_selection_sweep.png` (chưa có tệp trong repository)
 
 ---
 
@@ -32,14 +32,15 @@ Trong bài toán phân loại email rác, việc chỉ dựa vào các từ đơ
 ```
 
 ### Phân chia các khối đặc trưng (Feature Slices)
-| Tên khối đặc trưng | Khoảng chỉ số cột | Số chiều | Vai trò của đặc trưng |
-| :--- | :--- | :---: | :--- |
-| `word` (Unigram) | $[0, 3000)$ | 3.000 | Nhận diện các từ vựng xuất hiện phổ biến trong email (`claim`, `offer`, `prize`). |
-| `bigram` (Bigram) | $[3000, 3800)$ | 800 | Bắt ngữ cảnh cục bộ hai từ liền kề (`free entry`, `call now`, `click here`). |
-| `char` (Char N-gram) | $[3800, 4300)$ | 500 | Cung cấp tín hiệu ký tự con cho biến thể từ (`w!n`, `fr3e`, `c@sh`). |
-| `keyword` (Từ khóa) | $[4300, 4310)$ | 10 | Tín hiệu từ khóa có thể xuất hiện ở cả Spam và Ham; không xác định ý định. |
-| `numeric` (Cấu trúc số) | $[4310, 4318)$ | 8 | Tỷ lệ chữ hoa, tần suất dấu chấm than, ký hiệu tiền tệ, URL và độ dài văn bản. |
-| **Tổng thể Không gian** | $[0, 4318)$ | **4.318** | **Không gian vector thưa hoàn chỉnh đưa vào huấn luyện mô hình.** |
+
+| Tên khối đặc trưng          | Khoảng chỉ số cột |   Số chiều   | Vai trò của đặc trưng                                                                       |
+| :------------------------------- | :-------------------- | :-------------: | :----------------------------------------------------------------------------------------------- |
+| `word` (Unigram)               | $[0, 3000)$         |      3.000      | Nhận diện các từ vựng xuất hiện phổ biến trong email (`claim`, `offer`, `prize`). |
+| `bigram` (Bigram)              | $[3000, 3800)$      |       800       | Bắt ngữ cảnh cục bộ hai từ liền kề (`free entry`, `call now`, `click here`).       |
+| `char` (Char N-gram)           | $[3800, 4300)$      |       500       | Cung cấp tín hiệu ký tự con cho biến thể từ (`w!n`, `fr3e`, `c@sh`).               |
+| `keyword` (Từ khóa)          | $[4300, 4310)$      |       10       | Tín hiệu từ khóa có thể xuất hiện ở cả Spam và Ham; không xác định ý định.     |
+| `numeric` (Cấu trúc số)     | $[4310, 4318)$      |        8        | Tỷ lệ chữ hoa, tần suất dấu chấm than, ký hiệu tiền tệ, URL và độ dài văn bản.  |
+| **Tổng thể Không gian** | $[0, 4318)$         | **4.318** | **Không gian vector thưa hoàn chỉnh đưa vào huấn luyện mô hình.**               |
 
 ---
 
@@ -48,11 +49,13 @@ Trong bài toán phân loại email rác, việc chỉ dựa vào các từ đơ
 ### 2.1. Lớp `CSRMatrixScratch`: Cấu Trúc Ma Trận Thưa Tự Cài Đặt (Compressed Sparse Row)
 
 Lớp `CSRMatrixScratch` được tự cài đặt từ đầu bằng thư viện `array` chuẩn của Python, cấp phát vùng nhớ C liên tục, độc lập hoàn toàn với SciPy. Cấu trúc lưu trữ 3 mảng 1 chiều cơ bản:
+
 - `data`: Mảng kiểu số thực `array('d')` chứa các giá trị khác 0 (float64).
 - `indices`: Mảng số nguyên không âm `array('I')` lưu chỉ số cột tương ứng (uint32).
 - `indptr`: Mảng con trỏ hàng `array('Q')` lưu vị trí bắt đầu và kết thúc của từng hàng (uint64).
 
 #### 6 điều kiện cấu trúc cần duy trì (Memory Invariants)
+
 1. `shape` gồm đúng 2 số nguyên không âm: `(n_rows, n_cols)`.
 2. `len(data) == len(indices)` (mỗi phần tử dữ liệu phải có chỉ số cột tương ứng).
 3. `len(indptr) == shape[0] + 1` (số con trỏ dòng luôn bằng số hàng cộng 1).
@@ -87,9 +90,11 @@ Không duyệt qua các phần tử 0; chưa có benchmark trong artifact để 
 ### 2.2. Lớp `TfidfVectorizerScratch`: Thuật Toán Sublinear TF-IDF Tự Cài Đặt
 
 #### Hàm khởi tạo `__init__(min_df=2, max_features=None, sublinear_tf=True, smooth_idf=True, norm='l2')`
+
 - Thiết lập các siêu tham số vector hóa. Bộ lọc `min_df=2` loại bỏ toàn bộ các từ chỉ xuất hiện đúng 1 lần trên tập Train để giảm từ hiếm, đồng thời có thể loại tín hiệu spam hiếm.
 
 #### Phương thức tĩnh `_tokens(document)`
+
 - Kiểm tra kiểu dữ liệu đầu vào: nếu là chuỗi `str` thì gọi `.split()`; nếu đã là danh sách `list[str]` (đối với Bigram hoặc Char N-gram đã được trích xuất sẵn), giữ nguyên cấu trúc n-gram, tuyệt đối không gọi `.split()` làm phá vỡ ngữ cảnh.
 
 #### Phương thức `fit(raw_documents)` (Chỉ học trên Train set)
@@ -159,13 +164,13 @@ $$
 
 **I/O:** Input là các tập sạch với `text`/`raw_text`; output là ma trận cùng thứ tự cột, builder đã fit, `selected_indices` và nhãn nhị phân. Số chiều phụ thuộc từ vựng học được và cấu hình; 4.318 là số của lần tham chiếu.
 
-| Quyết định | Lý do / phương án thay thế | Cách kiểm chứng và giới hạn |
-| :--- | :--- | :--- |
-| Bắt đầu word TF-IDF + CNB baseline | Đơn giản và có trọng số từ; count/binary TF là đối chứng | So sánh cùng split và cùng model; chưa có bằng chứng tăng AUC cố định nhờ sublinear TF |
-| Thêm bigram/char/keyword/numeric | Có thể bổ sung tín hiệu cục bộ và cấu trúc bị mất khi chuẩn hóa từ | Ablation từng khối trên Validation; không mặc định hybrid tốt hơn, không chứng nhận chống obfuscation |
-| CSR thay dense | Chỉ lưu giá trị và chỉ số cần thiết khi dữ liệu thưa | Đo nnz, byte thực tế và thời gian; SciPy CSR là lựa chọn thay thế, không mặc định bản tự viết nhanh hơn |
-| MaxAbs thay centering | Chia cho scale dương giữ các số 0 và tính không âm | StandardScaler có centering có thể làm đặc/âm; MinMax chỉ dịch số 0 khi min khác 0, không phải lúc nào cũng phá sparse |
-| Chọn Top-K bằng proxy CNB | Giảm chi phí dò số chiều trước tuning toàn bộ model | Proxy có thể xếp hạng khác LR/SVM; nếu muốn kết luận cho từng model cần kiểm chứng lại trên Validation |
+| Quyết định                         | Lý do / phương án thay thế                                                   | Cách kiểm chứng và giới hạn                                                                                                       |
+| :------------------------------------ | :-------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| Bắt đầu word TF-IDF + CNB baseline | Đơn giản và có trọng số từ; count/binary TF là đối chứng              | So sánh cùng split và cùng model; chưa có bằng chứng tăng AUC cố định nhờ sublinear TF                                     |
+| Thêm bigram/char/keyword/numeric     | Có thể bổ sung tín hiệu cục bộ và cấu trúc bị mất khi chuẩn hóa từ | Ablation từng khối trên Validation; không mặc định hybrid tốt hơn, không chứng nhận chống obfuscation                      |
+| CSR thay dense                        | Chỉ lưu giá trị và chỉ số cần thiết khi dữ liệu thưa                  | Đo nnz, byte thực tế và thời gian; SciPy CSR là lựa chọn thay thế, không mặc định bản tự viết nhanh hơn                |
+| MaxAbs thay centering                 | Chia cho scale dương giữ các số 0 và tính không âm                       | StandardScaler có centering có thể làm đặc/âm; MinMax chỉ dịch số 0 khi min khác 0, không phải lúc nào cũng phá sparse |
+| Chọn Top-K bằng proxy CNB           | Giảm chi phí dò số chiều trước tuning toàn bộ model                      | Proxy có thể xếp hạng khác LR/SVM; nếu muốn kết luận cho từng model cần kiểm chứng lại trên Validation                   |
 
 ## 4. Logic, invariants và failure modes
 
