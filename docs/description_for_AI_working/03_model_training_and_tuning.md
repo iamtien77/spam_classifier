@@ -1,4 +1,4 @@
-# Đặc Tả Kỹ Thuật Giai Đoạn 3: Huấn Luyện 3 Mô Hình Cốt Lõi From-Scratch, Tối Ưu Ngưỡng Ràng Buộc & Lựa Chọn Winner (Model Training & Tuning)
+# Giai đoạn 3: Huấn luyện 3 mô hình From-Scratch, tối ưu ngưỡng và lựa chọn mô hình (Model Training & Tuning)
 
 > **Vị trí trong Pipeline:** Giai đoạn 3 / 4 (`step_model_training` & `step_evaluation_and_tuning` - Phần 1)
 > **Module nguồn:** [`src/models/classifiers.py`](../../src/models/classifiers.py), [`src/models/tuning.py`](../../src/models/tuning.py), [`src/models/ensemble.py`](../../src/models/ensemble.py)
@@ -6,11 +6,11 @@
 
 ---
 
-> **Cách đọc bằng chứng:** Các số liệu tham chiếu dưới đây thuộc artifact đã lưu của lần chạy 2026-10-19, không phải kết quả chạy mới khi sửa tài liệu. Lý do thiết kế là giả thuyết cần kiểm chứng; không suy ra quan hệ nhân quả chỉ từ một kết quả tốt. Thiết kế trước code nằm ở [design.md](../Algorithms/design.md).
+> **Nguồn số liệu:** Các số liệu dưới đây được lấy từ artifact của lần chạy 2026-10-19. Việc cập nhật tài liệu không bao gồm chạy lại thực nghiệm. Các lý do lựa chọn thiết kế vẫn cần được kiểm chứng; một kết quả tốt chưa đủ để xác định nguyên nhân. Phần thiết kế trước khi triển khai được trình bày tại [design.md](../Algorithms/design.md).
 
-## 1. Bối Cảnh Nghiệp Vụ & Hợp Đồng Huấn Luyện (Training Contract)
+## 1. Bối cảnh và yêu cầu huấn luyện (Training Contract)
 
-Giai đoạn 3 là "trái tim giải thuật" của toàn bộ hệ thống lọc thư rác. Sau khi Giai đoạn 2 đã tạo lập ma trận thưa 4.318 chiều, Giai đoạn 3 tiếp nhận dữ liệu và thực hiện tối ưu hóa toán học thuần túy (100% From-Scratch, không phụ thuộc vào `sklearn.linear_model` hay `sklearn.svm`). Hệ thống huấn luyện đồng thời 3 trường phái học máy cơ bản, thực hiện quét lưới siêu tham số, tối ưu hóa ngưỡng quyết định dựa trên mục tiêu thực nghiệm cấu hình ($\text{Recall} \ge 0.85$), và chọn ra mô hình vô địch (Winner Model) trên tập Validation.
+Giai đoạn 3 tập trung vào huấn luyện và lựa chọn mô hình lọc thư rác. Sau khi Giai đoạn 2 tạo ra ma trận thưa 4.318 chiều, Giai đoạn 3 sử dụng dữ liệu này để huấn luyện các thuật toán tự cài đặt (100% From-Scratch, không phụ thuộc vào `sklearn.linear_model` hay `sklearn.svm`). Hệ thống huấn luyện 3 mô hình học máy, quét lưới siêu tham số và tối ưu ngưỡng quyết định theo mục tiêu thực nghiệm đã cấu hình ($\text{Recall} \ge 0.85$). Mô hình cuối cùng (Winner Model) được chọn dựa trên kết quả Validation.
 
 ```text
 [Ma trận X_train: 23.223 x 4.318] & [Vector y_train: 23.223]
@@ -39,7 +39,7 @@ Giai đoạn 3 là "trái tim giải thuật" của toàn bộ hệ thống lọ
                                           - Winner: Linear SVM (C=2.0, tau*=0.465)
 ```
 
-### Ràng Buộc Hợp Đồng Toán Học & Dữ Liệu
+### Ràng buộc toán học và dữ liệu
 
 $X_{\text{train}} \in \mathbb{R}^{23223 \times 4318}$ và $X_{\text{val}} \in \mathbb{R}^{2903 \times 4318}$ phải có cùng số cột $D = 4.318$.
 
@@ -55,7 +55,7 @@ $$
 
 ---
 
-## 2. Bóc Tách Chi Tiết Logic Chức Năng Nghiệp Vụ Từng Lớp & Từng Hàm
+## 2. Chi tiết xử lý theo lớp và hàm
 
 ### 2.1. Các Hàm Phụ Trợ Đại Số Tuyến Tính & Thuật Toán Tối Ưu Hóa Bậc Một
 
@@ -71,7 +71,7 @@ $$
 
 **Bản chất toán học:** Thuật toán **Spectral Gradient Descent** kết hợp **Bước học Barzilai-Borwein** và **Armijo Backtracking Line Search**.
 
-**Quy trình 5 bước hội tụ:**
+**Quy trình tối ưu gồm 5 bước:**
 
 **1.** *Khởi tạo:* Điểm bắt đầu $w_0 = \text{initial}$, bước học ban đầu $`\eta = \text{learning\_rate}`$.
 
@@ -150,7 +150,7 @@ J(w, b) = \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2 + \frac{1}{N} \sum_{i=1}^{N} a_
 $$
 
 **Tại sao chọn Squared Hinge Loss?**
-Hàm Standard Hinge Loss cổ điển $\max(0, 1 - \widetilde{y}z)$ có điểm gãy tại $1 - \widetilde{y}z = 0$ (đạo hàm không liên tục tại 0). Khi dùng Gradient Descent, điểm gãy này khiến nghiệm bị dao động zig-zag quanh cực tiểu. Squared Hinge Loss bình phương độ vi phạm lề, tạo ra hàm mất mát có đạo hàm bậc nhất liên tục trơn tru ($C^1$ smooth), phù hợp với bước tối ưu dùng gradient và line search; chưa có benchmark chứng minh nhanh hơn một hệ số cố định:
+Hàm Standard Hinge Loss cổ điển $\max(0, 1 - \widetilde{y}z)$ có điểm gãy tại $1 - \widetilde{y}z = 0$ (đạo hàm không liên tục tại 0). Khi dùng Gradient Descent, điểm gãy này khiến nghiệm bị dao động zig-zag quanh cực tiểu. Squared Hinge Loss bình phương độ vi phạm lề, tạo ra hàm mất mát có đạo hàm bậc nhất liên tục ($C^1$ smooth), phù hợp với bước tối ưu dùng gradient và line search; chưa có benchmark chứng minh nhanh hơn một hệ số cố định:
 
 $$
 \nabla_w J = \lambda w - \frac{2}{N} X^\top \left[ a \odot \widetilde{y} \odot \max(0, 1 - \widetilde{y} \odot (X w + b)) \right]
@@ -224,7 +224,7 @@ $$
 
 F2 ưu tiên Recall hơn F1 theo hệ số beta bình phương trong công thức. Chi phí bỏ sót và chặn nhầm phải được thỏa thuận theo ứng dụng; dữ liệu nhãn spam không tự xác nhận có mã độc.
 
-#### Phương thức `select_best_threshold`: Tối ưu hóa có Ràng buộc Sàn An toàn
+#### Phương thức `select_best_threshold`: Tối ưu hóa theo ràng buộc Recall
 
 $$
 \text{Mục tiêu cấu hình trên Validation: } \text{Recall}(\tau) \ge 0.85
@@ -282,4 +282,4 @@ Nguồn [validation_model_selection.csv](../../results/metrics/validation_model_
 
 Chưa có artifact xác nhận 98/124 vòng hội tụ, thời gian fit 1.15/1.42 giây hoặc SLA training. So sánh weighting, hinge, optimizer, calibration và nhiều seed là thí nghiệm đề xuất, chưa được chạy trong lần sửa tài liệu. Không giữ các bảng benchmark thiếu nguồn làm bằng chứng.
 
-**Bàn giao:** Model và threshold đã chọn từ Validation, cùng metadata quyết định; không dùng kết quả Test để chọn lại winner.
+**Đầu ra:** Model và threshold đã chọn từ Validation, cùng metadata quyết định; không dùng kết quả Test để chọn lại winner.

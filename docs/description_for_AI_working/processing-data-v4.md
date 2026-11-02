@@ -1,9 +1,9 @@
 Phiên bản v4. Phân chia tập dữ liệu phân tầng (Stratified Split) an toàn
-Mục tiêu của bản này là chia 29.028 mẫu sạch thành 3 tập Train, Validation và Test theo tỷ lệ phân tầng 80/10/10, đảm bảo tính bất biến của tỷ lệ nhãn và tính tái lập hoàn toàn của thực nghiệm.
+Phiên bản này chia 29.028 mẫu sạch thành 3 tập Train, Validation và Test theo tỷ lệ phân tầng 80/10/10, đảm bảo tính bất biến của tỷ lệ nhãn và tính tái lập hoàn toàn của thực nghiệm.
 
 Bước 1. Xác định vai trò của 3 tập dữ liệu
-Tập Train (80%): Dùng để học từ vựng, IDF, tham số co dãn scaler và huấn luyện trọng số mô hình.
-Tập Validation (10%): Dùng để so sánh đặc trưng Top-K, quét siêu tham số, tối ưu ngưỡng và chọn mô hình vô địch.
+Tập Train (80%): Dùng để học từ vựng, IDF, tham số co giãn scaler và huấn luyện trọng số mô hình.
+Tập Validation (10%): Dùng để so sánh đặc trưng Top-K, quét siêu tham số, tối ưu ngưỡng và chọn mô hình được chọn.
 Tập Test (10%): Đánh giá kiểm chứng khách quan cuối cùng tại mô hình và ngưỡng đã chọn.
 Tuyệt đối không gộp chung Validation và Test, không dùng Test để chọn ngưỡng.
 

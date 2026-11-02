@@ -1,5 +1,5 @@
 Phiên bản v5. Trích xuất khối đặc trưng Character n-gram TF-IDF (500 chiều)
-Mục tiêu của bản này là trích xuất 500 đặc trưng chuỗi con ký tự (character n-grams) độ dài từ 3 đến 5 ký tự nhằm chống lại các thủ thuật ngụy trang gõ sai chữ (obfuscation) thường dùng trong thư rác.
+Phiên bản này trích xuất 500 đặc trưng chuỗi con ký tự (character n-grams) độ dài từ 3 đến 5 ký tự nhằm chống lại các thủ thuật ngụy trang gõ sai chữ (obfuscation) thường dùng trong thư rác.
 
 Bước 1. Xác định sự cần thiết của Character n-grams
 Kẻ gửi thư rác thường cố tình chèn ký tự lạ hoặc gõ sai chính tả để đánh lừa bộ lọc từ vựng (ví dụ: w!n, c@sh, fr3e, v1agra).

@@ -1,4 +1,4 @@
-# Đặc Tả Kỹ Thuật Giai Đoạn 1: Tiền Xử Lý Dữ Liệu, Kiểm Toán Chất Lượng & Phân Tầng Chống Rò Rỉ (Data Preprocessing & Audit)
+# Giai đoạn 1: Tiền xử lý, đánh giá chất lượng và chia tập dữ liệu (Data Preprocessing & Audit)
 
 > **Vị trí trong Pipeline:** Giai đoạn 1 / 4 (`step_data_preprocessing`)
 > **Module nguồn:** [`src/data/loader.py`](../../src/data/loader.py), [`src/data/preprocessing.py`](../../src/data/preprocessing.py), [`src/config.py`](../../src/config.py)
@@ -6,9 +6,9 @@
 
 ---
 
-> **Cách đọc bằng chứng:** Các số liệu tham chiếu dưới đây thuộc artifact đã lưu của lần chạy 2026-10-19, không phải kết quả chạy mới khi sửa tài liệu. Lý do thiết kế là giả thuyết cần kiểm chứng; không suy ra quan hệ nhân quả chỉ từ một kết quả tốt. Thiết kế trước code nằm ở [design.md](../Algorithms/design.md).
+> **Nguồn số liệu:** Các số liệu dưới đây được lấy từ artifact của lần chạy 2026-10-19. Việc cập nhật tài liệu không bao gồm chạy lại thực nghiệm. Các lý do lựa chọn thiết kế vẫn cần được kiểm chứng; một kết quả tốt chưa đủ để xác định nguyên nhân. Phần thiết kế trước khi triển khai được trình bày tại [design.md](../Algorithms/design.md).
 
-## 1. Bối Cảnh Nghiệp Vụ & Hợp Đồng Dữ Liệu (Data Contract)
+## 1. Bối cảnh và yêu cầu dữ liệu (Data Contract)
 
 Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán học tập phân loại Spam/Ham. Dữ liệu đang dùng là tin nhắn; chưa có bằng chứng về nguồn gateway, botnet hoặc các cuộc tấn công thực tế. Mục tiêu là phát hiện bản ghi không hợp lệ, bảo toàn khả năng đối chiếu và tránh bản trùng đi qua nhiều tập.
 
@@ -28,24 +28,24 @@ Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán h
   (Học cap_word_limit)    (Áp dụng ngưỡng Train)  (Đóng băng tuyệt đối)
 ```
 
-### Hợp đồng Schema Dữ liệu Đầu Vào & Đầu Ra
-| Tên trường | Kiểu dữ liệu | Ràng buộc nghiệp vụ & Bản chất kỹ thuật |
+### Schema dữ liệu đầu vào và đầu ra
+| Tên trường | Kiểu dữ liệu | Yêu cầu và ý nghĩa của trường dữ liệu |
 | :--- | :--- | :--- |
-| `source_id` | `int64` | Chỉ số định danh bất biến nguyên thủy (bắt đầu từ 1 theo thứ tự bản ghi CSV), làm mỏ neo truy vết vết lỗi xuyên suốt pipeline. |
+| `source_id` | `int64` | Chỉ số định danh bất biến nguyên thủy (bắt đầu từ 1 theo thứ tự bản ghi CSV), dùng để truy lại bản ghi gốc khi phân tích lỗi trong pipeline. |
 | `label` | `str` $`\in \{\text{'ham'}, \text{'spam'}\}`$ | Nhãn phân loại nhị phân. Tuyệt đối không chấp nhận giá trị rỗng hoặc nhãn lạ. |
 | `text` | `str` | Nội dung nạp từ CSV; văn bản dùng cho model được tạo sau đó ở trường `model_text`. |
 | `raw_text` | `str` | Bản sao nguyên vẹn của văn bản thô ban đầu, dùng để trích xuất tín hiệu cấu trúc (chữ hoa, dấu `!`, `$`). |
 
 ---
 
-## 2. Bóc Tách Chi Tiết Logic Chức Năng Nghiệp Vụ Từng Lớp & Từng Hàm
+## 2. Chi tiết xử lý theo lớp và hàm
 
 ### 2.1. Module `src/data/loader.py`
 
 #### Hàm `resolve_data_path(custom_path: Optional[Path] = None) -> Path`
-- **Mục đích:** Phân giải và kiểm định tính hợp lệ của đường dẫn dữ liệu với cơ chế **Fail-Fast**.
+- **Mục đích:** Phân giải và kiểm định tính hợp lệ của đường dẫn dữ liệu với nguyên tắc **Fail-Fast**.
 - **Logic thực thi:**
-  1. Nếu người dùng truyền `custom_path`: Chuyển đổi sang `Path(custom_path)` và gọi `.is_file()`. Nếu không tìm thấy tệp, lập tức raise `FileNotFoundError` chỉ rõ đường dẫn lỗi. Tuyệt đối không tự ý fallback ngầm sang đường dẫn mặc định vì sẽ dẫn tới việc huấn luyện nhầm tập dữ liệu cũ mà kỹ sư không hề hay biết.
+  1. Nếu người dùng truyền `custom_path`: Chuyển đổi sang `Path(custom_path)` và gọi `.is_file()`. Nếu không tìm thấy tệp, lập tức raise `FileNotFoundError` chỉ rõ đường dẫn lỗi. Tuyệt đối không tự ý fallback ngầm sang đường dẫn mặc định vì có thể khiến người dùng huấn luyện nhầm trên tập dữ liệu cũ.
   2. Nếu `custom_path` là `None`: Duyệt danh sách 4 vị trí tiêu chuẩn (`root / 'data/raw/spam.csv'`, `root / 'data/spam.csv'`, `Path('data/raw/spam.csv')`, `Path('../data/raw/spam.csv')`). Trả về đường dẫn đầu tiên tồn tại.
 
 #### Hàm `load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True)`
@@ -61,16 +61,16 @@ Giai đoạn này chuẩn bị dữ liệu văn bản có nhãn cho bài toán h
 ### 2.2. Module `src/data/preprocessing.py`
 
 #### Lớp `_EmailHTMLTextParser(HTMLParser)` & Hàm `_extract_html_text(text: str) -> str`
-- **Mục đích:** Bóc tách an toàn nội dung văn bản từ email HTML mà không bị bẫy bởi Catastrophic Backtracking của biểu thức chính quy.
+- **Mục đích:** Trích xuất văn bản từ email HTML, tránh nguy cơ Catastrophic Backtracking khi dùng biểu thức chính quy.
 - **Logic thực thi:**
-  - Kế thừa lớp `HTMLParser` dòng sự kiện của Python với `convert_charrefs=True`, tự động giải mã các thực thể HTML (`&amp;` $\rightarrow$ `&`, `&pound;` $\rightarrow$ `£`, `&quot;` $\rightarrow$ `"`).
+  - Kế thừa lớp `HTMLParser` của Python để xử lý theo sự kiện với `convert_charrefs=True`, tự động giải mã các thực thể HTML (`&amp;` $\rightarrow$ `&`, `&pound;` $\rightarrow$ `£`, `&quot;` $\rightarrow$ `"`).
   - Khởi tạo frozenset `HTML_TAGS` chứa 65 thẻ HTML tiêu chuẩn.
   - Khi gặp thẻ bắt đầu (`handle_starttag`) hoặc thẻ đóng (`handle_endtag`): nếu thẻ nằm trong `HTML_TAGS`, chèn một khoảng trắng `' '` để tránh việc các từ ở 2 thẻ dính liền nhau (ví dụ: `<td>Hello</td><td>World</td>` $\rightarrow$ `Hello World`).
   - Nếu thẻ lạ không thuộc chuẩn HTML (ví dụ cú pháp biểu cảm `<3` hoặc đoạn code `<variable>`), phương thức giữ nguyên chuỗi văn bản gốc qua `self.get_starttag_text()` để không làm mất thông tin phân loại.
 
 #### Hàm `audit_data_quality(df, text_col='text', label_col='label') -> dict[str, int]`
 
-**Mục đích:** Kiểm toán định lượng chất lượng dữ liệu theo thứ tự ưu tiên loại trừ lẫn nhau (Mutually Exclusive).
+**Mục đích:** Thống kê lỗi dữ liệu theo thứ tự ưu tiên, sao cho mỗi bản ghi chỉ thuộc một nhóm lỗi (Mutually Exclusive).
 
 **Quy tắc 5 nhóm lỗi:**
 
@@ -84,12 +84,12 @@ $$
 
 **3.** *Conflicting Groups (Mâu thuẫn nhãn):* Các email có cùng khóa nội dung `_content_key` nhưng vừa bị gán nhãn `ham` vừa bị gán nhãn `spam` (thực tế: 738 nhóm, loại toàn bộ **1.480 dòng**).
 
-**4.** *Duplicate Rows (Bản lặp cùng nhãn):* Các email có cùng khóa nội dung và cùng nhãn, giữ bản ghi xuất hiện đầu tiên trong input và loại bỏ các bản sao (thực tế: loại **8.954 dòng**).
+**4.** *Duplicate Rows (Bản lặp cùng nhãn):* Các email có cùng khóa nội dung và cùng nhãn, giữ bản ghi xuất hiện đầu tiên trong dữ liệu đầu vào và loại bỏ các bản sao (thực tế: loại **8.954 dòng**).
 
 **5.** *Retained Clean Rows (Mẫu sạch giữ lại):* **29.028 dòng** sau lọc theo chính sách đã nêu ($16.636$ Ham, $12.392$ Spam).
 
 #### Hàm `clean_email_split(df, ...) -> pd.DataFrame`
-- **Mục đích:** Thực thi làm sạch dữ liệu toàn cục trước khi chia tập.
+- **Mục đích:** Làm sạch toàn bộ dữ liệu trước khi chia tập.
 - **Chính sách dữ liệu của dự án:** Loại toàn bộ các dòng thuộc nhóm mâu thuẫn nhãn vì chưa có căn cứ xác định nhãn đúng. Biểu quyết đa số có thể bị số bản lặp chi phối; thẩm định thủ công là phương án thay thế nếu có nguồn lực. Dữ liệu hiện tại không chứng minh nguyên nhân mâu thuẫn là botnet hay tấn công.
 
 #### Hàm `stratified_split_dataframe(...)` qua Thuật toán Hamilton Largest Remainder
@@ -112,10 +112,10 @@ Tập Validation (10%): **2.903 mẫu** ($1.664$ Ham, $1.239$ Spam).
 
 Tập Test (10%): **2.902 mẫu** ($1.663$ Ham, $1.239$ Spam).
 
-Tổng cộng: Đúng bằng $29.028$ mẫu, không lệch một mẫu nào do sai số làm tròn số học.
+Tổng cộng: Đúng bằng $29.028$ mẫu, không mất hoặc thêm mẫu do làm tròn.
 
 #### Lớp `SpamTextProcessor`
-- **Mục đích:** Xử lý văn bản phi trạng thái (Stateless Text Processor) gồm 6 phương thức nghiệp vụ:
+- **Mục đích:** Xử lý văn bản phi trạng thái (Stateless Text Processor) gồm 6 phương thức:
   1. `normalize_text(text)`: Thực thi chuỗi 7 bước chuẩn hóa (HTML $\rightarrow$ token URL `urltoken` $\rightarrow$ token tiền tệ `moneytoken` $\rightarrow$ token số `numbertoken` $\rightarrow$ lowercase/NFKC $\rightarrow$ loại bỏ ký tự lạ $\rightarrow$ lọc stop words tiếng Anh).
   2. `tokenize_words(text)`: Tách chuỗi theo khoảng trắng thành danh sách từ đơn `list[str]`.
   3. `extract_word_ngrams(tokens, n=2)`: Trượt cửa sổ thu thập các cặp từ liền kề `[' '.join(tokens[i:i+n])]`, bảo toàn cụm từ ngữ cảnh như `free entry`, `call now`.
@@ -173,4 +173,4 @@ Nguồn: [data_audit.json](../../results/metrics/data_audit.json), [loader.py](.
 
 [Test data](../../tests/test_data.py) kiểm tra nạp CSV, encoding, schema và split; [test features](../../tests/test_features.py) có ca ngưỡng độ dài chỉ fit trên Train. Các test chứng minh hành vi trên fixture, không chứng minh chất lượng mọi nhãn. Chưa có artifact ablation xác nhận mức tăng F1 do stop words, benchmark tốc độ HTMLParser hoặc đánh giá theo nhóm nhân khẩu học. Nếu có metadata nhóm hợp lệ, đủ mẫu, cần lập kế hoạch đo chênh lệch lỗi; không suy đoán nhóm từ văn bản.
 
-**Bàn giao:** Các tập sạch, định danh bản ghi và báo cáo audit; bước features sở hữu trạng thái fit như ngưỡng cắt độ dài và từ vựng.
+**Đầu ra:** Các tập sạch, định danh bản ghi và báo cáo audit; bước features sở hữu trạng thái fit như ngưỡng cắt độ dài và từ vựng.

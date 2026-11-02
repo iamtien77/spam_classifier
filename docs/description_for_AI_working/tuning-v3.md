@@ -1,9 +1,9 @@
 Phiên bản v3. Thiết lập hàm mục tiêu ràng buộc nghiệp vụ (Recall >= 0.85) và cơ chế Fallback
-Mục tiêu của bản này là cài đặt chiến lược lựa chọn ngưỡng tối ưu dựa trên ràng buộc nghiệp vụ: ưu tiên bắt trúng ít nhất 85% thư rác, sau đó tối đa hóa độ chính xác và xử lý an toàn các trường hợp hòa điểm hoặc không đạt mục tiêu.
+Phiên bản này cài đặt chiến lược lựa chọn ngưỡng tối ưu dựa trên ràng buộc nghiệp vụ: ưu tiên bắt trúng ít nhất 85% thư rác, sau đó tối đa hóa độ chính xác và xử lý an toàn các trường hợp hòa điểm hoặc không đạt mục tiêu.
 
 Bước 1. Xác định ràng buộc nghiệp vụ (Business Constraint)
 Dự án thiết lập cấu hình: recall_target = 0.85.
-Mục tiêu: Đảm bảo bộ lọc phát hiện được đại đa số thư rác để bảo vệ hòm thư người dùng.
+Mục tiêu: Đảm bảo bộ lọc phát hiện được phần lớn thư rác để bảo vệ hòm thư người dùng.
 Phương thức select_for_recall_target(threshold_df, recall_target):
 Lọc các mốc ngưỡng thỏa mãn điều kiện: threshold_df['recall'] >= 0.85.
 

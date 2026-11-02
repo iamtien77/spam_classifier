@@ -1,5 +1,5 @@
 Phiên bản v7. Ghép nối 5 khối đặc trưng lai (Hybrid Feature Matrix 4.318 chiều)
-Mục tiêu của bản này là tích hợp toàn bộ 5 khối đặc trưng độc lập thành một ma trận đặc trưng lai duy nhất bằng HybridFeatureBuilderScratch, bảo đảm tính nhất quán số chiều và quản lý thứ tự cột chặt chẽ.
+Phiên bản này tích hợp toàn bộ 5 khối đặc trưng độc lập thành một ma trận đặc trưng lai duy nhất bằng HybridFeatureBuilderScratch, bảo đảm tính nhất quán số chiều và quản lý thứ tự cột chặt chẽ.
 
 Bước 1. Xác định kiến trúc ma trận đặc trưng lai
 Ma trận đặc trưng cuối cùng là sự kết hợp theo chiều ngang (horizontal stack) của 5 khối:
@@ -24,6 +24,6 @@ Bước 3. Phương thức transform và ghép nối thưa
 Với bất kỳ DataFrame đầu vào nào (Train, Val, Test hoặc email mới khi inference):
 - Biến đổi văn bản qua từng vectorizer tương ứng.
 - Trích xuất từ khóa nhạy cảm và nhân trọng số nhóm keyword_group_weight.
-- Trích xuất đặc trưng số và co dãn qua numeric_scaler đã fit.
+- Trích xuất đặc trưng số và co giãn qua numeric_scaler đã fit.
 - Gọi CSRMatrixScratch.hstack() để ghép ngang 5 ma trận thưa thành 1 ma trận duy nhất kích thước (N, 4318).
 - Bảo đảm tính thưa và tốc độ thực thi nhanh, không bao giờ giải nén thành mảng đặc.

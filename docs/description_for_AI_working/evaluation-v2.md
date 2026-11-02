@@ -1,5 +1,5 @@
 Phiên bản v2. Tính toán bộ chỉ số đo lường hiệu năng toàn diện trên Test
-Mục tiêu của bản này là ứng dụng SpamModelEvaluator để tự tính toán bộ chỉ số đánh giá toàn diện: Accuracy, Precision, Recall, F1-Score, F2-Score, Specificity và False Positive Rate trên tập Test.
+Phiên bản này ứng dụng SpamModelEvaluator để tự tính toán bộ chỉ số đánh giá toàn diện: Accuracy, Precision, Recall, F1-Score, F2-Score, Specificity và False Positive Rate trên tập Test.
 
 Bước 1. Xác định các công thức toán học đo lường
 Dựa trên ma trận nhầm lẫn: TN = 997, FP = 666, FN = 180, TP = 1.059.
@@ -22,5 +22,5 @@ Bước 2. Tính toán các chỉ số phân loại nhị phân
    FPR = FP / (FP + TN) = 666 / 1663 = 40,05% (0.40048).
 
 Bước 3. Đánh giá sự đánh đổi thực nghiệm (Trade-off)
-Mô hình hoàn thành xuất sắc mục tiêu phát hiện 85,47% thư rác, tuy nhiên tỷ lệ chặn nhầm còn ở mức 40,05%.
+Mô hình đạt mục tiêu với tỷ lệ phát hiện thư rác là 85,47%, tuy nhiên tỷ lệ chặn nhầm còn ở mức 40,05%.
 Kết luận: Kết quả phản ánh đúng bản chất đánh đổi trong lọc thư rác thực tế, rất phù hợp cho cơ chế cảnh báo hoặc chuyển vào thư mục Spam tạm thời.

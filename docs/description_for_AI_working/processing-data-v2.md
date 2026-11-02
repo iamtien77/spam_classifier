@@ -1,7 +1,7 @@
 Phiên bản v2. Xử lý và chuẩn hóa văn bản chuyên sâu cho bài toán Spam
-Mục tiêu của bản này là nâng cấp quá trình làm sạch văn bản, loại bỏ mã HTML, thế chỗ các tín hiệu nhạy cảm bằng token chuyên biệt và lọc stop-words nhưng bảo toàn các từ phủ định.
+Phiên bản này nâng cấp quá trình làm sạch văn bản, loại bỏ mã HTML, thế chỗ các tín hiệu nhạy cảm bằng token chuyên biệt và lọc stop-words nhưng bảo toàn các từ phủ định.
 
-Bước 1. Xác định mục tiêu nâng cấp so với v1
+Bước 1. Nội dung bổ sung so với v1
 Chuyển đổi văn bản tự do thành dạng văn bản mô hình (model_text) được chuẩn hóa.
 Bảo toàn các tín hiệu có giá trị phân biệt cao (như URL, tiền tệ, số điện thoại) dưới dạng token đại diện.
 Tránh làm mất các từ phủ định quan trọng khi loại bỏ stop-words.

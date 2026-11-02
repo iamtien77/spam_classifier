@@ -1,5 +1,5 @@
 Phiên bản v1. Đánh giá độc lập trên Test set và ma trận nhầm lẫn
-Mục tiêu của bản này là thực hiện kiểm chứng khách quan mô hình chiến thắng Linear SVM (Tuned) trên tập Test độc lập (2.902 mẫu) tại ngưỡng tối ưu đã chốt tau* = 0.465, tính toán chi tiết 4 thành phần ma trận nhầm lẫn.
+Phiên bản này thực hiện kiểm chứng khách quan mô hình được chọn Linear SVM (Tuned) trên tập Test độc lập (2.902 mẫu) tại ngưỡng tối ưu đã chốt tau* = 0.465, tính toán chi tiết 4 thành phần ma trận nhầm lẫn.
 
 Bước 1. Nguyên tắc đánh giá độc lập bất biến
 Tập Test gồm 2.902 mẫu (1.663 Ham, 1.239 Spam).
@@ -15,7 +15,7 @@ y_pred = (probs >= 0.465).astype(int).
 Bước 3. Tính toán 4 thành phần ma trận nhầm lẫn (Confusion Matrix)
 Sử dụng hàm compute_confusion_matrix() trong SpamModelEvaluator.
 Quy ước: Hàng là nhãn thực tế, Cột là nhãn dự đoán.
-Ghi nhận kết quả định lượng chính xác:
+Kết quả ghi nhận:
 - True Negatives (TN): 997 mẫu (Email hợp lệ được phân loại đúng là Ham).
 - False Positives (FP): 666 mẫu (Email hợp lệ bị chặn nhầm thành Spam).
 - False Negatives (FN): 180 mẫu (Email rác bị bỏ sót, gán nhầm thành Ham).

@@ -1,5 +1,5 @@
 Phiên bản v3. Tự cài đặt và đánh giá chỉ số ROC-AUC bằng thống kê thứ bậc Wilcoxon
-Mục tiêu của bản này là tự xây dựng hàm compute_roc_auc() từ đầu dựa trên thống kê xếp hạng Wilcoxon-Mann-Whitney có xử lý điểm số đồng hạng (ties handling), đánh giá năng lực phân biệt thứ bậc của mô hình mà không phụ thuộc vào ngưỡng.
+Phiên bản này tự xây dựng hàm compute_roc_auc() từ đầu dựa trên thống kê xếp hạng Wilcoxon-Mann-Whitney có xử lý điểm số đồng hạng (ties handling), đánh giá năng lực phân biệt thứ bậc của mô hình mà không phụ thuộc vào ngưỡng.
 
 Bước 1. Xác định ý nghĩa của chỉ số ROC-AUC trong bài toán lọc thư rác
 ROC-AUC đo lường xác suất một email Spam được mô hình gán điểm số cao hơn một email Ham được chọn ngẫu nhiên.
@@ -21,4 +21,4 @@ Bước 3. Kết quả đánh giá ROC-AUC trên tập Test
 - Logistic Regression (Tuned): ROC-AUC = 81,38% (0.81381).
 - SpamVotingEnsemble (Tuned): ROC-AUC = 80,26% (0.80258).
 - Complement Naive Bayes (Tuned): ROC-AUC = 75,22% (0.75219).
-Kết quả ROC-AUC vượt 81% khẳng định mô hình Linear SVM có năng lực phân tách thứ bậc điểm số rất vững chắc.
+Kết quả ROC-AUC vượt 81% khẳng định mô hình Linear SVM có khả năng phân biệt hai lớp qua thứ hạng điểm số tốt.

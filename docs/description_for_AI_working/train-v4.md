@@ -1,5 +1,5 @@
 Phiên bản v4. Huấn luyện Logistic Regression với Spectral Gradient Descent và Armijo Backtracking
-Mục tiêu của bản này là cài đặt và huấn luyện mô hình xác suất Logistic Regression từ đầu bằng Spectral Gradient Descent kết hợp Armijo Backtracking trên hàm mất mát Binary Cross-Entropy có điều chuẩn L2, cung cấp mô hình phân loại có tính giải thích cao.
+Phiên bản này cài đặt và huấn luyện mô hình xác suất Logistic Regression từ đầu bằng Spectral Gradient Descent kết hợp Armijo Backtracking trên hàm mất mát Binary Cross-Entropy có điều chuẩn L2, cung cấp mô hình phân loại có tính giải thích cao.
 
 Bước 1. Xác định hàm mục tiêu Binary Cross-Entropy (BCE)
 Mô hình hóa xác suất một email là Spam bằng hàm Sigmoid:
@@ -22,4 +22,4 @@ Thay thế vòng lặp giảm bước học cố định (dễ bị kẹt tại 
 Bước 3. Dự đoán xác suất hậu nghiệm
 Phương thức predict_proba(X): Xuất mảng xác suất 2 cột [1 - p, p], trong đó p là xác suất email là Spam.
 Phương thức predict(X, threshold): So sánh p với threshold để phân loại nhị phân.
-Mô hình Logistic Regression hoàn thành huấn luyện, sẵn sàng cho khâu tuning và so sánh đối đầu.
+Sau khi huấn luyện, Logistic Regression được chuyển sang bước tuning và so sánh.

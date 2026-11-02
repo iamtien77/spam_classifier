@@ -1,14 +1,14 @@
 Bản v2. Phân tích phân bố nhãn và kiểm tra dữ liệu thiếu
-Mục tiêu của bản này là nâng cấp EDA v1, đi sâu vào kiểm tra chất lượng nhãn, phát hiện giá trị thiếu (missing values) và đo lường chính xác tỷ lệ mất cân bằng.
+Phiên bản này nâng cấp EDA v1, đi sâu vào kiểm tra chất lượng nhãn, phát hiện giá trị thiếu (missing values) và đo lường chính xác tỷ lệ mất cân bằng.
 
-Bước 1. Xác định mục tiêu nâng cấp so với EDA v1
+Bước 1. Nội dung bổ sung so với EDA v1
 Bổ sung kiểm tra missing values chi tiết trên từng cột.
 Xác định các nhãn không hợp lệ (không phải ham hoặc spam).
-Đo lường mức độ ảnh hưởng của dữ liệu khuyết thiếu đối với bài toán phân loại.
+Đo lường mức độ ảnh hưởng của dữ liệu thiếu đối với bài toán phân loại.
 
 Bước 2. Kiểm tra missing values trên toàn bộ DataFrame
 Đếm số lượng giá trị null, NaN, None trên cột nhãn.
-Đếm số lượng giá trị null hoặc chuỗi trắng trên cột nội dung văn bản.
+Đếm số lượng giá trị null hoặc chuỗi chỉ chứa khoảng trắng trên cột nội dung văn bản.
 Tính tỷ lệ phần trăm missing values tương ứng trên tổng số mẫu.
 Ghi nhận các trường hợp văn bản trống hoàn toàn để chuẩn bị xử lý ở khâu data cleaning.
 

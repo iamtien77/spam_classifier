@@ -1,5 +1,5 @@
 Phiên bản v6. Đóng gói mô hình (Model Persistence) và kiểm toán toàn vẹn mã nguồn (21 SHA-256)
-Mục tiêu của bản này là ứng dụng module persistence.py để đóng gói mô hình đã fit, các bộ vector hóa, danh sách đặc trưng đã chọn và ngưỡng tối ưu thành một artifact duy nhất bằng joblib, đồng thời tính toán 21 mã băm SHA-256 đối chiếu toàn vẹn mã nguồn.
+Phiên bản này ứng dụng module persistence.py để đóng gói mô hình đã fit, các bộ vector hóa, danh sách đặc trưng đã chọn và ngưỡng tối ưu thành một artifact duy nhất bằng joblib, đồng thời tính toán 21 mã băm SHA-256 đối chiếu toàn vẹn mã nguồn.
 
 Bước 1. Thiết kế cấu trúc gói suy luận (Persistence Bundle)
 Gói triển khai phải chứa đầy đủ mọi thành phần cần thiết để suy luận độc lập trên văn bản thô mới mà không cần nạp lại dữ liệu huấn luyện:

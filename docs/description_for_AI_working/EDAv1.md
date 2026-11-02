@@ -1,5 +1,5 @@
 Bản v1. Kế hoạch EDA ban đầu
-Mục tiêu của bản này là phác thảo các bước phân tích dữ liệu email spam/ham ở mức nền tảng trước khi notebook được bổ sung thêm trực quan hóa, audit và kiểm chứng chi tiết.
+Phiên bản này phác thảo các bước phân tích dữ liệu email spam/ham ở mức nền tảng trước khi notebook được bổ sung thêm trực quan hóa, audit và kiểm chứng chi tiết.
 
 Bước 1. Nạp dữ liệu vào DataFrame
 Đọc file dữ liệu gốc data/raw/spam.csv vào DataFrame.

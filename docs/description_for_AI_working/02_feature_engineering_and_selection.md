@@ -1,4 +1,4 @@
-# Đặc Tả Kỹ Thuật Giai Đoạn 2: Kỹ Nghệ Đặc Trưng Lai, Ma Trận Thưa Tự Viết & Lựa Chọn Top-K (Feature Engineering & Selection)
+# Giai đoạn 2: Xây dựng đặc trưng lai, ma trận thưa và lựa chọn Top-K (Feature Engineering & Selection)
 
 > **Vị trí trong Pipeline:** Giai đoạn 2 / 4 (`step_data_preprocessing` - Phần 2)
 > **Module nguồn:** [`src/features/feature_engineering.py`](../../src/features/feature_engineering.py), [`src/config.py`](../../src/config.py)
@@ -6,9 +6,9 @@
 
 ---
 
-> **Cách đọc bằng chứng:** Các số liệu tham chiếu dưới đây thuộc artifact đã lưu của lần chạy 2026-10-19, không phải kết quả chạy mới khi sửa tài liệu. Lý do thiết kế là giả thuyết cần kiểm chứng; không suy ra quan hệ nhân quả chỉ từ một kết quả tốt. Thiết kế trước code nằm ở [design.md](../Algorithms/design.md).
+> **Nguồn số liệu:** Các số liệu dưới đây được lấy từ artifact của lần chạy 2026-10-19. Việc cập nhật tài liệu không bao gồm chạy lại thực nghiệm. Các lý do lựa chọn thiết kế vẫn cần được kiểm chứng; một kết quả tốt chưa đủ để xác định nguyên nhân. Phần thiết kế trước khi triển khai được trình bày tại [design.md](../Algorithms/design.md).
 
-## 1. Bối Cảnh Nghiệp Vụ & Hợp Đồng Không Gian Đặc Trưng (Feature Contract)
+## 1. Bối cảnh và yêu cầu biểu diễn đặc trưng (Feature Contract)
 
 Trong bài toán phân loại email rác, việc chỉ dựa vào các từ đơn lẻ (Word Unigram) thường khiến mô hình dễ bị qua mặt bởi các thủ thuật của spammer như nhồi từ khóa (Keyword Stuffing), cố tình gõ sai chính tả (Obfuscation), hoặc chèn các liên kết lừa đảo ẩn dưới văn bản bình thường. Để khảo sát khả năng bổ sung tín hiệu, hệ thống triển khai kiến trúc **Không gian Đặc trưng Lai 5 Khối (Hybrid Feature Representation)** với tổng số chiều $D = 4.318$.
 
@@ -31,8 +31,8 @@ Trong bài toán phân loại email rác, việc chỉ dựa vào các từ đơ
   (Dung lượng và độ thưa cần đo theo ma trận và môi trường cụ thể)
 ```
 
-### Cấu Trúc Phân Lát Không Gian Đặc Trưng (Feature Slices)
-| Tên khối đặc trưng | Khoảng chỉ số cột | Số chiều | Mục đích an ninh thông tin |
+### Phân chia các khối đặc trưng (Feature Slices)
+| Tên khối đặc trưng | Khoảng chỉ số cột | Số chiều | Vai trò của đặc trưng |
 | :--- | :--- | :---: | :--- |
 | `word` (Unigram) | $[0, 3000)$ | 3.000 | Nhận diện các từ vựng xuất hiện phổ biến trong email (`claim`, `offer`, `prize`). |
 | `bigram` (Bigram) | $[3000, 3800)$ | 800 | Bắt ngữ cảnh cục bộ hai từ liền kề (`free entry`, `call now`, `click here`). |
@@ -43,7 +43,7 @@ Trong bài toán phân loại email rác, việc chỉ dựa vào các từ đơ
 
 ---
 
-## 2. Bóc Tách Chi Tiết Logic Chức Năng Nghiệp Vụ Từng Lớp & Từng Phương Thức
+## 2. Chi tiết xử lý theo lớp và phương thức
 
 ### 2.1. Lớp `CSRMatrixScratch`: Cấu Trúc Ma Trận Thưa Tự Cài Đặt (Compressed Sparse Row)
 
@@ -52,7 +52,7 @@ Lớp `CSRMatrixScratch` được tự cài đặt từ đầu bằng thư việ
 - `indices`: Mảng số nguyên không âm `array('I')` lưu chỉ số cột tương ứng (uint32).
 - `indptr`: Mảng con trỏ hàng `array('Q')` lưu vị trí bắt đầu và kết thúc của từng hàng (uint64).
 
-#### 6 Bất biến Toán học Bảo đảm Tính Toàn vẹn Vùng nhớ C (Memory Invariants)
+#### 6 điều kiện cấu trúc cần duy trì (Memory Invariants)
 1. `shape` gồm đúng 2 số nguyên không âm: `(n_rows, n_cols)`.
 2. `len(data) == len(indices)` (mỗi phần tử dữ liệu phải có chỉ số cột tương ứng).
 3. `len(indptr) == shape[0] + 1` (số con trỏ dòng luôn bằng số hàng cộng 1).
@@ -80,7 +80,7 @@ Không duyệt qua các phần tử 0; chưa có benchmark trong artifact để 
 
 `transpose_dot(values)`: Thực hiện phép nhân chuyển vị $g = X^\top \cdot v$ trong thời gian $O(\text{nnz})$ mà **không cần cấp phát ma trận chuyển vị $X^\top$ trong RAM**, phục vụ tính gradient mà không tạo bản dense.
 
-`to_dense(max_cells=100_000)`: Chuyển đổi sang mảng đặc có chốt chặn an toàn `max_cells` để giới hạn số ô của thao tác chuyển dense này; không thay thế kiểm soát RAM toàn pipeline.
+`to_dense(max_cells=100_000)`: Chuyển đổi sang mảng đặc có giới hạn an toàn `max_cells` để giới hạn số ô của thao tác chuyển dense này; không thay thế kiểm soát RAM toàn pipeline.
 
 ---
 
@@ -90,7 +90,7 @@ Không duyệt qua các phần tử 0; chưa có benchmark trong artifact để 
 - Thiết lập các siêu tham số vector hóa. Bộ lọc `min_df=2` loại bỏ toàn bộ các từ chỉ xuất hiện đúng 1 lần trên tập Train để giảm từ hiếm, đồng thời có thể loại tín hiệu spam hiếm.
 
 #### Phương thức tĩnh `_tokens(document)`
-- Nhận diện thông minh kiểu dữ liệu đầu vào: nếu là chuỗi `str` thì gọi `.split()`; nếu đã là danh sách `list[str]` (đối với Bigram hoặc Char N-gram đã được trích xuất sẵn), giữ nguyên cấu trúc n-gram, tuyệt đối không gọi `.split()` làm phá vỡ ngữ cảnh.
+- Kiểm tra kiểu dữ liệu đầu vào: nếu là chuỗi `str` thì gọi `.split()`; nếu đã là danh sách `list[str]` (đối với Bigram hoặc Char N-gram đã được trích xuất sẵn), giữ nguyên cấu trúc n-gram, tuyệt đối không gọi `.split()` làm phá vỡ ngữ cảnh.
 
 #### Phương thức `fit(raw_documents)` (Chỉ học trên Train set)
 
@@ -130,15 +130,15 @@ $$
 
 ---
 
-### 2.3. Lớp `MaxAbsScalerScratch`: Co Dãn Đặc Trưng Bảo Toàn 100% Độ Thưa
+### 2.3. Lớp `MaxAbsScalerScratch`: Co Giãn Đặc Trưng Bảo Toàn 100% Độ Thưa
 
-Lớp `MaxAbsScalerScratch` thực hiện co dãn từng cột đặc trưng số học bằng cực đại tuyệt đối học trên Train; với đầu vào không âm, Train nằm trong $[0, 1]$, nhưng giá trị mới lớn hơn cực đại Train có thể vượt 1:
+Lớp `MaxAbsScalerScratch` thực hiện co giãn từng cột đặc trưng số học bằng cực đại tuyệt đối học trên Train; với đầu vào không âm, Train nằm trong $[0, 1]$, nhưng giá trị mới lớn hơn cực đại Train có thể vượt 1:
 
 $$
 M_j = \max_{i \in \mathrm{Train}} |x_{ij}|, \quad x'_{ij} = \frac{x_{ij}}{\begin{cases}M_j & M_j > 0 \\ 1 & M_j = 0\end{cases}}
 $$
 
-**Bản chất an ninh mạng & bộ nhớ:** Phép chia cho cực đại $M_j$ đảm bảo: nếu $x_{ij} = 0$ thì $x'_{ij} = 0$. Không làm biến đổi bất kỳ vị trí số 0 nào của ma trận. Giữ vị trí các số 0; dung lượng vẫn phụ thuộc số mẫu, số cột và nnz.
+**Ảnh hưởng đến bộ nhớ:** Phép chia cho cực đại $M_j$ đảm bảo: nếu $x_{ij} = 0$ thì $x'_{ij} = 0$. Không làm biến đổi bất kỳ vị trí số 0 nào của ma trận. Giữ vị trí các số 0; dung lượng vẫn phụ thuộc số mẫu, số cột và nnz.
 
 **Bảo toàn tính không âm:** Phép chia cho scale dương giữ tính không âm nếu input không âm; không clipping giá trị Validation/Test về $[0, 1]$.
 
@@ -151,7 +151,7 @@ $$
 - `compute_combined_importance(X_train, y_train, nb_model)`: Kết hợp 55% chênh lệch trọng số NB, 35% Chi-Square và 10% activity (tổng giá trị cột qua log1p), sau chuẩn hóa điểm. Khi không truyền NB đã fit, nhánh NB dùng lại Chi-Square; main.py hiện đi qua nhánh này.
 - `sweep_top_k(...)`: Quét lưới số lượng đặc trưng Top-K (`K = 500, 1000, 1500, 2000, 2500, 3000, 4318` trong artifact tham chiếu) trên tập Validation:
   - **Kết quả tham chiếu:** `top_k_sweep.csv` chọn 4.318 cột theo fallback Recall cao nhất vì mọi cấu hình đều chưa đạt 0.85; tại đó proxy CNB có Recall 64.65% và F1 64.49%. Đây không phải F1 của SVM sau tuning. Không thể quy nguyên nhân kết quả Top-K cho regularization của LR/SVM.
-  - Danh sách chỉ số cột `selected_indices` được chốt và khóa cứng để đưa vào đối tượng `FittedFeatureTransform`.
+  - Danh sách chỉ số cột `selected_indices` được chốt và cố định để đưa vào đối tượng `FittedFeatureTransform`.
 
 ---
 
@@ -196,4 +196,4 @@ khóa selected_indices; dùng cùng thứ tự đó cho mọi transform tiếp t
 - [test_features.py](../../tests/test_features.py) kiểm tra TF-IDF, scaler, hybrid và cap chỉ fit trên Train; [test_review_regressions.py](../../tests/test_review_regressions.py) kiểm tra bảo toàn thứ tự cột.
 - Chưa có artifact benchmark xác nhận 98.54% độ thưa, RAM 15 MB, latency 1.12 ms hay SLA. Muốn báo các số này phải đo trên dữ liệu, phần cứng, dtype và phiên bản cụ thể. So sánh ablation/seed bổ sung là việc cần thực nghiệm, chưa được thực hiện bởi lần sửa tài liệu này.
 
-**Bàn giao:** Builder, thứ tự cột đã chọn và các ma trận; training không được fit lại builder trên Validation/Test.
+**Đầu ra:** Builder, thứ tự cột đã chọn và các ma trận; training không được fit lại builder trên Validation/Test.

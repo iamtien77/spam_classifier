@@ -1,5 +1,5 @@
 Phiên bản v1. Nạp dữ liệu thô và chuẩn hóa Schema
-Mục tiêu của bản này là xây dựng luồng nạp dữ liệu an toàn, xử lý linh hoạt các bảng mã (encoding fallback) và đưa các định dạng cột khác nhau về một cấu trúc schema thống nhất.
+Phiên bản này xây dựng luồng nạp dữ liệu an toàn, xử lý linh hoạt các bảng mã (encoding fallback) và đưa các định dạng cột khác nhau về một cấu trúc schema thống nhất.
 
 Bước 1. Xác định yêu cầu nạp dữ liệu an toàn
 Đảm bảo file đầu vào được nạp chính xác từ data/raw/spam.csv.

@@ -1,5 +1,5 @@
 Phiên bản v2. Thiết kế bộ dò ngưỡng tự xây dựng (ThresholdOptimizerScratch)
-Mục tiêu của bản này là cài đặt lớp ThresholdOptimizerScratch để quét lưới 200 mốc ngưỡng phân vị xác suất trên tập Validation và tính toán chi tiết toàn bộ bảng chỉ số tương ứng tại từng mốc.
+Phiên bản này cài đặt lớp ThresholdOptimizerScratch để quét lưới 200 mốc ngưỡng phân vị xác suất trên tập Validation và tính toán chi tiết toàn bộ bảng chỉ số tương ứng tại từng mốc.
 
 Bước 1. Thiết kế lưới ngưỡng quét (Threshold Grid)
 Triển khai lớp ThresholdOptimizerScratch trong src/models/tuning.py.
@@ -23,4 +23,4 @@ Phương thức compute_metrics_at_threshold(y_true, probs, threshold):
 Bước 3. Xuất bảng dữ liệu đánh giá ngưỡng (Metrics Table)
 Phương thức metrics_table(y_true, probs):
 Duyệt qua toàn bộ 200 mốc ngưỡng, tính toán và lưu vào DataFrame gồm 200 hàng.
-DataFrame này cung cấp bức tranh toàn cảnh về sự đánh đổi giữa Precision và Recall khi ngưỡng thay đổi từ thấp đến cao.
+DataFrame này cung cấp cái nhìn tổng quan về sự đánh đổi giữa Precision và Recall khi ngưỡng thay đổi từ thấp đến cao.

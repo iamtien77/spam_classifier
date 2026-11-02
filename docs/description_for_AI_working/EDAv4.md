@@ -1,7 +1,7 @@
 Bản v4. Phân tích các tín hiệu spam cấu trúc (Spam Signal Analysis)
-Mục tiêu của bản này là khảo sát và đo lường tần suất xuất hiện của các tín hiệu cấu trúc đặc trưng trong email như liên kết URL, ký hiệu tiền tệ, chữ số và tỷ lệ chữ hoa giữa Ham và Spam.
+Phiên bản này khảo sát và đo lường tần suất xuất hiện của các tín hiệu cấu trúc đặc trưng trong email như liên kết URL, ký hiệu tiền tệ, chữ số và tỷ lệ chữ hoa giữa Ham và Spam.
 
-Bước 1. Xác định mục tiêu nâng cấp so với EDA v3
+Bước 1. Nội dung bổ sung so với EDA v3
 Mở rộng phân tích từ độ dài đơn thuần sang các đặc tính cấu trúc đặc trưng của email spam.
 Đo lường độ chênh lệch xuất hiện của các tín hiệu số giữa hai lớp để kiểm chứng giả thuyết phân loại.
 
@@ -9,7 +9,7 @@ Bước 2. Phân tích sự xuất hiện của liên kết URL
 Định nghĩa mẫu regex nhận diện URL thống nhất: các liên kết bắt đầu bằng http://, https:// hoặc www. kèm nội dung hợp lệ theo sau.
 Tính tỷ lệ email chứa URL trong lớp Spam so với lớp Ham.
 Kết quả cho thấy email Spam có tỷ lệ chứa URL cao vượt trội so với email Ham thông thường.
-Ghi nhận cờ nhị phân has_url là một đặc trưng phân loại cực kỳ mạnh mẽ.
+Ghi nhận has_url là một cờ nhị phân có khả năng phân biệt hai lớp rõ rệt.
 
 Bước 3. Phân tích sự xuất hiện của chữ số và ký hiệu tiền tệ
 Đếm số lượng chữ số (digit_count) và cờ nhị phân has_number trong từng email.

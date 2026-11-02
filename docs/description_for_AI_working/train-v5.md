@@ -1,5 +1,5 @@
 Phiên bản v5. Xây dựng mô hình tổ hợp biểu quyết (SpamVotingEnsemble)
-Mục tiêu của bản này là cài đặt lớp SpamVotingEnsemble để kết hợp dự đoán giữa 3 mô hình nền tảng (Logistic Regression, Linear SVM, Complement Naive Bayes) theo cơ chế Soft Voting và Hard Voting nhằm giảm phương sai dự đoán.
+Phiên bản này cài đặt lớp SpamVotingEnsemble để kết hợp dự đoán giữa 3 mô hình nền tảng (Logistic Regression, Linear SVM, Complement Naive Bayes) theo cơ chế Soft Voting và Hard Voting nhằm giảm phương sai dự đoán.
 
 Bước 1. Xác định kiến trúc tổ hợp biểu quyết
 Mô hình tổ hợp tiếp nhận từ điển 3 mô hình đã huấn luyện: models = {'lr': model_lr, 'svm': model_svm, 'nb': model_nb}.
@@ -19,5 +19,5 @@ Phương thức predict_hard(X):
 2. Áp dụng quy tắc đa số phiếu: Nhãn cuối cùng là nhãn nhận được từ 2/3 phiếu bầu trở lên.
 
 Bước 4. Đánh giá tính sẵn sàng của mô hình tổ hợp
-SpamVotingEnsemble đóng gói hoàn tất giao diện fit/predict/predict_proba, sẵn sàng tham gia quy trình Model Selection trên tập Validation như một ứng viên độc lập.
-Toàn bộ giai đoạn Model Training chính thức hoàn tất.
+SpamVotingEnsemble cung cấp giao diện fit/predict/predict_proba và được đánh giá như một ứng viên riêng trong bước Model Selection trên tập Validation.
+Đây là bước cuối của giai đoạn Model Training.

@@ -1,5 +1,5 @@
 Phiên bản v2. Huấn luyện mô hình cơ sở Complement Naive Bayes From-Scratch
-Mục tiêu của bản này là cài đặt và huấn luyện mô hình Complement Naive Bayes (CNB) từ đầu, tận dụng cơ chế học từ tập phần bù của lớp để khắc phục triệt để hiện tượng mất cân bằng nhãn và chênh lệch độ dài văn bản.
+Phiên bản này cài đặt và huấn luyện mô hình Complement Naive Bayes (CNB) từ đầu, tận dụng cơ chế học từ tập phần bù của lớp để khắc phục ảnh hưởng của mất cân bằng nhãn và chênh lệch độ dài văn bản.
 
 Bước 1. Xác định ưu thế của Complement Naive Bayes
 Multinomial Naive Bayes thông thường dễ bị thiên lệch về lớp Ham chiếm đa số.
@@ -21,4 +21,4 @@ Hàm predict_proba(X):
 - Lấy exp(z - max(z)) để tránh tràn số (overflow).
 - Chia cho tổng exp trên mỗi dòng để thu được phân phối xác suất p in [0, 1].
 Trích xuất cột xác suất lớp 1 (Spam) để chuyển sang module tối ưu hóa ngưỡng trên tập Validation.
-Mô hình CNB hoàn thành huấn luyện, sẵn sàng làm baseline so sánh.
+CNB sau huấn luyện được dùng làm baseline để so sánh với các mô hình khác.

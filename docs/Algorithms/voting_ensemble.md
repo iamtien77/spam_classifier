@@ -5,19 +5,19 @@
 
 ---
 
-## 1. Purpose (Mục đích & Động lực lựa chọn)
+## 1. Mục đích và lý do lựa chọn
 
 ### 1.1. Mục đích bài toán
-Trong học máy ứng dụng, một mô hình đơn lẻ có thể gặp phải các điểm mù (Blind spots) hoặc sai số cục bộ do đặc thù hàm mất mát và không gian giả thuyết của nó. 
+Mỗi mô hình có thể dự đoán sai ở những nhóm văn bản khác nhau do cách học và hàm mất mát riêng. Dự án thử kết hợp các mô hình để xem những khác biệt này có giúp cải thiện kết quả hay không.
 
 Mục đích của phương pháp **Voting Ensemble** trong dự án:
-- Tổng hợp sức mạnh phân loại từ ba họ thuật toán có nguyên lý hoạt động hoàn toàn khác nhau:
+- Kết hợp dự đoán từ ba thuật toán sử dụng cách học khác nhau:
   1. **Linear SVM:** Tối ưu hóa siêu phẳng lề cực đại dựa trên các điểm hỗ trợ (Support Vectors).
   2. **Logistic Regression:** Ước lượng xác suất log-odds toàn cục trên toàn bộ mẫu dữ liệu.
   3. **Complement Naive Bayes:** Phân tích tần suất từ vựng trên tập phần bù của lớp.
 - Kiểm tra liệu việc kết hợp các mô hình có giảm sai số trên tập Validation hay không; hiệu quả giảm phương sai cần được xác minh qua nhiều lần chia dữ liệu.
 
-### 1.2. Cơ chế hoạt động & Toán học kết hợp
+### 1.2. Cách kết hợp dự đoán
 Lớp `SpamVotingEnsemble` hỗ trợ hai cơ chế kết hợp:
 
 #### A. Soft Voting (Bỏ phiếu mềm - Mặc định trong pipeline tham chiếu)
@@ -36,21 +36,21 @@ $$
 \hat{y}_{\text{ensemble}} = \operatorname{mode}\left( \{\hat{y}_1, \hat{y}_2, \dots, \hat{y}_M\} \right)
 $$
 
-### 1.3. Đánh đổi & Failure Modes
-- **Trade-offs:** Soft Voting sử dụng điểm số của ba mô hình; thang điểm chưa calibration có thể khiến một thành viên ảnh hưởng quá mức. Chi phí suy luận gồm ba lần dự đoán; chi phí huấn luyện tăng nếu phải fit cả ba mô hình.
-- **Failure Modes:** 
-  - **Hiệu ứng kéo tụt (Dragging Down Effect):** CNB có Test Accuracy $64.71\%$, thấp hơn Linear SVM ($70.85\%$) và LR ($70.74\%$); điểm Ensemble cũng thấp hơn winner trong lần chạy tham chiếu. Chưa có ablation về trọng số/calibration để kết luận riêng CNB là nguyên nhân.
+### 1.3. Đánh đổi và các trường hợp dễ dự đoán sai
+- **Đánh đổi:** Soft Voting sử dụng điểm số của ba mô hình; thang điểm chưa calibration có thể khiến một thành viên ảnh hưởng quá mức. Chi phí suy luận gồm ba lần dự đoán; chi phí huấn luyện tăng nếu phải fit cả ba mô hình.
+- **Các trường hợp dễ dự đoán sai:**
+  - **Kết hợp mô hình chưa cải thiện kết quả:** CNB có Test Accuracy $64.71\%$, thấp hơn Linear SVM ($70.85\%$) và LR ($70.74\%$); điểm Ensemble cũng thấp hơn winner trong lần chạy tham chiếu. Chưa có ablation về trọng số/calibration để kết luận riêng CNB là nguyên nhân.
 
 ---
 
-## 2. Input / Output (Đặc tả dữ liệu vào / ra)
+## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-### 2.1. Input
+### 2.1. Đầu vào
 - **Danh sách mô hình thành phần (Estimators):** Bộ ba mô hình [`LogisticRegressionFromScratch`](../../src/models/classifiers.py#L142), [`LinearSVMFromScratch`](../../src/models/classifiers.py#L218) và [`NaiveBayesClassifier`](../../src/models/classifiers.py#L330).
 - **Ma trận đặc trưng $X$:** Kích thước $(N, D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc ma trận thưa chuẩn; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
 - **Nhãn mục tiêu $y$:** Vector nhãn nhị phân $`\{0, 1\}`$.
 
-### 2.2. Output
+### 2.2. Đầu ra
 
 **Điểm Soft Voting ($\hat{p}_{\text{soft}}$):** Vector $N$ phần tử trong đoạn $[0, 1]$; tên biến giữ theo API, giá trị chưa calibration.
 
@@ -64,7 +64,7 @@ Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 
 ---
 
-## 3. Data used (Dữ liệu sử dụng)
+## 3. Dữ liệu sử dụng
 
 - **Train set:** $23.223$ mẫu ($13.309$ Ham, $9.914$ Spam) - Dùng huấn luyện độc lập cho cả 3 mô hình thành phần.
 - **Validation set:** $2.903$ mẫu ($1.664$ Ham, $1.239$ Spam) - Dùng tổng hợp điểm số và quét lưới ngưỡng $\tau^*$.
@@ -73,26 +73,26 @@ Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 
 ---
 
-## 4. Evaluation (Phương pháp đánh giá)
+## 4. Phương pháp đánh giá
 
 - Tối ưu hóa ngưỡng qua [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27) với điều kiện tiên quyết $\text{Recall} \ge 0.85$.
 - Trong lần chạy tham chiếu, ngưỡng chọn trên Validation là $0.365$ (Default) và $0.385$ (Tuned); các giá trị này phụ thuộc thang điểm và trọng số từng nhánh.
 
 ---
 
-## 5. Status (Trạng thái triển khai trong dự án)
+## 5. Trạng thái triển khai
 
 - **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy trong module `src/models/ensemble.py`.
 - **Kiểm thử tự động:** Vượt qua $51/51$ tests trong thư mục [`tests/`](../../tests).
 - **Vị trí xếp hạng:** Xếp hạng 5 (nhánh Tuned) và hạng 6 (nhánh Default) trên tập Validation.
-- **Kết luận kiến trúc:** Mô hình Ensemble được đưa vào quy trình so sánh công bằng như mọi ứng viên độc lập khác. Vì không đạt điểm Validation Accuracy cao hơn Linear SVM, Ensemble không được chọn làm mô hình cuối cùng để triển khai, đảm bảo tính thực nghiệm khách quan và tiết kiệm tài nguyên tính toán.
+- **Kết quả lựa chọn:** Ensemble được đánh giá theo cùng quy trình với các mô hình đơn lẻ. Do Validation Accuracy thấp hơn Linear SVM, Ensemble không được chọn để triển khai. Kết quả này cho thấy trong lần thử hiện tại, việc kết hợp ba mô hình chưa mang lại lợi ích tương xứng với chi phí tính toán.
 
 ---
 
-## 6. Results (Kết quả thực nghiệm định lượng)
+## 6. Kết quả thực nghiệm
 
 ### 6.1. Kết quả trên tập Validation
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
+*(Nguồn số liệu: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 
 | Cấu hình Ensemble | Ngưỡng ($\tau^*$) | Accuracy | Precision | Recall | F1-Score | F2-Score | Thứ hạng |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -100,7 +100,7 @@ Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 | **SpamVotingEnsemble (Default)**| **$0.365$** | **$68.72\%$** | $59.15\%$ | $86.36\%$ | **$70.21\%$** | $79.08\%$ | **6 / 8** |
 
 ### 6.2. Kết quả trên tập Test
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
+*(Nguồn số liệu: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
 
 | Chỉ số đánh giá | Voting Ensemble (Tuned) | Voting Ensemble (Default) | So sánh với Linear SVM (Winner) |
 | :--- | :---: | :---: | :---: |
@@ -111,5 +111,5 @@ Với $\tau^* = 0.385$ cho nhánh Tuned và $\tau^* = 0.365$ cho nhánh Default.
 | **F2-Score** | **$78.73\%$** | $78.94\%$ | $-0.52\%$ |
 | **ROC-AUC** | **$80.26\%$** | $79.98\%$ | $-1.18\%$ |
 
-### 6.3. Bài học thực nghiệm rút ra
+### 6.3. Nhận xét kết quả
 Kết quả trên split tham chiếu cho thấy cả hai nhánh Ensemble có Validation Accuracy thấp hơn Linear SVM (Tuned), nên quy tắc chọn mô hình đã chọn SVM. Test Recall của Ensemble (Tuned) là $84.99\%$, thấp hơn mốc $85\%$ dù Validation Recall đạt $85.47\%$. Để xác định nguyên nhân chênh lệch hoặc kết luận về độ ổn định, cần thêm ablation trọng số, calibration và đánh giá qua nhiều split; Test không được dùng để chọn lại mô hình.

@@ -1,5 +1,5 @@
-Phiên bản v6. Chốt mô hình chiến thắng (Winner Selection) và chuyển giao sang Test
-Mục tiêu của bản này là phân tích bảng kết quả Validation, chính thức xác định mô hình chiến thắng (Winner), khóa ngưỡng quyết định tối ưu và chuẩn bị chuyển giao toàn bộ sang khâu đánh giá độc lập.
+Phiên bản v6. Chốt mô hình được chọn (Winner Selection) và chuyển giao sang Test
+Phiên bản này phân tích bảng kết quả Validation, chính thức xác định mô hình được chọn (Winner), cố định ngưỡng quyết định tối ưu và chuẩn bị chuyển giao toàn bộ sang khâu đánh giá độc lập.
 
 Bước 1. Phân tích kết quả xếp hạng trên tập Validation
 Từ bảng validation_model_selection.csv:
@@ -27,4 +27,4 @@ Cấu hình tham số tối ưu:
 Bước 3. Đóng băng cấu hình và chuyển giao
 Khóa toàn bộ tham số và ngưỡng tau* = 0.465.
 Không cho phép thay đổi ngưỡng hay tham số trong bước đánh giá Test tiếp theo.
-Quy trình Tuning & Model Selection chính thức hoàn tất.
+Kết quả lựa chọn được chuyển sang bước đánh giá Test.

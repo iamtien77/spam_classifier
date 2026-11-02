@@ -1,5 +1,5 @@
 Phiên bản v6. Trích xuất khối từ khóa nhạy cảm và chuẩn hóa đặc trưng số bằng MaxAbsScalerScratch
-Mục tiêu của bản này là trích xuất 10 cờ từ khóa spam nhạy cảm từ văn bản gốc, thu thập 8 đặc trưng cấu trúc số học và co dãn an toàn về đoạn [0, 1] bằng MaxAbsScaler tự viết nhằm bảo toàn tính thưa và tính không âm.
+Phiên bản này trích xuất 10 cờ từ khóa spam nhạy cảm từ văn bản gốc, thu thập 8 đặc trưng cấu trúc số học và co giãn an toàn về đoạn [0, 1] bằng MaxAbsScaler tự viết nhằm bảo toàn tính thưa và tính không âm.
 
 Bước 1. Trích xuất khối đặc trưng từ khóa nhạy cảm (10 chiều)
 Sử dụng danh sách 10 từ khóa đặc trưng: free, win, prize, claim, urgent, call, cash, guarantee, offer, click.

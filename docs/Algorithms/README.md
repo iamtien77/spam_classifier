@@ -1,48 +1,48 @@
-# 📚 Tổng Hợp Các Thuật Toán Học Máy Trong Dự Án (Algorithms Overview)
+# Các thuật toán học máy trong dự án
 
-Thư mục này chứa toàn bộ tài liệu kỹ thuật chuyên sâu về các thuật toán phân loại email spam được triển khai trong dự án **Spam Classifier (Practice 1: Classifying Spam Emails)**.
+Thư mục này trình bày các thuật toán phân loại email spam được sử dụng trong dự án **Spam Classifier (Practice 1: Classifying Spam Emails)**.
 
-Xem [design.md](./design.md) để nắm thiết kế theo **5W1H**, luồng Train → Validation → Test → suy luận và **cấu trúc thư mục của toàn dự án**. Tài liệu này là bản đồ kiến trúc; các trang bên dưới giải thích từng thuật toán.
+Xem [design.md](./design.md) để nắm thiết kế theo **5W1H**, luồng Train → Validation → Test → suy luận và **cấu trúc thư mục của toàn dự án**. Tài liệu thiết kế trình bày cách tổ chức hệ thống; các trang bên dưới tập trung vào từng thuật toán.
 
 Tất cả các thuật toán đều được **tự xây dựng từ đầu (From-Scratch)** bằng Python và NumPy/SciPy, tuân thủ nguyên tắc không sử dụng mô hình học máy hộp đen có sẵn từ scikit-learn.
 
 ---
 
-## 📌 Đặc Tả Kỹ Thuật Chuyên Sâu 4 Giai Đoạn Pipeline (Stage Specifications)
+## 4 giai đoạn của pipeline
 
-Toàn bộ lập luận logic, bóc tách chức năng từng lớp/hàm và bảng phân tích đối kháng kỹ thuật 4 chiều được trình bày chi tiết tại bộ 4 tài liệu giai đoạn:
+Phần phân tích theo 4 khía cạnh giúp làm rõ lý do lựa chọn và giới hạn của từng phương án. Bộ 4 tài liệu dưới đây trình bày cách xử lý ở từng giai đoạn cùng chức năng của các lớp và hàm:
 
-| Giai đoạn | Tài liệu đặc tả kỹ thuật chuyên sâu | Module mã nguồn chính | Trọng tâm logic nghiệp vụ & Đối kháng giải pháp |
+| Giai đoạn | Tài liệu chi tiết | Module mã nguồn chính | Nội dung chính |
 | :---: | :--- | :--- | :--- |
-| **Giai đoạn 1** | 📥 [01_data_preprocessing_and_audit.md](../description_for_AI_working/01_data_preprocessing_and_audit.md) | `loader.py`, `preprocessing.py` | Bóc tách HTML dòng sự kiện, khử trùng & xóa nhóm mâu thuẫn toàn cục, phân chia phân tầng Hamilton 80/10/10 chống rò rỉ. |
+| **Giai đoạn 1** | 📥 [01_data_preprocessing_and_audit.md](../description_for_AI_working/01_data_preprocessing_and_audit.md) | `loader.py`, `preprocessing.py` | Xử lý HTML theo sự kiện, loại bản ghi trùng và các nhóm mâu thuẫn nhãn trên toàn bộ dữ liệu, chia phân tầng Hamilton 80/10/10 để tránh rò rỉ dữ liệu. |
 | **Giai đoạn 2** | ⚙️ [02_feature_engineering_and_selection.md](../description_for_AI_working/02_feature_engineering_and_selection.md) | `feature_engineering.py` | Cấu trúc ma trận thưa nén hàng `CSRMatrixScratch`, Sublinear TF-IDF, Char n-gram 3-5, `MaxAbsScalerScratch` bảo toàn độ thưa, Top-K 4.318 chiều. |
 | **Giai đoạn 3** | 🧠 [03_model_training_and_tuning.md](../description_for_AI_working/03_model_training_and_tuning.md) | `classifiers.py`, `tuning.py`, `ensemble.py` | 3 mô hình cốt lõi From-Scratch (Balanced BCE, Squared Hinge $C^1$, Complement NB), Barzilai-Borwein + Armijo Line Search, dò ngưỡng sàn Recall $\ge 85\%$. |
-| **Giai đoạn 4** | 🚀 [04_evaluation_and_deployment.md](../description_for_AI_working/04_evaluation_and_deployment.md) | `metrics.py`, `error_analysis.py`, `persistence.py`, `predictor.py` | Kiểm chứng độc lập Test (Mann-Whitney U ROC-AUC), mổ xẻ 846 ca lỗi, Joblib Atomic Bundle, dịch vụ suy luận `SpamInferenceService` (< 2.5 ms SLA, XAI). |
+| **Giai đoạn 4** | 🚀 [04_evaluation_and_deployment.md](../description_for_AI_working/04_evaluation_and_deployment.md) | `metrics.py`, `error_analysis.py`, `persistence.py`, `predictor.py` | Kiểm chứng độc lập Test (Mann-Whitney U ROC-AUC), phân tích 846 trường hợp dự đoán sai, Joblib Atomic Bundle, dịch vụ suy luận `SpamInferenceService` (< 2.5 ms SLA, XAI). |
 
 ---
 
 ## 1. Danh Mục Tài Liệu Kỹ Thuật
 
-Mỗi thuật toán được trình bày độc lập theo cấu trúc chuẩn mực gồm 6 phần: **Purpose**, **Input / Output**, **Data used**, **Evaluation**, **Status** và **Results**:
+Mỗi tài liệu gồm 6 phần: mục đích, dữ liệu đầu vào và kết quả đầu ra, dữ liệu sử dụng, phương pháp đánh giá, trạng thái triển khai và kết quả thực nghiệm:
 
 | Tài liệu | Thuật toán | Vai trò trong hệ thống | Trạng thái / Thứ hạng |
 | :--- | :--- | :--- | :---: |
-| 🛡️ [linear_svm.md](./linear_svm.md) | **Linear Support Vector Machine** | Tìm siêu phẳng phân cách lề cực đại với Squared Hinge Loss | 🥇 **Winner (Mô hình triển khai)** |
+| 🛡️ [linear_svm.md](./linear_svm.md) | **Linear Support Vector Machine** | Tìm siêu phẳng phân cách lề cực đại với Squared Hinge Loss | **Mô hình được chọn để triển khai** |
 | 📈 [logistic_regression.md](./logistic_regression.md) | **Logistic Regression** | Phân loại xác suất nhị phân với Binary Cross-Entropy & Armijo | 🥈 **Hạng 2 trên Test (F1: 71.42%)** |
 | 🎲 [naive_bayes.md](./naive_bayes.md) | **Complement & Multinomial Naive Bayes** | Đường cơ sở xác suất và Proxy Model cho Top-K Feature Selection | 🥉 **Baseline thực nghiệm** |
 | 🤝 [voting_ensemble.md](./voting_ensemble.md) | **Spam Voting Ensemble** | Kết hợp Soft/Hard Voting và so sánh với mô hình đơn lẻ | 🏅 **Mô hình nghiên cứu thực nghiệm** |
 
 ---
 
-## 2. Bảng So Sánh Đối Đầu Trên Tập Validation (Lựa Chọn Mô Hình)
+## 2. So sánh và lựa chọn mô hình trên tập Validation
 
 Quá trình lựa chọn mô hình được thực hiện trên tập **Validation** ($2.903$ mẫu) với ràng buộc nghiệp vụ: $\text{Recall} \ge 0.85$, sau đó ưu tiên **Accuracy $\rightarrow$ F1-Score $\rightarrow$ Precision $\rightarrow$ FPR**:
 
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
+*(Nguồn số liệu: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 
 | Thứ hạng | Mô hình ứng viên | Nhánh tham số | Ngưỡng ($\tau^*$) | Thỏa mãn Recall $\ge 85\%$ | Validation Accuracy | Validation Recall | Validation F1 | Đạt chuẩn chọn |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | **Linear SVM (Tuned)** | Grid Search ($C=2.0$) | **$0.465$** | **True** | **$70.07\%$** | **$85.55\%$** | **$70.93\%$** | 🏆 **CHỌN LÀM WINNER** |
+| **1** | **Linear SVM (Tuned)** | Grid Search ($C=2.0$) | **$0.465$** | **True** | **$70.07\%$** | **$85.55\%$** | **$70.93\%$** | **Được chọn** |
 | 2 | Linear SVM (Default) | Cố định ($C=1.0$) | $0.465$ | True | $69.96\%$ | $85.39\%$ | $70.82\%$ | Không |
 | 3 | Logistic Regression (Tuned) | Grid Search ($C=0.5$) | $0.415$ | True | $69.96\%$ | $85.39\%$ | $70.82\%$ | Không |
 | 4 | Logistic Regression (Default)| Cố định ($C=1.0$) | $0.410$ | True | $69.72\%$ | $85.47\%$ | $70.67\%$ | Không |
@@ -53,11 +53,11 @@ Quá trình lựa chọn mô hình được thực hiện trên tập **Validati
 
 ---
 
-## 3. Bảng So Sánh Độc Lập Trên Tập Test (Final Evaluation)
+## 3. Kết quả đánh giá trên tập Test
 
 Đánh giá khách quan trên tập **Test** ($2.902$ mẫu) tại các ngưỡng tối ưu đã được chốt từ Validation set:
 
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
+*(Nguồn số liệu: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
 
 | Mô hình | Accuracy | Precision | Recall | F1-Score | F2-Score | ROC-AUC | Trạng thái |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -72,11 +72,11 @@ Quá trình lựa chọn mô hình được thực hiện trên tập **Validati
 
 ---
 
-## 4. Tổng Kết Kiến Trúc & Quyết Định Kỹ Thuật
+## 4. Nhận xét và lựa chọn kỹ thuật
 
 1. **Hiệu năng của mô hình tuyến tính:** Trong lần chạy tham chiếu, Linear SVM và Logistic Regression có Accuracy và F1 cao hơn Complement Naive Bayes trên cùng Validation/Test split; $4.318$ là số cột được giữ sau Top-K của lần chạy này.
 2. **Lý do chọn Linear SVM:** Linear SVM (Tuned) có Validation Accuracy cao nhất ($70.07\%$) trong nhóm đạt Validation Recall $\ge 85\%$. Test Accuracy $70.85\%$ và Recall $85.47\%$ chỉ được dùng để đánh giá sau khi đã chốt winner; một split chưa đủ để kết luận khả năng chống nhiễu.
-3. **Thực tế vận hành:** Mặc dù mô hình đạt Recall cao ($85.47\%$), tỷ lệ chặn nhầm thư hợp lệ vẫn ở mức $40.05\%$. Vì vậy, pipeline này được định vị là hệ thống thực nghiệm học tập và phù hợp để **cảnh báo / đưa thư vào hòm thư rác tạm thời** thay vì tự động xóa vĩnh viễn.
+3. **Giới hạn khi sử dụng:** Mặc dù mô hình đạt Recall cao ($85.47\%$), tỷ lệ chặn nhầm thư hợp lệ vẫn ở mức $40.05\%$. Vì vậy, pipeline này được sử dụng trong phạm vi thực nghiệm học tập và phù hợp để **cảnh báo / đưa thư vào hòm thư rác tạm thời** thay vì tự động xóa vĩnh viễn.
 
 ---
 

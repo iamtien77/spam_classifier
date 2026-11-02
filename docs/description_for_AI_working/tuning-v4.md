@@ -1,5 +1,5 @@
 Phiên bản v4. Quét lưới siêu tham số (Hyperparameter Grid Search) kết hợp Threshold Optimizer
-Mục tiêu của bản này là cài đặt hàm tune_model_hyperparameters() để thực hiện tìm kiếm toàn diện trên lưới siêu tham số cho 3 mô hình, kết hợp dò ngưỡng tối ưu trên tập Validation cho từng cấu hình.
+Phiên bản này cài đặt hàm tune_model_hyperparameters() để thực hiện tìm kiếm toàn diện trên lưới siêu tham số cho 3 mô hình, kết hợp dò ngưỡng tối ưu trên tập Validation cho từng cấu hình.
 
 Bước 1. Thiết lập không gian tìm kiếm siêu tham số (Param Grid)
 Định nghĩa lưới tham số trong main.py:
@@ -27,4 +27,4 @@ Bước 3. Chọn ra cấu hình tốt nhất cho từng thuật toán
 - Logistic Regression (Tuned): Best C = 0.5, ngưỡng tối ưu tau = 0.415.
 - Linear SVM (Tuned): Best C = 2.0, ngưỡng tối ưu tau = 0.465.
 - Complement Naive Bayes (Tuned): Best alpha = 2.0, ngưỡng tối ưu tau = 0.220.
-Toàn bộ các mô hình Tuned này sẵn sàng chuyển sang bước Model Selection tổng thể.
+Các mô hình Tuned được chuyển sang bước Model Selection để so sánh chung.

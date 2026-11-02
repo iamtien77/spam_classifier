@@ -1,11 +1,11 @@
 Phiên bản v4. Phân tích lỗi chi tiết (Error Analysis) và trích xuất mẫu phân loại sai
-Mục tiêu của bản này là ứng dụng module error_analysis.py để lọc toàn bộ 846 mẫu email bị phân loại sai trên tập Test, phân tích đặc điểm ngôn ngữ học và cấu trúc của các mẫu lỗi nhằm định hướng cải tiến hệ thống.
+Phiên bản này ứng dụng module error_analysis.py để lọc toàn bộ 846 mẫu email bị phân loại sai trên tập Test, phân tích đặc điểm ngôn ngữ học và cấu trúc của các mẫu lỗi nhằm định hướng cải tiến hệ thống.
 
 Bước 1. Lọc các mẫu phân loại sai trên tập Test
 So sánh nhãn thực tế y_test và nhãn dự đoán y_pred:
 Xác định tập các chỉ số sai: error_indices = {i | y_test[i] != y_pred[i]}.
 Tổng số mẫu phân loại sai: 846 mẫu (chiếm 29,15% tập Test).
-Trong đó gồm 666 mẫu False Positive (Ham bị gán nhầm là Spam) và 180 mẫu False Negative (Spam bị lọt lưới).
+Trong đó gồm 666 mẫu False Positive (Ham bị gán nhầm là Spam) và 180 mẫu False Negative (Spam bị bỏ sót).
 
 Bước 2. Xuất dữ liệu lỗi chi tiết ra file CSV
 Sử dụng hàm extract_misclassified_samples():

@@ -1,5 +1,5 @@
 Phiên bản v1. Thiết kế kiến trúc học máy From-Scratch và chuẩn bị đầu vào
-Mục tiêu của bản này là thiết lập chuẩn kiến trúc From-Scratch cho toàn bộ các mô hình phân loại trong dự án, xác định giao diện chung (fit, predict, predict_proba) và kiểm tra ma trận đầu vào trước khi huấn luyện.
+Phiên bản này thiết lập chuẩn kiến trúc From-Scratch cho toàn bộ các mô hình phân loại trong dự án, xác định giao diện chung (fit, predict, predict_proba) và kiểm tra ma trận đầu vào trước khi huấn luyện.
 
 Bước 1. Xác định nguyên tắc thiết kế From-Scratch
 Toàn bộ các mô hình học máy cốt lõi phải được tự viết bằng Python và NumPy/SciPy, không sử dụng các lớp phân loại có sẵn của scikit-learn trong pipeline tham chiếu.
@@ -19,4 +19,4 @@ Bước 3. Thiết kế chiến lược huấn luyện độc lập 3 họ thu�
 1. Complement Naive Bayes: Mô hình xác suất thống kê dựa trên tần suất phần bù, đóng vai trò Baseline.
 2. Linear Support Vector Machine: Mô hình tìm siêu phẳng lề cực đại với hàm mất mát Squared Hinge, tối ưu bằng Gradient Descent.
 3. Logistic Regression: Mô hình xác suất nhị phân với Binary Cross-Entropy và điều chuẩn L2, tối ưu bằng Spectral Gradient Descent có Armijo backtracking.
-Bước này tạo nền tảng vững chắc để triển khai độc lập từng thuật toán ở các phiên bản tiếp theo.
+Giao diện và yêu cầu đầu vào này được dùng khi triển khai từng thuật toán ở các phiên bản tiếp theo.

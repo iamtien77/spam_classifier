@@ -1,8 +1,8 @@
-# Thiết kế Spam Classifier trước triển khai — 5W1H & Target Structure
+# Thiết kế ban đầu của hệ thống Spam Classifier theo 5W1H
 
-**Trạng thái:** Bản thiết kế để định hướng xây dựng dự án từ đầu. Các module, cấu hình và luồng xử lý dưới đây là phương án dự kiến, không phải xác nhận đã cài đặt hoặc đã đạt kết quả thực nghiệm.
+**Trạng thái:** Tài liệu trình bày phương án thiết kế ban đầu của dự án. Các module, cấu hình và luồng xử lý dưới đây vẫn là đề xuất; kết quả triển khai và thực nghiệm cần được ghi nhận riêng.
 
-Tài liệu phục vụ người học, người phát triển và người đánh giá thống nhất phạm vi trước khi viết code. Baseline, tỷ lệ chia tập và Recall mục tiêu là lựa chọn thiết kế; không mặc định coi chúng là yêu cầu bắt buộc của đề bài nếu chưa đối chiếu tài liệu gốc.
+Tài liệu giúp người học, người phát triển và người đánh giá thống nhất phạm vi công việc trước khi viết code. Baseline, tỷ lệ chia tập và Recall mục tiêu được đề xuất cho nghiên cứu này. Những lựa chọn đó chỉ được xem là yêu cầu của đề bài khi có căn cứ từ tài liệu gốc.
 
 ## 1. What — Cần xây dựng hệ thống gì?
 
@@ -12,7 +12,7 @@ Xây dựng hệ thống **supervised binary text classification**: từ nội d
 
 Phạm vi ban đầu gồm kiểm toán dữ liệu, tiền xử lý, trích xuất đặc trưng, baseline, so sánh mô hình, đánh giá và demo suy luận. Web UI, tích hợp hộp thư thật, tự động xóa email và phục vụ production nằm ngoài phạm vi ban đầu.
 
-### Hợp đồng đầu vào / đầu ra dự kiến
+### Dữ liệu đầu vào và kết quả đầu ra dự kiến
 
 | Thành phần | Đầu vào | Đầu ra / yêu cầu |
 | :--- | :--- | :--- |
@@ -28,7 +28,7 @@ Score thể hiện mức độ model nghiêng về Spam. Nếu chuyển margin S
 
 ## 2. Why — Vì sao chọn hướng thiết kế này?
 
-Mục tiêu là hiểu toàn bộ vòng đời phân loại văn bản, tạo kết quả có thể tái lập và giải thích được lựa chọn. Thiết kế ưu tiên baseline đơn giản, module rõ trách nhiệm và đánh giá độc lập với bước tuning.
+Mục tiêu của dự án là tìm hiểu đầy đủ quy trình phân loại văn bản, từ xử lý dữ liệu đến đánh giá mô hình. Kết quả cần có thể tái lập và các lựa chọn kỹ thuật cần có cơ sở. Vì vậy, thiết kế bắt đầu từ một baseline đơn giản, phân chia rõ công việc của từng module và tách bước đánh giá cuối khỏi quá trình tuning.
 
 | Lựa chọn dự kiến | Lý do | Đánh đổi / giới hạn |
 | :--- | :--- | :--- |
@@ -64,9 +64,9 @@ Một người có thể đảm nhiệm nhiều vai trò. Metric chính, Recall 
 
 Nếu Test gợi ý thay đổi thiết kế, đó là một vòng nghiên cứu mới cần holdout mới hoặc kế hoạch đánh giá độc lập phù hợp. Không tiếp tục xem Test đã quan sát là bằng chứng chưa thiên lệch.
 
-## 5. Where — Hệ thống chạy và các trách nhiệm nằm ở đâu?
+## 5. Where — Môi trường chạy và cách tổ chức mã nguồn
 
-Thiết kế ban đầu hướng tới batch và demo trên máy local. Script điều phối pipeline; notebook phục vụ EDA, giải thích và thử nghiệm. Không giả định cần GPU, cloud hoặc API production.
+Hệ thống dự kiến xử lý dữ liệu theo batch và chạy demo trên máy cá nhân. Script đảm nhiệm việc chạy pipeline, còn notebook dùng cho EDA, trình bày phương pháp và thử nghiệm. Ở giai đoạn này, thiết kế chưa đặt ra nhu cầu sử dụng GPU, cloud hay API phục vụ production.
 
 | Vị trí dự kiến | Trách nhiệm | Ranh giới |
 | :--- | :--- | :--- |
@@ -117,7 +117,7 @@ Sau khi có baseline và phân tích lỗi Validation:
 - Giới hạn không gian tuning; ghi rõ cấu hình thất bại hoặc không hội tụ.
 - Xem **Voting Ensemble** là mở rộng tùy chọn khi lỗi các model có tính bổ sung; so sánh lại chất lượng và chi phí, không mặc định tốt hơn model đơn.
 
-Không chốt trước winner, số chiều cuối cùng, threshold hoặc hyperparameter tốt nhất. Những giá trị đó phải đến từ thực nghiệm trên dữ liệu phát triển.
+Mô hình được chọn, số chiều đặc trưng, threshold và hyperparameter phù hợp sẽ được xác định từ thực nghiệm trên dữ liệu phát triển, thay vì ấn định trước.
 
 ### 6.4. Metrics và quy tắc lựa chọn trước training
 
@@ -143,9 +143,9 @@ Mốc `0.85` là mục tiêu thực nghiệm đề xuất, không phải hiệu 
 - **Tích hợp:** pipeline chạy trên fixture nhỏ, tạo đủ artifact; nạp lại bundle cho cùng nhãn và score trong sai số số học cho phép.
 - **Tái lập:** báo cáo gắn với cấu hình, seed, định danh dữ liệu/split và phiên bản mã nguồn.
 
-Hoàn thành chức năng và đạt chất lượng mô hình là hai tiêu chí riêng. Chất lượng cần bằng chứng Test; nếu chưa đạt phải báo cáo trung thực, không sửa tiêu chí sau khi xem kết quả.
+Việc pipeline chạy đầy đủ chưa đủ để kết luận mô hình đạt chất lượng mong muốn. Kết luận về chất lượng cần dựa trên kết quả Test. Nếu kết quả chưa đạt mục tiêu, báo cáo cần nêu rõ điều đó và giữ nguyên tiêu chí đã đặt ra trước thực nghiệm.
 
-### 6.6. Failure modes và giới hạn
+### 6.6. Các trường hợp dễ gặp lỗi và giới hạn
 
 | Rủi ro | Cách đánh giá dự kiến |
 | :--- | :--- |
@@ -159,9 +159,9 @@ Hoàn thành chức năng và đạt chất lượng mô hình là hai tiêu ch�
 
 Nếu có metadata nhóm được thu thập hợp lệ và đủ mẫu, có thể kiểm tra chênh lệch lỗi giữa các nhóm. Không suy đoán thuộc tính nhân khẩu học từ văn bản; khi thiếu dữ liệu, ghi rõ giới hạn đánh giá.
 
-## 7. Target Structure — Cấu trúc dự án mục tiêu
+## 7. Cấu trúc dự án dự kiến
 
-Cây dưới đây là **blueprint triển khai**, không xác nhận file đã tồn tại và không yêu cầu tạo mọi file ngay. Mỗi thành phần được triển khai theo milestone khi trách nhiệm tương ứng phát sinh.
+Cấu trúc dưới đây thể hiện cách tổ chức dự án dự kiến. Các file được bổ sung theo tiến độ và nhu cầu của từng giai đoạn, vì vậy sơ đồ này không có nghĩa là mọi file đã tồn tại hoặc cần được tạo ngay.
 
 ```text
 spam_classifier/
@@ -213,4 +213,4 @@ spam_classifier/
 └── logs/                             # Log pipeline
 ```
 
-Notebook nên gọi lại logic trong `src/` để giảm sai khác với pipeline chính. Bắt đầu bằng luồng baseline tối thiểu có thể kiểm chứng; đánh giá ranh giới module và hợp đồng I/O trước khi mở rộng cấu trúc.
+Notebook nên sử dụng lại các hàm trong `src/` để giữ cách xử lý nhất quán với pipeline chính. Việc triển khai bắt đầu từ một baseline có thể chạy và kiểm tra đầy đủ. Trước khi mở rộng, cần xem lại chức năng của từng module cùng dữ liệu mà chúng nhận vào và trả về.

@@ -1,5 +1,5 @@
 Phiên bản v1. Cài đặt cấu trúc ma trận thưa tự viết (CSRMatrixScratch)
-Mục tiêu của bản này là tự xây dựng lớp ma trận thưa Compressed Sparse Row (CSR) độc lập với SciPy, giúp hệ thống biểu diễn và tính toán trên hàng nghìn chiều đặc trưng văn bản mà không bị cạn kiệt bộ nhớ RAM.
+Phiên bản này tự xây dựng lớp ma trận thưa Compressed Sparse Row (CSR) độc lập với SciPy, giúp hệ thống biểu diễn và tính toán trên hàng nghìn chiều đặc trưng văn bản mà không bị cạn kiệt bộ nhớ RAM.
 
 Bước 1. Xác định sự cần thiết của ma trận thưa trong Text Classification
 Mỗi email chỉ chứa vài chục đến vài trăm từ khác nhau trong khi từ điển có hơn 4.000 từ.

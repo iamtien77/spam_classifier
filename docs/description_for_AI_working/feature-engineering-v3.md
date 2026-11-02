@@ -1,5 +1,5 @@
 Phiên bản v3. Trích xuất khối đặc trưng Word Unigram TF-IDF (3.000 chiều)
-Mục tiêu của bản này là ứng dụng TfidfVectorizerScratch để trích xuất 3.000 đặc trưng từ đơn (unigram) quan trọng nhất từ văn bản email đã làm sạch, tạo thành khung xương sống cho ma trận đặc trưng.
+Phiên bản này ứng dụng TfidfVectorizerScratch để trích xuất 3.000 đặc trưng từ đơn (unigram) quan trọng nhất từ văn bản email đã làm sạch, tạo thành thành phần chính cho ma trận đặc trưng.
 
 Bước 1. Chuẩn bị văn bản đầu vào cho Word Unigram
 Sử dụng trường văn bản model_text đã được làm sạch và cắt độ dài từ Giai đoạn 1.

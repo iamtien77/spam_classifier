@@ -1,5 +1,5 @@
 Phiên bản v7. Triển khai dịch vụ suy luận email mới (SpamInferenceService) và kịch bản Demo
-Mục tiêu của bản này là ứng dụng module predictor.py để xây dựng lớp dịch vụ suy luận SpamInferenceService, cung cấp giao diện lập trình trực quan (Python API) cho phép dự đoán nhãn Spam/Ham trên các email văn bản mới bất kỳ.
+Phiên bản này ứng dụng module predictor.py để xây dựng lớp dịch vụ suy luận SpamInferenceService, cung cấp giao diện lập trình trực quan (Python API) cho phép dự đoán nhãn Spam/Ham trên các email văn bản mới bất kỳ.
 
 Bước 1. Thiết kế dịch vụ suy luận SpamInferenceService
 Triển khai lớp SpamInferenceService trong src/deployment/predictor.py.
@@ -31,4 +31,4 @@ Bước 4. Thực thi kịch bản kiểm thử Demo trên 5 mẫu email thực 
 3. Email báo cáo dự án: "Please send the weekly project report when ready." -> Dự đoán: ham.
 4. Email quà tặng miễn phí: "Free entry into the weekly draw. Text WIN to 80082." -> Dự đoán: spam.
 5. Email thông báo dịch vụ: "Your account balance is low, please refill." -> Phân loại và xuất xác suất chi tiết.
-Toàn bộ hệ thống Spam Classifier hoàn thành chu trình từ dữ liệu thô đến triển khai thực tế.
+Phần demo kết thúc quy trình từ nạp dữ liệu đến suy luận trên văn bản mới.

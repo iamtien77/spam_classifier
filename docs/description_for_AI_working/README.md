@@ -1,12 +1,12 @@
-# 🧭 Mục Lục Toàn Diện: Hướng Dẫn Kỹ Thuật Dự Án (Description for AI Working)
+# Mục lục tài liệu kỹ thuật dự án (Description for AI Working)
 
-Thư mục này chứa toàn bộ hệ thống các kịch bản mô tả kỹ thuật chi tiết theo từng phiên bản tiến hóa (`v1` đến `vn`), tái hiện đầy đủ tiến trình lặp (Iterative Progression) của dự án **Spam Email Classifier** tại [`main.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/main.py) và thư mục [`src/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src).
+Thư mục này tập hợp tài liệu kỹ thuật của dự án **Spam Email Classifier**, gồm phần tổng quan và các bản mô tả theo từng bước phát triển (`v1` đến `vn`). Nội dung trình bày quy trình được tổ chức trong [`main.py`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/main.py) và thư mục [`src/`](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/src).
 
-Mỗi tài liệu được chuẩn hóa thành các hành động kỹ thuật cụ thể theo cấu trúc: `Bước 1. ...`, `Bước 2. ...` quy định rõ đầu vào, logic xử lý thuật toán, kiểm soát lỗi biên, phòng chống rò rỉ dữ liệu (Data Leakage) và số liệu kiểm chứng thực nghiệm.
+Các bản mô tả được chia theo cấu trúc `Bước 1. ...`, `Bước 2. ...`, trình bày đầu vào, cách xử lý, các trường hợp biên, biện pháp tránh Data Leakage và số liệu thực nghiệm.
 
 ---
 
-## 1. Bảng Điều Phối Theo Giai Đoạn Lớn (4 Phase Summaries)
+## 1. Tổng quan theo giai đoạn (4 Phase Summaries)
 
 | Giai đoạn | File tổng quan giai đoạn | Hàm điều phối trong `main.py` | Module mã nguồn chính |
 | :---: | :--- | :--- | :--- |
@@ -17,7 +17,7 @@ Mỗi tài liệu được chuẩn hóa thành các hành động kỹ thuật c
 
 ---
 
-## 2. Hệ Thống 37 Phiên Bản Tiến Hóa Chi Tiết (Iterative Progression Files)
+## 2. Mô tả chi tiết qua 37 phiên bản (Iterative Progression Files)
 
 ### 📊 Nhóm 1: Khám Phá & Phân Tích Dữ Liệu (EDA - 6 bản)
 - [EDAv1.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/EDAv1.md): Kế hoạch EDA ban đầu, nạp DataFrame, kiểm tra schema, xem trước nội dung.
@@ -40,7 +40,7 @@ Mỗi tài liệu được chuẩn hóa thành các hành động kỹ thuật c
 - [feature-engineering-v3.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v3.md): Trích xuất khối đặc trưng Word Unigram ($3.000$ từ vựng, `min_df = 2`).
 - [feature-engineering-v4.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v4.md): Trích xuất khối đặc trưng Word Bigram ($800$ cặp từ ngữ cảnh).
 - [feature-engineering-v5.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v5.md): Trích xuất khối đặc trưng Character n-gram ($500$ chuỗi ký tự 3-5).
-- [feature-engineering-v6.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v6.md): Trích xuất 10 từ khóa nhạy cảm và 8 đặc trưng số co dãn bằng `MaxAbsScalerScratch`.
+- [feature-engineering-v6.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v6.md): Trích xuất 10 từ khóa nhạy cảm và 8 đặc trưng số co giãn bằng `MaxAbsScalerScratch`.
 - [feature-engineering-v7.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v7.md): Ghép nối 5 khối đặc trưng lai $4.318$ chiều bằng `HybridFeatureBuilderScratch`.
 - [feature-engineering-v8.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/feature-engineering-v8.md): Thử nghiệm lựa chọn đặc trưng Top-K và lưu trữ ma trận đệm `.npz`, `.npy`.
 
@@ -57,7 +57,7 @@ Mỗi tài liệu được chuẩn hóa thành các hành động kỹ thuật c
 - [tuning-v3.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/tuning-v3.md): Thiết lập hàm mục tiêu có ràng buộc nghiệp vụ: Bắt buộc $\text{Recall} \ge 0.85$, tối đa hóa Accuracy.
 - [tuning-v4.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/tuning-v4.md): Quét lưới siêu tham số (Grid Search) cho LR ($C$), SVM ($C$) và Naive Bayes ($\alpha$).
 - [tuning-v5.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/tuning-v5.md): Quy trình so sánh và xếp hạng 8 mô hình ứng viên trên tập Validation.
-- [tuning-v6.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/tuning-v6.md): Chốt mô hình chiến thắng (Winner): Linear SVM Tuned ($C=2.0$, ngưỡng $0.465$).
+- [tuning-v6.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/tuning-v6.md): Chốt mô hình được chọn (Winner): Linear SVM Tuned ($C=2.0$, ngưỡng $0.465$).
 
 ### 📈 Nhóm 6: Đánh Giá & Triển Khai (Evaluation & Deployment - 7 bản)
 - [evaluation-v1.md](file:///e:/Hoc_May_Tren_truong/lab_1%20spam_classifier/docs/description_for_AI_working/evaluation-v1.md): Đánh giá độc lập trên Test set tại ngưỡng đã chốt, tính ma trận nhầm lẫn ($997$ TN, $666$ FP, $180$ FN, $1.059$ TP).

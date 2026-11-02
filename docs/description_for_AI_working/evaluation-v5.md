@@ -1,5 +1,5 @@
 Phiên bản v5. Trực quan hóa và xuất biểu đồ đánh giá thực nghiệm (Visualization)
-Mục tiêu của bản này là ứng dụng module visualization.py để tự động vẽ và lưu trữ toàn bộ các biểu đồ phân tích đánh giá chất lượng cao (300 DPI) vào thư mục results/figures/.
+Phiên bản này ứng dụng module visualization.py để tự động vẽ và lưu trữ toàn bộ các biểu đồ phân tích đánh giá chất lượng cao (300 DPI) vào thư mục results/figures/.
 
 Bước 1. Vẽ biểu đồ nhiệt ma trận nhầm lẫn (Confusion Matrix Heatmap)
 Hàm plot_confusion_matrix():
@@ -25,6 +25,6 @@ Hàm plot_precision_recall_curve():
 Bước 4. Vẽ biểu đồ so sánh các mô hình (Model Comparison Bar Chart)
 Hàm plot_models_comparison():
 - Vẽ biểu đồ cột nhóm thể hiện các chỉ số Accuracy, Precision, Recall, F1-score và ROC-AUC của các mô hình ứng viên.
-- Thể hiện trực quan sự vượt trội của Linear SVM (Tuned) và Logistic Regression (Tuned) so với Complement Naive Bayes.
+- So sánh trực quan kết quả của Linear SVM (Tuned) và Logistic Regression (Tuned) so với Complement Naive Bayes.
 - Lưu biểu đồ ra file results/figures/test_models_comparison.png.
-Tất cả các biểu đồ được hoàn thành và xuất bản tự động phục vụ báo cáo khoa học.
+Các biểu đồ được lưu tự động để sử dụng trong báo cáo.

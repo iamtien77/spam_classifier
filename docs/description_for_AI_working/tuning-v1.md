@@ -1,7 +1,7 @@
 Phiên bản v1. Phân tích hạn chế của ngưỡng quyết định mặc định 0.5
-Mục tiêu của bản này là phân tích cơ sở lý thuyết tại sao ngưỡng xác suất mặc định 0.5 không phù hợp cho bài toán lọc thư rác thực tế, từ đó đặt ra yêu cầu xây dựng bộ tối ưu hóa ngưỡng phân loại chuyên biệt.
+Phiên bản này phân tích cơ sở lý thuyết tại sao ngưỡng xác suất mặc định 0.5 không phù hợp cho bài toán lọc thư rác thực tế, từ đó đặt ra yêu cầu xây dựng bộ tối ưu hóa ngưỡng phân loại chuyên biệt.
 
-Bước 1. Bản chất sự bất đối xứng về chi phí sai sót (Cost Asymmetry)
+Bước 1. Sự khác biệt về chi phí giữa hai loại lỗi (Cost Asymmetry)
 Trong bài toán spam, hai loại sai sót có mức độ thiệt hại rất khác nhau:
 - False Positive (FP): Email công việc hợp lệ bị chặn nhầm vào hòm thư rác (hậu quả: người dùng có thể lỡ thông tin quan trọng, hợp đồng hoặc giao dịch).
 - False Negative (FN): Thư rác lọt vào hòm thư chính (hậu quả: gây phiền toái, giảm trải nghiệm).

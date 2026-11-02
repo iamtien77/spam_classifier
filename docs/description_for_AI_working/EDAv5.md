@@ -1,7 +1,7 @@
 Bản v5. Phân tích tần suất từ vựng, từ khóa nhạy cảm và n-gram
-Mục tiêu của bản này là khảo sát không gian từ vựng, xác định các từ khóa spam nhạy cảm xuất hiện dày đặc và phân tích các cụm từ (bigrams) mang tính phân loại cao.
+Phiên bản này khảo sát không gian từ vựng, xác định các từ khóa spam nhạy cảm xuất hiện dày đặc và phân tích các cụm từ (bigrams) mang tính phân loại cao.
 
-Bước 1. Xác định mục tiêu nâng cấp so với EDA v4
+Bước 1. Nội dung bổ sung so với EDA v4
 Phân tích sâu vào nội dung từ vựng ngôn ngữ tự nhiên thay vì chỉ xét các biến số cấu trúc.
 Lọc bỏ stop-words tạm thời để tìm ra top từ khóa có tần suất xuất hiện cao nhất trong từng lớp.
 

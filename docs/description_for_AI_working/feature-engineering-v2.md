@@ -1,5 +1,5 @@
 Phiên bản v2. Tự cài đặt thuật toán TF-IDF từ đầu (TfidfVectorizerScratch)
-Mục tiêu của bản này là tự triển khai bộ vector hóa Term Frequency - Inverse Document Frequency (TF-IDF) từ đầu bằng Python thuần, áp dụng kỹ thuật sublinear TF và smooth IDF nhằm giảm độ thiên lệch của các từ lặp lại nhiều lần.
+Phiên bản này tự triển khai bộ vector hóa Term Frequency - Inverse Document Frequency (TF-IDF) từ đầu bằng Python thuần, áp dụng kỹ thuật sublinear TF và smooth IDF nhằm giảm độ thiên lệch của các từ lặp lại nhiều lần.
 
 Bước 1. Xác định công thức toán học cho TF-IDF tự viết
 Sử dụng Sublinear Term Frequency:

@@ -1,5 +1,5 @@
 Phiên bản v8. Lựa chọn đặc trưng Top-K và lưu trữ ma trận đệm (Cache Persistence)
-Mục tiêu của bản này là hoàn thiện khâu Feature Engineering bằng cách kiểm chứng quy trình lựa chọn đặc trưng Top-K trên tập Validation, khóa thứ tự cột và xuất toàn bộ ma trận đặc trưng ra thư mục cache data/processed/.
+Phiên bản này hoàn thiện khâu Feature Engineering bằng cách kiểm chứng quy trình lựa chọn đặc trưng Top-K trên tập Validation, khóa thứ tự cột và xuất toàn bộ ma trận đặc trưng ra thư mục cache data/processed/.
 
 Bước 1. Thử nghiệm lựa chọn đặc trưng Top-K (ManualFeatureSelectorScratch)
 Xây dựng lớp ManualFeatureSelectorScratch để xếp hạng độ quan trọng của 4.318 cột trên tập Train.
@@ -22,4 +22,4 @@ Sử dụng hàm export_processed_data() để lưu các ma trận và nhãn và
 - X_train.npz, X_val.npz, X_test.npz (ma trận thưa SciPy CSR).
 - y_train.npy, y_val.npy, y_test.npy (mảng nhãn nhị phân NumPy int32).
 Giúp Giai đoạn 3 nạp dữ liệu tức thì trong vài mili-giây mà không cần tiền xử lý hay trích xuất lại từ đầu.
-Quy trình Feature Engineering chính thức hoàn tất.
+Các ma trận và vector nhãn được chuyển sang bước huấn luyện.

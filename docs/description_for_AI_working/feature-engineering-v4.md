@@ -1,5 +1,5 @@
 Phiên bản v4. Trích xuất khối đặc trưng Word Bigram TF-IDF (800 chiều)
-Mục tiêu của bản này là trích xuất 800 đặc trưng cặp từ liền kề (word bigrams) để bổ sung thông tin ngữ cảnh cục bộ mà khối từ đơn (unigram) không thể nắm bắt được.
+Phiên bản này trích xuất 800 đặc trưng cặp từ liền kề (word bigrams) để bổ sung thông tin ngữ cảnh cục bộ mà khối từ đơn (unigram) không thể nắm bắt được.
 
 Bước 1. Xác định sự cần thiết của Word Bigrams
 Nhiều từ đơn lẻ xuất hiện phổ biến trong email hợp lệ (ví dụ: free, entry, call, now, cash, customer), nhưng khi ghép thành cặp từ (như free entry, call now, cash prize, urgent call), chúng mang tín hiệu cảnh báo spam rõ rệt.

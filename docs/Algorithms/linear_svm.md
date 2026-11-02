@@ -1,11 +1,11 @@
 # 🛡️ Linear Support Vector Machine (Linear SVM From-Scratch)
 
-> **Vị trí trong dự án:** Mô hình phân loại cốt lõi và là **Mô hình chiến thắng (Selected Winner)** trong pipeline tham chiếu [`main.py`](../../main.py).
+> **Vị trí trong dự án:** Mô hình phân loại cốt lõi và là **mô hình được chọn** trong pipeline tham chiếu [`main.py`](../../main.py).
 > **Mã nguồn triển khai:** Class [`LinearSVMFromScratch`](../../src/models/classifiers.py#L218) trong [`src/models/classifiers.py`](../../src/models/classifiers.py).
 
 ---
 
-## 1. Purpose (Mục đích & Động lực lựa chọn)
+## 1. Mục đích và lý do lựa chọn
 
 ### 1.1. Mục đích bài toán
 Trong bài toán phân loại email spam, không gian biểu diễn sau khi kết hợp n-gram và tín hiệu cấu trúc là ma trận thưa (*sparse*); lần chạy tham chiếu giữ $D = 4.318$ đặc trưng sau Top-K.
@@ -14,7 +14,7 @@ Mục đích của thuật toán **Linear Support Vector Machine (Linear SVM)** 
 - Tìm một siêu phẳng phân tách tuyến tính (Separating Hyperplane) tối ưu trong không gian đa chiều: $f(x) = w^\top x + b$.
 - Tối ưu lề mềm giữa hai lớp Spam ($+1$) và Ham ($-1$); khả năng tổng quát hóa cần được kiểm chứng trên dữ liệu giữ riêng và nhiều lần chia tập.
 
-### 1.2. Cơ sở toán học & Hàm mục tiêu
+### 1.2. Cơ sở toán học và hàm mục tiêu
 Pipeline sử dụng biến thể **Soft-margin SVM với hàm mất mát Squared Hinge Loss** kết hợp điều chuẩn $L_2$ và trọng số lớp cân bằng (`class_weight='balanced'`):
 
 $$
@@ -44,24 +44,24 @@ $$
 
 Bước học $\eta$ được cập nhật thích ứng theo độ cong Barzilai-Borwein và co nếu không thỏa mãn điều kiện Armijo; cách này giảm rủi ro bước học không phù hợp, không bảo đảm hội tụ trong mọi cấu hình.
 
-### 1.4. Đánh đổi & Failure Modes
-- **Trade-offs:** Linear SVM có tốc độ hội tụ nhanh và ít tham số hơn kernel SVM, nhưng không mô hình hóa được tương tác phi tuyến phức tạp nếu không có khối đặc trưng n-gram/hybrid hỗ trợ.
-- **Failure Modes:** 
+### 1.4. Đánh đổi và các trường hợp dễ dự đoán sai
+- **Đánh đổi:** Linear SVM có tốc độ hội tụ nhanh và ít tham số hơn kernel SVM, nhưng không mô hình hóa được tương tác phi tuyến phức tạp nếu không có khối đặc trưng n-gram/hybrid hỗ trợ.
+- **Các trường hợp dễ dự đoán sai:**
   - Khi gặp spam làm nhiễu từ vựng (Spam evasion / obfuscation), token ngoài từ điển Word TF-IDF không đóng góp ở khối đó. Character n-gram, keyword và numeric features vẫn có thể mang tín hiệu; hướng thay đổi của $w^\top x+b$ phụ thuộc trọng số đã học.
   - Điểm sigmoid của margin chưa qua calibration (như Platt Scaling), nên không diễn giải trực tiếp thành xác suất rủi ro thực tế.
 
 ---
 
-## 2. Input / Output (Đặc tả dữ liệu vào / ra)
+## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-### 2.1. Input
+### 2.1. Đầu vào
 - **Ma trận đặc trưng $X$:** Định dạng thưa [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix` kích thước $(N,D_{\text{selected}})$; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
   - Các giá trị biểu diễn trọng số TF-IDF và tần suất chuẩn hóa, thỏa mãn $x_{ij} \ge 0$.
 - **Vector nhãn $y$:** Mảng NumPy nhị phân $N$ phần tử, $`y \in \{0, 1\}`$ (trong đó $0$: Ham, $1$: Spam).
 
-### 2.2. Output
+### 2.2. Đầu ra
 
-**Điểm quyết định khoảng cách (Decision Score):**
+**Điểm quyết định (Decision Score):**
 
 $$
 z_i = w^\top x_i + b \in (-\infty, +\infty)
@@ -69,13 +69,13 @@ $$
 
 Đại diện cho khoảng cách đại số từ mẫu $x_i$ đến siêu phẳng phân cách.
 
-**Điểm phân loại / Xác suất giả lập qua Sigmoid (`spam_score`):**
+**Điểm phân loại sau phép biến đổi Sigmoid (`spam_score`):**
 
 $$
 p_i = \sigma(z_i) = \frac{1}{1 + \exp(-z_i)} \in [0, 1]
 $$
 
-Đây là điểm lề chuyển đổi qua Sigmoid để dùng chung giao diện với bộ dò ngưỡng và Voting Ensemble; trường `is_calibrated=False` trong kết quả inference cho biết đây không phải xác suất hậu nghiệm đã cân chuẩn.
+Đây là điểm lề chuyển đổi qua Sigmoid để dùng chung giao diện với bộ dò ngưỡng và Voting Ensemble; trường `is_calibrated=False` trong kết quả inference cho biết đây không phải xác suất hậu nghiệm đã hiệu chỉnh.
 
 **Nhãn dự đoán nhị phân ($\hat{y}$):**
 
@@ -87,10 +87,10 @@ Với $\tau^* = 0.465$ là ngưỡng quyết định tối ưu được chốt t
 
 ---
 
-## 3. Data used (Dữ liệu sử dụng)
+## 3. Dữ liệu sử dụng
 
 ### 3.1. Tập dữ liệu sau làm sạch
-Dữ liệu được làm sạch thông qua quy trình kiểm toán không chồng lặp tại [`src/data/preprocessing.py`](../../src/data/preprocessing.py), loại bỏ hoàn toàn nhãn không hợp lệ, chuỗi rỗng và xung đột nhãn. Tổng số mẫu giữ lại là **29.028 mẫu**:
+Dữ liệu được làm sạch thông qua quy trình kiểm tra dữ liệu theo các nhóm lỗi không chồng lặp tại [`src/data/preprocessing.py`](../../src/data/preprocessing.py), loại bỏ hoàn toàn nhãn không hợp lệ, chuỗi rỗng và xung đột nhãn. Tổng số mẫu giữ lại là **29.028 mẫu**:
 - **Ham (Nhãn 0):** $16.636$ mẫu ($57.31\%$)
 - **Spam (Nhãn 1):** $12.392$ mẫu ($42.69\%$)
 
@@ -107,13 +107,13 @@ Mô hình nhận đầu vào từ bộ ghép đặc trưng lai [`HybridFeatureBu
 2. **Word Bigram TF-IDF:** $800$ chiều (cặp từ liên tiếp nắm bắt ngữ cảnh).
 3. **Character n-gram TF-IDF:** $500$ chiều (chuỗi con ký tự độ dài 3–5).
 4. **Keyword binary features:** $10$ chiều (từ khóa nhạy cảm: `free`, `win`, `prize`, `claim`, `urgent`, `call`, `cash`, `guarantee`, `offer`, `click`).
-5. **Numeric/Structural features:** $8$ chiều co dãn bằng [`MaxAbsScalerScratch`](../../src/features/feature_engineering.py#L239) (`has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`).
+5. **Numeric/Structural features:** $8$ chiều được chuẩn hóa bằng [`MaxAbsScalerScratch`](../../src/features/feature_engineering.py#L239) (`has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`).
 
 ---
 
-## 4. Evaluation (Phương pháp đánh giá & Tiêu chí nghiệp vụ)
+## 4. Phương pháp và tiêu chí đánh giá
 
-### 4.1. Ràng buộc tối ưu hóa nghiệp vụ (Constrained Selection)
+### 4.1. Quy tắc lựa chọn mô hình
 Dự án áp dụng quy tắc thực nghiệm ưu tiên bắt trúng thư rác với ràng buộc:
 
 $$
@@ -122,9 +122,9 @@ $$
 
 Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27) quét 200 mốc cách đều từ $0.005$ đến $1.0$ trên tập Validation:
 - Nhóm ngưỡng khả thi ($\text{Recall} \ge 0.85$) được xếp hạng ưu tiên theo: **Accuracy $\rightarrow$ F1-Score $\rightarrow$ Precision $\rightarrow$ FPR**.
-- Nếu không có ngưỡng nào thỏa mãn, hệ thống fallback về tối đa hóa Recall.
+- Nếu không có ngưỡng nào thỏa mãn, hệ thống ưu tiên ngưỡng có Recall cao nhất.
 
-### 4.2. Hệ thống chỉ số đo lường
+### 4.2. Các chỉ số đánh giá
 - **Accuracy:** Tỷ lệ dự đoán đúng toàn thể $\frac{TP + TN}{TP + FP + TN + FN}$.
 - **Precision:** Tỷ lệ email bị gắn cờ là spam thực tế $\frac{TP}{TP + FP}$.
 - **Recall (Độ nhạy):** Tỷ lệ thư rác thực tế được phát hiện $\frac{TP}{TP + FN}$.
@@ -135,16 +135,16 @@ Tại mỗi cấu hình siêu tham số, bộ tối ưu [`ThresholdOptimizerScra
 
 ---
 
-## 5. Status (Trạng thái triển khai trong dự án)
+## 5. Trạng thái triển khai
 
 - **Trạng thái cài đặt:** Đã hoàn thiện $100\%$ From-Scratch, tuân thủ thuần Python/NumPy, không sử dụng `sklearn.svm.LinearSVC`.
 - **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](../../tests), bao gồm kiểm thử hội tụ gradient, kiểm thử ma trận thưa, kiểm thử phân xử hòa và kiểm thử tích hợp đầu cuối.
-- **Vị trí trong hệ thống:** **Mô hình vô địch (Rank 1 / Selected Final Model)** được chọn tự động từ quy trình [`ModelSelectionWorkflow`](../../src/models/tuning.py#L235) trên tập Validation và lưu thành artifact bundle tại [`results/saved_models/spam_pipeline.joblib`](../../results/saved_models/spam_pipeline.joblib).
-- **Mức độ sẵn sàng vận hành:** Đạt chỉ tiêu nghiệp vụ Recall ($85.47\%$), tuy nhiên tỷ lệ chặn nhầm (FPR $\approx 40.05\%$) còn cao. Khuyến nghị triển khai ở chế độ gắn cờ cảnh báo (Flagging/Warning) thay vì tự động xóa email.
+- **Vị trí trong hệ thống:** **Mô hình xếp hạng 1 và được chọn cuối cùng** được chọn tự động từ quy trình [`ModelSelectionWorkflow`](../../src/models/tuning.py#L235) trên tập Validation và lưu thành artifact bundle tại [`results/saved_models/spam_pipeline.joblib`](../../results/saved_models/spam_pipeline.joblib).
+- **Giới hạn sử dụng:** Đạt mục tiêu Recall ($85.47\%$), tuy nhiên tỷ lệ chặn nhầm (FPR $\approx 40.05\%$) còn cao. Khuyến nghị triển khai ở chế độ gắn cờ cảnh báo (Flagging/Warning) thay vì tự động xóa email.
 
 ---
 
-## 6. Results (Kết quả thực nghiệm định lượng)
+## 6. Kết quả thực nghiệm
 
 ### 6.1. Siêu tham số tối ưu (Hyperparameters)
 Qua quét lưới tham số (Grid Search):
@@ -156,7 +156,7 @@ Qua quét lưới tham số (Grid Search):
 - Ngưỡng quyết định tối ưu: $\tau^* = 0.465$
 
 ### 6.2. Kết quả trên tập Validation (Chọn mô hình)
-*(Nguồn trích xuất: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
+*(Nguồn số liệu: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
 - **Validation Accuracy:** **$70.07\%$** ($0.70065$)
 - **Validation Recall:** **$85.55\%$** ($0.85553$) *(Thỏa mãn ràng buộc $\ge 85\%$)*
 - **Validation Precision:** **$60.57\%$** ($0.60571$)
@@ -166,7 +166,7 @@ Qua quét lưới tham số (Grid Search):
 - **Chi tiết nhầm lẫn trên Validation:** $TP=1.060, FP=690, TN=974, FN=179$.
 
 ### 6.3. Kết quả trên tập Test (Đánh giá độc lập)
-*(Nguồn trích xuất: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv) & [`results/metrics/run_summary.json`](../../results/metrics/run_summary.json))*
+*(Nguồn số liệu: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv) & [`results/metrics/run_summary.json`](../../results/metrics/run_summary.json))*
 
 | Chỉ số đánh giá | Giá trị thực nghiệm | Diễn giải ý nghĩa |
 | :--- | :---: | :--- |
@@ -175,7 +175,7 @@ Qua quét lưới tham số (Grid Search):
 | **Precision (Spam)** | **$61.39\%$** | Trong số các email bị dự đoán là spam, $61.39\%$ là spam thật |
 | **F1-Score** | **$71.46\%$** | Cân bằng điều hòa giữa Precision và Recall |
 | **F2-Score** | **$79.25\%$** | Đánh giá tổng hợp có trọng số ưu tiên bắt spam |
-| **ROC-AUC** | **$81.44\%$** | Năng lực phân tách thứ bậc điểm số giữa hai lớp rất tốt |
+| **ROC-AUC** | **$81.44\%$** | Khả năng xếp hạng mẫu Spam cao hơn mẫu Ham theo điểm dự đoán |
 | **False Positive Rate**| **$40.05\%$** | Tỷ lệ email hợp lệ bị cảnh báo nhầm |
 
 ### 6.4. Ma trận nhầm lẫn chi tiết trên Test Set

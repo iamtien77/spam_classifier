@@ -1,10 +1,10 @@
 # Giai đoạn 4: Lập luận đánh giá, phân tích lỗi và đóng gói suy luận
 
-> **Cách đọc bằng chứng:** Các số liệu tham chiếu dưới đây thuộc artifact đã lưu của lần chạy 2026-10-19, không phải kết quả chạy mới khi sửa tài liệu. Lý do thiết kế là giả thuyết cần kiểm chứng; không suy ra quan hệ nhân quả chỉ từ một kết quả tốt. Thiết kế trước code nằm ở [design.md](../Algorithms/design.md).
+> **Nguồn số liệu:** Các số liệu dưới đây được lấy từ artifact của lần chạy 2026-10-19. Việc cập nhật tài liệu không bao gồm chạy lại thực nghiệm. Các lý do lựa chọn thiết kế vẫn cần được kiểm chứng; một kết quả tốt chưa đủ để xác định nguyên nhân. Phần thiết kế trước khi triển khai được trình bày tại [design.md](../Algorithms/design.md).
 
 ## 1. Mục tiêu và hợp đồng đầu vào / đầu ra
 
-Input gồm Test giữ riêng, nhãn Test, model/threshold đã chốt trên Validation và trạng thái biến đổi đã fit. Output là metrics, confusion matrix, các mẫu FP/FN có `source_id`, báo cáo giới hạn và bundle dùng lại cho văn bản mới.
+Đầu vào gồm tập Test được giữ riêng, nhãn Test, model và threshold đã chốt trên Validation, cùng trạng thái của bộ biến đổi sau khi fit. Đầu ra gồm metrics, confusion matrix, các mẫu FP/FN có `source_id`, báo cáo về giới hạn của kết quả và bundle để suy luận trên văn bản mới.
 
 [main.py](../../main.py) đánh giá các ứng viên với threshold đã chọn riêng trên Validation và giữ cờ `selected_on_validation`. Báo kết quả Test của nhiều ứng viên không cho phép chọn lại winner từ Test. Dữ liệu là tin nhắn; chưa có kiểm chứng cho gateway email hay SLA production.
 
@@ -26,7 +26,7 @@ Cách tính này tương ứng xác suất score của một mẫu dương lớn
 
 ### 2.2. Phân tích lỗi
 
-[error_analysis.py](../../src/evaluation/error_analysis.py) nhận bảng Test và các vector dự đoán, tách FP/FN, rồi gắn mô tả bằng heuristic từ khóa, chữ hoa, dấu câu hoặc độ dài. Các mô tả `suspected_causes` là gợi ý để xem xét, không chứng minh nguyên nhân nhân quả.
+[error_analysis.py](../../src/evaluation/error_analysis.py) nhận bảng Test và các vector dự đoán, tách FP/FN, rồi gắn mô tả bằng heuristic từ khóa, chữ hoa, dấu câu hoặc độ dài. Các mô tả `suspected_causes` là gợi ý để xem xét, chưa đủ để xác định nguyên nhân.
 
 846 lỗi tham chiếu gồm 666 FP và 180 FN. Không đủ căn cứ để khẳng định phần lớn FP là email tài chính, hoặc FN là tin nhắn lừa đảo cực ngắn, nếu chưa tổng hợp và thẩm định mẫu. Không đổi nhãn chỉ vì model dự đoán khác nhãn gốc. Khi chia sẻ mẫu lỗi, cần bỏ thông tin cá nhân không cần thiết.
 
@@ -94,4 +94,4 @@ FPR 40.05% nghĩa là khoảng 4/10 Ham trong Test bị chặn nhầm tại thre
 
 Chưa có artifact kiểm chứng các score demo 0.9842/0.9615, latency 2.40 ms, throughput 1.250 email/giây, tỷ lệ nén 75% hoặc các SLA từng được ghi trong tài liệu. Các số thiếu bằng chứng đã được bỏ khỏi bảng kết quả. Không có thí nghiệm mới, calibration hay chứng nhận production phát sinh từ việc cập nhật Markdown này.
 
-**Bàn giao:** Bundle, cấu hình và báo cáo cùng lần chạy để demo suy luận; giới hạn chất lượng và môi trường cần được đọc cùng kết quả.
+**Đầu ra:** Bundle, cấu hình và báo cáo cùng lần chạy để demo suy luận; giới hạn chất lượng và môi trường cần được đọc cùng kết quả.
