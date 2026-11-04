@@ -80,6 +80,55 @@ def test_error_analysis_extraction():
 
 
 class TestEvaluationModule(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import matplotlib
+        matplotlib.use('Agg')
+
+    def test_roc_geometry_and_exact_threshold_marker(self):
+        from src.evaluation.visualization import plot_roc_and_pr_curves, plt
+
+        for labels, scores, threshold in (
+            ([0, 1], [.501, .502], .5015),
+            ([0, 1, 0, 1], [.1, .5, .5, .9], .5),
+            ([0, 1], [0., 1.], 1.),
+        ):
+            with self.subTest(scores=scores):
+                fig, axes = plt.subplots(1, 2)
+                try:
+                    with patch.object(plt, 'subplots', return_value=(fig, axes)):
+                        plot_roc_and_pr_curves(labels, scores, best_threshold=threshold)
+                    metrics = SpamModelEvaluator().compute_all_metrics(
+                        labels, (np.asarray(scores) >= threshold).astype(int), scores)
+                    x, y = axes[0].lines[0].get_data()
+                    area = np.sum(np.diff(x) * (y[:-1] + y[1:]) / 2)
+                    self.assertAlmostEqual(area, metrics['roc_auc'])
+                    self.assertTrue(np.all(np.diff(x) >= 0))
+                    self.assertTrue(np.all(np.diff(y) >= 0))
+                    np.testing.assert_allclose(axes[0].collections[0].get_offsets()[0],
+                                               [metrics['fpr'], metrics['recall']])
+                    np.testing.assert_allclose(axes[1].collections[0].get_offsets()[0],
+                                               [metrics['recall'], metrics['precision']])
+                finally:
+                    plt.close(fig)
+
+    def test_length_histogram_includes_long_emails(self):
+        from src.evaluation.visualization import plot_text_length_comparison, plt
+
+        frame = pd.DataFrame({'label': ['ham', 'spam'],
+                              'text': ['word ' * 151, 'word ' * 3000]})
+        fig, axes = plt.subplots(1, 2)
+        try:
+            with patch.object(plt, 'subplots', return_value=(fig, axes)), patch.object(plt, 'show'):
+                plot_text_length_comparison(frame)
+            for bars in axes[1].containers:
+                heights = np.array([bar.get_height() for bar in bars])
+                self.assertTrue(np.all(np.isfinite(heights)))
+                self.assertAlmostEqual(sum(bar.get_height() * bar.get_width() for bar in bars), 1.)
+            self.assertAlmostEqual(max(bar.get_x() + bar.get_width() for bar in axes[1].patches), 3000)
+        finally:
+            plt.close(fig)
+
     def test_url_plots_match_pipeline(self):
         import matplotlib
         matplotlib.use('Agg')

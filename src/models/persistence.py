@@ -16,6 +16,7 @@ Module này đảm nhiệm:
 from pathlib import Path
 from typing import Any, Dict, Optional
 import joblib
+from src.config import SAVED_MODELS_DIR
 
 
 def archive_run_outputs(directories, archive_root):
@@ -78,7 +79,7 @@ def save_spam_pipeline(
     save_path: Optional[Path] = None,
 ) -> Path:
     if save_path is None:
-        save_path = Path("results/saved_models/spam_pipeline.joblib")
+        save_path = SAVED_MODELS_DIR / "spam_pipeline.joblib"
     else:
         save_path = Path(save_path)
 
@@ -91,7 +92,7 @@ def load_spam_pipeline(
     model_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if model_path is None:
-        model_path = Path("results/saved_models/spam_pipeline.joblib")
+        model_path = SAVED_MODELS_DIR / "spam_pipeline.joblib"
     else:
         model_path = Path(model_path)
 

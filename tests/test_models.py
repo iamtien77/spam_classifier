@@ -178,6 +178,29 @@ def test_threshold_optimizer_scratch():
 
 
 class TestModelsModule(unittest.TestCase):
+    def test_ensemble_validates_weights_for_both_prediction_paths(self):
+        class Constant:
+            def predict_proba(self, X):
+                return np.tile([.25, .75], (len(X), 1))
+
+            def predict(self, X):
+                return np.ones(len(X), dtype=int)
+
+        X = np.zeros((2, 1))
+        for voting in ('soft', 'hard'):
+            for weights in ({'a': 0., 'b': 0.}, {'a': -1., 'b': 2.},
+                            {'a': np.nan}, {'a': np.inf}, {'a': -np.inf},
+                            {'a': 1e308, 'b': 1e308}):
+                model = SpamVotingEnsemble({'a': Constant(), 'b': Constant()}, weights, voting)
+                for method in (model.predict, model.predict_proba):
+                    with self.subTest(voting=voting, weights=weights, method=method.__name__):
+                        with self.assertRaises(ValueError):
+                            method(X)
+            model = SpamVotingEnsemble({'a': Constant(), 'b': Constant()}, {'a': 0., 'b': 2.}, voting)
+            expected = [[.25, .75]] * 2 if voting == 'soft' else [[0., 1.]] * 2
+            np.testing.assert_allclose(model.predict_proba(X), expected)
+            np.testing.assert_array_equal(model.predict(X), [1, 1])
+
     def test_threshold_invalid_inputs(self):
         optimizer = ThresholdOptimizerScratch()
         for labels, scores in [([], []), ([0, 1], [.8]), ([0, .5], [.2, .8]),

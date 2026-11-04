@@ -208,6 +208,45 @@ def test_manual_feature_selector_scratch():
 
 
 class TestFeaturesModule(unittest.TestCase):
+    def test_scaler_matrix_contract_and_representation_parity(self):
+        import numpy as np
+        from scipy.sparse import csr_matrix
+
+        values = [[0., 4.], [2., -2.]]
+        inputs = [values, np.array(values), csr_matrix(values), csr_matrix(values).tolil(),
+                  CSRMatrixScratch.from_rows([{1: 4.}, {0: 2., 1: -2.}], 2)]
+        for matrix in inputs:
+            with self.subTest(kind=type(matrix).__name__):
+                scaler = MaxAbsScalerScratch().fit(matrix)
+                output = scaler.transform(matrix)
+                if isinstance(output, CSRMatrixScratch):
+                    output = output.to_dense()
+                elif hasattr(output, 'toarray'):
+                    output = output.toarray()
+                np.testing.assert_allclose(output, [[0., 1.], [1., -.5]])
+                for wrong_width in ([[2.]], np.array([[2.]]), csr_matrix([[2.]]),
+                                    CSRMatrixScratch.from_rows([{0: 2.}], 1)):
+                    with self.assertRaises(ValueError):
+                        scaler.transform(wrong_width)
+
+    def test_scaler_rejects_nonfinite_and_nonmatrix_inputs(self):
+        import numpy as np
+        from scipy.sparse import csr_matrix
+
+        for value in (np.nan, np.inf, -np.inf):
+            for matrix in ([[value]], np.array([[value]]), csr_matrix([[value]])):
+                with self.subTest(value=value, kind=type(matrix).__name__):
+                    with self.assertRaises(ValueError):
+                        MaxAbsScalerScratch().fit(matrix)
+                    with self.assertRaises(ValueError):
+                        MaxAbsScalerScratch().fit([[1.]]).transform(matrix)
+        for matrix in ([1., 2.], np.array([1., 2.]), np.ones((1, 1, 1))):
+            with self.subTest(shape=np.shape(matrix)):
+                with self.assertRaises(ValueError):
+                    MaxAbsScalerScratch().fit(matrix)
+                with self.assertRaises(ValueError):
+                    MaxAbsScalerScratch().fit([[1.]]).transform(matrix)
+
     def test_export_avoids_direct_open_of_existing_csv(self):
         import builtins
         import errno

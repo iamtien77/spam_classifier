@@ -87,6 +87,28 @@ def test_inference_service_batch_prediction():
 
 
 class TestDeploymentModule(unittest.TestCase):
+    def test_persistence_defaults_match_service_outside_project_root(self):
+        import os
+        from unittest.mock import patch
+        from src.models.persistence import load_spam_pipeline
+
+        original_cwd = Path.cwd()
+        bundle = {'sentinel': 'pipeline'}
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                os.chdir(tmp)
+                service_path = SpamInferenceService().bundle_path
+                with patch('src.models.persistence.joblib.dump') as dump, patch.object(Path, 'mkdir'):
+                    saved_path = save_spam_pipeline(bundle)
+                self.assertEqual(saved_path.resolve(), service_path.resolve())
+                dump.assert_called_once_with(bundle, service_path, compress=3)
+                with patch.object(Path, 'exists', return_value=True), \
+                        patch('src.models.persistence.joblib.load', return_value=bundle) as load:
+                    self.assertEqual(load_spam_pipeline(), bundle)
+                load.assert_called_once_with(service_path)
+            finally:
+                os.chdir(original_cwd)
+
     def test_default_bundle_path(self):
         from unittest.mock import patch
         from src.config import SAVED_MODELS_DIR

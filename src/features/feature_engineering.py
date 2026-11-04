@@ -243,7 +243,34 @@ class MaxAbsScalerScratch:
     def __init__(self):
         self.max_abs_ = None
 
+    @staticmethod
+    def _validate_input(X, expected_features=None, fitting=False):
+        import numpy as np
+
+        if isinstance(X, CSRMatrixScratch):
+            shape = X.shape
+            values = np.asarray(X.data, dtype=float)
+        elif hasattr(X, 'tocsr'):
+            shape = X.shape
+            values = np.asarray(X.tocsr().data, dtype=float)
+        else:
+            values = np.asarray(X, dtype=float)
+            # Danh sách rỗng biểu diễn batch transform không có bản ghi.
+            if isinstance(X, (list, tuple)) and len(X) == 0:
+                shape = (0, expected_features if expected_features is not None else 0)
+            else:
+                shape = values.shape
+        if len(shape) != 2:
+            raise ValueError('Dữ liệu scaler phải là ma trận hai chiều.')
+        if fitting and shape[0] == 0:
+            raise ValueError('Không thể fit scaler trên tập rỗng.')
+        if expected_features is not None and shape[1] != expected_features:
+            raise ValueError('Số cột không khớp scaler.')
+        if not np.all(np.isfinite(values)):
+            raise ValueError('Đặc trưng số phải hữu hạn.')
+
     def fit(self, X):
+        self._validate_input(X, fitting=True)
         if isinstance(X, CSRMatrixScratch):
             if X.shape[0] == 0:
                 raise ValueError('Không thể fit scaler trên tập rỗng.')
@@ -283,6 +310,7 @@ class MaxAbsScalerScratch:
     def transform(self, X):
         if self.max_abs_ is None:
             raise ValueError('Scaler chưa được fit trên Train.')
+        self._validate_input(X, expected_features=len(self.max_abs_))
         if isinstance(X, CSRMatrixScratch):
             if X.shape[1] != len(self.max_abs_):
                 raise ValueError('Số cột không khớp scaler.')

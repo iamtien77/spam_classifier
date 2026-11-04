@@ -119,11 +119,12 @@ def plot_text_length_comparison(
     axes[0].set_ylabel("Số lượng ký tự (Characters)", fontsize=11)
     axes[0].grid(axis="y", linestyle=":", alpha=0.6)
 
-    # 2. Histogram mật độ số từ trong khoảng 0-150 từ (chiếm >95% mẫu)
+    # Dùng cùng khoảng cho hai lớp và giữ cả email dài trong phân phối.
+    max_words = max(1, int(clean_df['word_count'].max()))
     axes[1].hist(
         ham_words,
         bins=35,
-        range=(0, 150),
+        range=(0, max_words),
         alpha=0.55,
         color="#4C72B0",
         label=f"Ham (Trung vị: {int(np.median(ham_words)):,} từ)",
@@ -133,14 +134,14 @@ def plot_text_length_comparison(
     axes[1].hist(
         spam_words,
         bins=35,
-        range=(0, 150),
+        range=(0, max_words),
         alpha=0.55,
         color="#C44E52",
         label=f"Spam (Trung vị: {int(np.median(spam_words)):,} từ)",
         density=True,
         edgecolor="black",
     )
-    axes[1].set_title("Mật độ phân phối số lượng từ (0-150 từ)", fontsize=13, fontweight="bold")
+    axes[1].set_title(f"Mật độ phân phối số lượng từ (0–{max_words:,} từ)", fontsize=13, fontweight="bold")
     axes[1].set_xlabel("Số lượng từ (Word count)", fontsize=11)
     axes[1].set_ylabel("Mật độ xác suất (Density)", fontsize=11)
     axes[1].legend(loc="upper right", framealpha=0.9)
@@ -509,45 +510,41 @@ def plot_roc_and_pr_curves(
     save_path: Optional[Path] = None,
 ) -> None:
     """Vẽ đồ thị đôi ROC Curve và Precision-Recall Curve."""
-    y_true_arr = np.asarray(y_true, dtype=int).ravel()
+    y_true_arr = np.asarray(y_true).ravel()
     y_scores_arr = np.asarray(y_scores, dtype=float).ravel()
-
-    thresholds = np.linspace(0.0, 1.0, 150)
-    fpr_list, tpr_list = [], []
-    precision_list, recall_list = [], []
-
-    n_pos = max(1, int(np.sum(y_true_arr == 1)))
-    n_neg = max(1, int(np.sum(y_true_arr == 0)))
-
-    for th in thresholds:
-        preds = (y_scores_arr >= th).astype(int)
-        tp = int(np.sum((y_true_arr == 1) & (preds == 1)))
-        fp = int(np.sum((y_true_arr == 0) & (preds == 1)))
-        fn = int(np.sum((y_true_arr == 1) & (preds == 0)))
-        tn = int(np.sum((y_true_arr == 0) & (preds == 0)))
-
-        fpr_list.append(fp / n_neg)
-        tpr_list.append(tp / n_pos)
-        prec = tp / (tp + fp) if (tp + fp) > 0 else 1.0
-        rec = tp / n_pos
-        precision_list.append(prec)
-        recall_list.append(rec)
-
-    # Dùng chung bộ metrics để xử lý đúng các điểm bằng nhau.
-    roc_auc = SpamModelEvaluator().compute_all_metrics(
+    evaluator = SpamModelEvaluator()
+    # Xác minh input trước khi dựng đường cong; dùng chung phép tính AUC.
+    roc_auc = evaluator.compute_all_metrics(
         y_true_arr, (y_scores_arr >= 0.5).astype(int), y_prob=y_scores_arr,
     )["roc_auc"]
+    selected_metrics = None
+    if best_threshold is not None:
+        if not np.isfinite(best_threshold) or not 0 <= best_threshold <= 1:
+            raise ValueError("best_threshold phải hữu hạn và thuộc [0, 1].")
+        selected_metrics = evaluator.compute_all_metrics(
+            y_true_arr, (y_scores_arr >= best_threshold).astype(int))
+
+    # Quét score giảm dần, cập nhật cả nhóm ties trong một bước.
+    # Điểm đầu biểu diễn chưa chọn mẫu nào, kể cả khi score lớn nhất bằng 1.
+    order = np.argsort(-y_scores_arr, kind='stable')
+    sorted_scores = y_scores_arr[order]
+    positives = (y_true_arr[order] == 1).astype(int)
+    ends = np.r_[np.flatnonzero(np.diff(sorted_scores)), len(sorted_scores) - 1]
+    tp = np.r_[0, np.cumsum(positives)[ends]]
+    fp = np.r_[0, (ends + 1) - np.cumsum(positives)[ends]]
+    tpr_list = tp / max(1, int(positives.sum()))
+    fpr_list = fp / max(1, int(len(positives) - positives.sum()))
+    recall_list = tpr_list
+    precision_list = np.divide(tp, tp + fp, out=np.ones(len(tp), dtype=float), where=(tp + fp) != 0)
     auc_label = f"{roc_auc:.4f}" if roc_auc is not None else "N/A"
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
 
     # 1. ROC Curve
-    order = np.argsort(fpr_list)
-    axes[0].plot(np.array(fpr_list)[order], np.array(tpr_list)[order], color="#1F77B4", lw=2, label=f"ROC (AUC = {auc_label})")
+    axes[0].plot(fpr_list, tpr_list, color="#1F77B4", lw=2, label=f"ROC (AUC = {auc_label})")
     axes[0].plot([0, 1], [0, 1], color="#7F7F7F", lw=1.5, linestyle="--", label="Random Chance")
     if best_threshold is not None:
-        idx_th = np.argmin(np.abs(thresholds - best_threshold))
-        axes[0].scatter([fpr_list[idx_th]], [tpr_list[idx_th]], color="#D62728", s=90, zorder=5, label=f"Ngưỡng tối ưu ({best_threshold:.2f})")
+        axes[0].scatter([selected_metrics['fpr']], [selected_metrics['recall']], color="#D62728", s=90, zorder=5, label=f"Ngưỡng tối ưu ({best_threshold:.4g})")
     axes[0].set_title(f"ROC Curve - {model_name}", fontsize=13, fontweight="bold")
     axes[0].set_xlabel("False Positive Rate (FPR)", fontsize=11)
     axes[0].set_ylabel("True Positive Rate (Recall / TPR)", fontsize=11)
@@ -557,11 +554,9 @@ def plot_roc_and_pr_curves(
     axes[0].grid(True, linestyle=":", alpha=0.6)
 
     # 2. Precision-Recall Curve
-    rec_order = np.argsort(recall_list)
-    axes[1].plot(np.array(recall_list)[rec_order], np.array(precision_list)[rec_order], color="#2CA02C", lw=2, label="PR Curve")
+    axes[1].step(recall_list, precision_list, where='pre', color="#2CA02C", lw=2, label="PR Curve")
     if best_threshold is not None:
-        idx_th = np.argmin(np.abs(thresholds - best_threshold))
-        axes[1].scatter([recall_list[idx_th]], [precision_list[idx_th]], color="#D62728", s=90, zorder=5, label=f"Ngưỡng tối ưu ({best_threshold:.2f})")
+        axes[1].scatter([selected_metrics['recall']], [selected_metrics['precision']], color="#D62728", s=90, zorder=5, label=f"Ngưỡng tối ưu ({best_threshold:.4g})")
     axes[1].axvline(x=0.85, color="#FF7F0E", linestyle=":", lw=1.5, label="Mục tiêu Recall >= 0.85")
     axes[1].set_title(f"Precision-Recall Curve - {model_name}", fontsize=13, fontweight="bold")
     axes[1].set_xlabel("Recall", fontsize=11)

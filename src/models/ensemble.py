@@ -47,17 +47,23 @@ class SpamVotingEnsemble:
             model.fit(X, y)
         return self
 
-    def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
+    def _validated_weights(self):
         if not self.models:
             raise ValueError("Chưa cấu hình mô hình thành viên nào trong Ensemble.")
+        weights = {name: float(self.weights.get(name, 1.0)) for name in self.models}
+        if any(not np.isfinite(weight) or weight < 0 for weight in weights.values()):
+            raise ValueError("Trọng số Ensemble phải hữu hạn và không âm.")
+        total_weight = sum(weights.values())
+        if not np.isfinite(total_weight) or total_weight <= 0:
+            raise ValueError("Tổng trọng số Ensemble phải hữu hạn và dương.")
+        return weights, total_weight
 
-        total_weight = sum(self.weights.get(name, 1.0) for name in self.models)
-        if total_weight <= 0:
-            total_weight = float(len(self.models))
+    def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
+        weights, total_weight = self._validated_weights()
 
         accumulated_prob = None
         for name, model in self.models.items():
-            w = float(self.weights.get(name, 1.0))
+            w = weights[name]
             if self.voting == "hard":
                 # Điểm hard voting là tỷ lệ phiếu có trọng số, không phải soft probability.
                 preds = np.asarray(model.predict(X), dtype=float).ravel()
@@ -84,10 +90,10 @@ class SpamVotingEnsemble:
             probs = self.predict_proba(X)[:, 1]
             return (probs >= threshold).astype(int)
         else:
-            total_weight = sum(self.weights.get(name, 1.0) for name in self.models)
+            weights, total_weight = self._validated_weights()
             weighted_votes = None
             for name, model in self.models.items():
-                w = float(self.weights.get(name, 1.0))
+                w = weights[name]
                 preds = np.asarray(model.predict(X), dtype=float).ravel()
                 if weighted_votes is None:
                     weighted_votes = w * preds
