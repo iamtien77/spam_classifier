@@ -96,3 +96,16 @@ def explore_raw_data(records: Optional[Any] = None, *, df: Optional[Any] = None)
                                   for label in ('ham', 'spam')},
             'invalid_label_count': len(data) - valid,
             'character_length': describe(lengths), 'word_length': describe(words)}
+
+
+def load_and_sanitize_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
+    """Nạp dữ liệu thô và thực hiện vệ sinh tính toàn vẹn mẫu (Data Hygiene Sanitization).
+
+    Loại bỏ các bản ghi rỗng, nhãn không hợp lệ và khử trùng lặp thô tại tầng nạp
+    nhằm bảo đảm giả thiết mẫu độc lập i.i.d và chống rò rỉ dữ liệu qua bản ghi lặp
+    (Duplicate Leakage) trước khi đưa vào Machine Learning Pipeline.
+    """
+    from src.data.preprocessing import clean_email_split
+    raw = load_raw_data(data_path, as_dataframe=as_dataframe)
+    return clean_email_split(raw, as_dataframe=as_dataframe)
+

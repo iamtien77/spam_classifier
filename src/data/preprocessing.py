@@ -1,7 +1,12 @@
-"""Tiền xử lý thuần Python. Các hàm tên dataframe nhận/trả list[dict].
+"""Module xử lý dữ liệu: Vệ sinh tính toàn vẹn mẫu (Data Hygiene) và Tiền xử lý Học máy (ML Preprocessing).
 
-Quy trình: kiểm tra chất lượng toàn bộ dữ liệu -> chia tập -> chuẩn hóa text.
-Không học bất kỳ từ vựng, IDF hoặc ngưỡng độ dài nào từ Validation/Test.
+Phân định rạch ròi 2 tầng kiến trúc:
+1. Tầng Data Hygiene / Ingestion: Khử trùng lặp thô (Exact Deduplication) và kiểm toán tính toàn vẹn mẫu
+   (clean_email_split / sanitize_raw_dataset) nhằm bảo đảm giả thiết mẫu độc lập i.i.d và chống rò rỉ dữ liệu
+   qua bản ghi lặp (Duplicate Data Leakage) trước khi đưa vào Machine Learning Pipeline.
+2. Tầng ML Pipeline: Chia phân tầng độc lập ngay từ đầu (stratified_split_dataframe) TRƯỚC,
+   sau đó toàn bộ khâu Tiền xử lý văn bản học máy (SpamTextProcessor: normalize, stop words, regex, length cap)
+   và học đặc trưng số học (TF-IDF, Scaler, Selector) được thực hiện SAU, CHỈ FIT DUY NHẤT TRÊN TẬP TRAIN.
 """
 import html
 from html.parser import HTMLParser
@@ -94,10 +99,12 @@ def audit_data_quality(df, text_col='text', label_col='label') -> dict[str, int]
 
 
 def clean_email_split(df, text_col='text', label_col='label', as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
-    """Lọc chất lượng, không thay đổi dữ liệu đầu vào.
+    """Kiểm toán chất lượng & vệ sinh tính toàn vẹn mẫu thô (Data Hygiene Sanitization).
 
-    QUAN TRỌNG: gọi trên TOÀN BỘ dữ liệu trước chia tập để loại cả nhóm
-    mâu thuẫn và trùng liên tập. Mặc định trả về pandas.DataFrame.
+    Mục đích: Loại bỏ các bản ghi rỗng, nhãn không hợp lệ và khử trùng lặp bản ghi thô (Exact Deduplication)
+    ngay tại tầng nạp dữ liệu. Bước này bảo đảm giả thiết i.i.d (các mẫu độc lập) và triệt tiêu hoàn toàn
+    nguy cơ rò rỉ dữ liệu do trùng lặp chéo tập (Cross-split Duplication Leakage) trước khi đưa vào ML Pipeline.
+    Mặc định trả về pandas.DataFrame.
     """
     records = df.to_dict('records') if hasattr(df, 'to_dict') else df
     groups = {}
@@ -286,3 +293,7 @@ class SpamTextProcessor:
         if as_dataframe:
             return pd.DataFrame(prepared)
         return prepared
+
+
+# Bí danh thể hiện đúng ngữ nghĩa tầng Data Hygiene Sanitization
+sanitize_raw_dataset = clean_email_split

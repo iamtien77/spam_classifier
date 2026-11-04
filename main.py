@@ -4,13 +4,16 @@ Chuẩn hóa 100% theo yêu cầu đề bài (ML project: Classifying Spam Email
 ========================================================================
 Quy trình thực thi gồm 4 giai đoạn cốt lõi và các phần mở rộng theo đúng đề bài:
 
-GIAI ĐOẠN 1: DATA PREPROCESSING (TIỀN XỬ LÝ & TRÍCH XUẤT ĐẶC TRƯNG)
-  - Bước 1.1: Khởi tạo môi trường, kiểm tra cấu hình và hệ thống thư mục lưu trữ.
-  - Bước 1.2: Nạp tập dữ liệu thô (spam.csv), chuẩn hóa 2 trường cốt lõi 'label' và 'text'.
-  - Bước 1.3: Khám phá dữ liệu (EDA), phân tích tỷ lệ mất cân bằng nhãn Ham vs Spam.
-  - Bước 1.4: Phân tầng dữ liệu độc lập (Early Stratified Split) thành Train (80%) - Val (10%) - Test (10%).
-  - Bước 1.5: Tiền xử lý văn bản: chuẩn hóa Unicode, loại bỏ stop words, punctuation, HTML tags/URLs.
-  - Bước 1.6: Trích xuất đặc trưng số học: Word TF-IDF, Character frequency ('!', '$'), Keywords, Numerics.
+TẦNG DATA INGESTION & HYGIENE (NẠP & KIỂM TOÁN TÍNH TOÀN VẸN MẪU THÔ)
+  - Nạp tập dữ liệu thô (spam_ham_dataset.csv), xác thực 2 trường cốt lõi 'label' và 'text'.
+  - Kiểm toán chất lượng & khử trùng lặp thô (Exact Deduplication) để bảo đảm giả thiết mẫu độc lập i.i.d và chống rò rỉ dữ liệu qua bản ghi lặp (Duplicate Leakage).
+  - Khám phá dữ liệu ban đầu (EDA), xuất bản bộ 6 biểu đồ phân tích phân phối dữ liệu thô.
+
+GIAI ĐOẠN 1: ML PIPELINE - CHIA TẬP TRƯỚC, TIỀN XỬ LÝ ĐẶC TRƯNG SAU
+  - Bước 1.1: Phân tách dữ liệu độc lập ngay từ đầu (Early Stratified Split First) thành Train (80%) - Val (10%) - Test (10%).
+  - Bước 1.2: Tiền xử lý văn bản học máy (SpamTextProcessor - CHỈ FIT TRÊN TRAIN): chuẩn hóa Unicode, stop words, trần độ dài 791 từ.
+  - Bước 1.3: Trích xuất không gian đặc trưng lai 5 khối (HybridFeatureBuilder - CHỈ FIT TRÊN TRAIN): Word TF-IDF, Bigrams, Char n-grams, Keywords, Scaler.
+  - Bước 1.4: Lựa chọn đặc trưng Top-K tối ưu trên tập Validation (K=500 chiều).
 
 GIAI ĐOẠN 2: MODEL TRAINING (HUẤN LUYỆN 3 MÔ HÌNH CỐT LÕI THEO ĐỀ BÀI)
   - Bước 2.1: Huấn luyện mô hình 1 - Logistic Regression (Hàm Logistic/Sigmoid, Binary Cross-Entropy).
@@ -106,7 +109,7 @@ from src.evaluation.error_analysis import (
 from src.deployment.predictor import SpamInferenceService
 
 
-@log_step("GIAI ĐOẠN 1: TIỀN XỬ LÝ & TRÍCH XUẤT ĐẶC TRƯNG")
+@log_step("GIAI ĐOẠN 1: CHIA TẬP ĐỘC LẬP (EARLY SPLIT) & TIỀN XỬ LÝ ĐẶC TRƯNG")
 def step_data_preprocessing(logger, config=None):
     config = config or SpamExperimentConfig()
     data_file = getattr(config, "raw_data_file", RAW_DATA_FILE)
@@ -114,25 +117,25 @@ def step_data_preprocessing(logger, config=None):
     raw_data = load_raw_data(data_file) if (data_file is not None and str(data_file) != str(RAW_DATA_FILE)) else load_raw_data()
     logger.info(f"Tổng số bản ghi đọc được: {len(raw_data):,} dòng.")
 
-    # Lọc chất lượng & khử trùng lặp
-    logger.info("Kiểm toán và làm sạch dữ liệu (clean_email_split)...")
-    cleaned_data = clean_email_split(raw_data)
+    # Tầng Data Ingestion: Kiểm toán chất lượng & vệ sinh tính toàn vẹn mẫu (chống Duplicate Leakage)
+    logger.info("Kiểm toán chất lượng & khử trùng lặp thô tại tầng nạp (bảo đảm giả thiết i.i.d và chống rò rỉ qua duplicate)...")
+    sanitized_data = clean_email_split(raw_data)
     audit = audit_data_quality(raw_data)
-    logger.info(f"Số mẫu sạch giữ lại sau kiểm toán: {len(cleaned_data):,} mẫu.")
+    logger.info(f"Số mẫu độc lập hợp lệ sau kiểm toán toàn vẹn: {len(sanitized_data):,} mẫu.")
 
-    # Xuất bản bộ 6 biểu đồ khám phá dữ liệu (EDA & Outliers)
-    logger.info("Xuất bản bộ biểu đồ khám phá dữ liệu & Outlier analysis vào results/figures/...")
+    # Xuất bản bộ 6 biểu đồ khám phá dữ liệu ban đầu (EDA & Outliers)
+    logger.info("Xuất bản bộ biểu đồ khám phá dữ liệu ban đầu vào results/figures/...")
     plot_class_distribution(raw_data, save_path=FIGURES_DIR / "eda_class_distribution.png")
-    plot_text_length_comparison(cleaned_data, save_path=FIGURES_DIR / "eda_text_length_comparison.png")
-    plot_spam_signals_comparison(cleaned_data, save_path=FIGURES_DIR / "eda_spam_signals_distribution.png")
-    plot_discriminative_words(cleaned_data, save_path=FIGURES_DIR / "eda_discriminative_words.png")
-    plot_feature_correlation_heatmap(cleaned_data, save_path=FIGURES_DIR / "eda_feature_correlation.png")
-    plot_outlier_length_distribution(cleaned_data, save_path=FIGURES_DIR / "eda_outlier_length_distribution.png")
+    plot_text_length_comparison(sanitized_data, save_path=FIGURES_DIR / "eda_text_length_comparison.png")
+    plot_spam_signals_comparison(sanitized_data, save_path=FIGURES_DIR / "eda_spam_signals_distribution.png")
+    plot_discriminative_words(sanitized_data, save_path=FIGURES_DIR / "eda_discriminative_words.png")
+    plot_feature_correlation_heatmap(sanitized_data, save_path=FIGURES_DIR / "eda_feature_correlation.png")
+    plot_outlier_length_distribution(sanitized_data, save_path=FIGURES_DIR / "eda_outlier_length_distribution.png")
 
-    # Chia phân tầng 80/10/10
-    logger.info(f"Chia phân tầng Train/Val/Test: {config.train_ratio:.0%}/{config.val_ratio:.0%}/{config.test_ratio:.0%}...")
+    # BƯỚC 1: CHIA PHÂN TẦNG ĐỘC LẬP TRƯỚC TIÊN (EARLY STRATIFIED SPLIT FIRST)
+    logger.info(f"BƯỚC 1: Chia phân tầng Train/Val/Test ({config.train_ratio:.0%}/{config.val_ratio:.0%}/{config.test_ratio:.0%}) TRƯỚC MỌI BƯỚC TIỀN XỬ LÝ...")
     train_records, val_records, test_records = stratified_split_dataframe(
-        cleaned_data, train_ratio=config.train_ratio, val_ratio=config.val_ratio,
+        sanitized_data, train_ratio=config.train_ratio, val_ratio=config.val_ratio,
         test_ratio=config.test_ratio, random_state=config.random_state,
     )
     logger.info(f"Kích thước tập: Train={len(train_records):,}, Val={len(val_records):,}, Test={len(test_records):,}")
@@ -153,8 +156,8 @@ def step_data_preprocessing(logger, config=None):
         y_val = np.array([1 if r["label"] == "spam" else 0 for r in val_records], dtype=int)
         y_test = np.array([1 if r["label"] == "spam" else 0 for r in test_records], dtype=int)
 
-    # Trích xuất đặc trưng lai
-    logger.info("Khởi tạo và fit HybridFeatureBuilderScratch trên Train...")
+    # BƯỚC 2: TIỀN XỬ LÝ VĂN BẢN & TRÍCH XUẤT ĐẶC TRƯNG (CHỈ FIT DUY NHẤT TRÊN TRAIN)
+    logger.info("BƯỚC 2: Khởi tạo và fit HybridFeatureBuilderScratch (CHỈ FIT TRÊN TRAIN)...")
     text_processor = SpamTextProcessor(config=config)
     signal_extractor = SpamSignalFeatureExtractor(config=config)
     builder = HybridFeatureBuilderScratch(
