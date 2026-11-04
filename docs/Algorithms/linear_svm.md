@@ -1,6 +1,6 @@
-﻿# Linear SVM trong bài lab phân loại spam
+# Linear SVM trong bài lab phân loại spam
 
-Trong bài lab, dùng Linear SVM để so sánh với Logistic Regression và baseline Naive Bayes. Phần cài đặt nằm trong lớp `LinearSVMFromScratch` của [classifiers.py](../../src/models/classifiers.py).
+Nhóm dự kiến dùng Linear SVM để so sánh với Logistic Regression và baseline Naive Bayes. Phần thiết kế tập trung vào hàm mục tiêu, cách tối ưu và cách dùng điểm mô hình để phân loại email.
 
 ## 1. Mục đích và lý do lựa chọn
 
@@ -12,76 +12,71 @@ $$
 
 Score cho biết mẫu nằm về phía nào của siêu phẳng. Khoảng cách có dấu đến siêu phẳng là $z/\|w\|$ khi $w$ khác 0; bản thân $z$ chưa phải khoảng cách hình học đã chuẩn hóa.
 
-Hạn chế của mô hình là khó biểu diễn quan hệ phi tuyến nếu đặc trưng đầu vào chưa thể hiện được những quan hệ đó.
+Hạn chế của mô hình là khó biểu diễn quan hệ phi tuyến nếu đặc trưng đầu vào chưa thể hiện được những quan hệ đó. Nhóm sẽ so sánh trên cùng bộ đặc trưng với các mô hình còn lại.
 
 ## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-`fit(X, y)` nhận ma trận đặc trưng hữu hạn, không rỗng và nhãn nhị phân có đủ hai lớp. Code hỗ trợ NumPy array, SciPy sparse matrix và `CSRMatrixScratch`. Bản thân SVM không yêu cầu đặc trưng không âm, dù đặc trưng của pipeline hiện tại không âm.
+Đầu vào huấn luyện gồm ma trận đặc trưng hữu hạn, không rỗng và nhãn ham = 0, spam = 1 có đủ hai lớp. Nhóm dự kiến dùng ma trận thưa. Bản thân SVM không yêu cầu đặc trưng không âm.
 
-Cần phân biệt hai cách dự đoán trong code:
+Nhóm sẽ phân biệt hai miền điểm để tránh nhầm threshold:
 
-| Cách gọi                    | Giá trị dùng so sánh                                                | Ngưỡng mặc định    |
-| :---------------------------- | :---------------------------------------------------------------------- | :---------------------- |
-| `decision_function(X)`      | Trả margin $z$                                                       | Không phân loại      |
-| `predict(X, threshold=0.0)` | So sánh trực tiếp margin với threshold                              | 0.0                     |
-| `predict_proba(X)`          | Trả hai cột điểm sigmoid từ margin                                 | Không phân loại      |
-| Pipeline trong `main.py`    | So sánh `predict_proba(X)[:, 1]` với threshold chọn từ Validation | Được chọn khi chạy |
+| Cách biểu diễn | Giá trị dùng so sánh | Ngưỡng dự kiến |
+| :--- | :--- | :--- |
+| Điểm tuyến tính | $z=w^Tx+b$ | Chỉ biểu diễn điểm |
+| Phân loại trực tiếp | So sánh $z$ với ngưỡng margin | Ban đầu là 0 |
+| Điểm sigmoid | $s(x)=1/(1+e^{-z})$ | Chỉ biểu diễn điểm trong khoảng 0–1 |
+| Phân loại sau chọn ngưỡng | So sánh $s(x)$ với $\tau$ | Chọn trên Validation |
 
-Vì hai loại threshold khác miền, không truyền trực tiếp threshold đã chọn trên sigmoid score vào `svm.predict()`. Để dùng đúng cách của pipeline:
+Mốc margin 0 tương ứng với sigmoid 0,5. Threshold chọn trên sigmoid phải được so sánh với sigmoid score, không dùng trực tiếp làm ngưỡng margin.
 
-```python
-spam_scores = svm.predict_proba(X)[:, 1]
-y_pred = (spam_scores >= selected_threshold).astype(int)
-```
-
-Sigmoid dùng margin giới hạn trong `[-30, 30]`. Điểm trả về chưa qua calibration, dù API có tên `predict_proba`.
+Quy tắc phân loại dự kiến là spam khi $s(x)\ge\tau$, ngược lại là ham. Khi tính sigmoid, nhóm dự kiến giới hạn margin trong $[-30,30]$ để ổn định số học. Phép biến đổi này chưa phải calibration.
 
 ## 3. Dữ liệu sử dụng
 
-Em huấn luyện bằng Train và dùng Validation chọn tham số, threshold. Test giữ riêng để đánh giá cuối.
+Nhóm sẽ huấn luyện bằng Train và dùng Validation chọn tham số, threshold. Test được giữ riêng để đánh giá cuối.
 
-Pipeline chính dùng đặc trưng hybrid sau chọn lọc: word TF-IDF, bigram, character n-gram, keyword và numeric features. Từ vựng, IDF và scaler được fit bằng Train. Số chiều thực tế phụ thuộc cấu hình và dữ liệu.
+Đầu vào dự kiến bắt đầu từ word TF-IDF, sau đó có thể bổ sung bigram, character n-gram, từ khóa và đặc trưng số. Từ vựng, IDF và tham số chuẩn hóa chỉ được học từ Train. Nếu chọn bớt đặc trưng, cả ba tập cần giữ cùng thứ tự cột.
 
 ## 4. Phương pháp huấn luyện và đánh giá
 
 ### Hàm mục tiêu
 
-Code đổi nhãn thành $t_i=2y_i-1$ và tính mức vi phạm lề:
+Nhãn được đổi thành $t_i=2y_i-1$. Mức vi phạm lề của mẫu $i$ là:
 
 $$
 m_i=\max(0,1-t_i(w^Tx_i+b))
 $$
 
-Với cấu hình mặc định `loss='squared_hinge'`, hàm mục tiêu là:
+Nhóm dự kiến ưu tiên squared hinge với hàm mục tiêu:
 
 $$
 J(w,b)=\frac{\lambda}{2}\|w\|^2+\frac{1}{N}\sum_i a_i m_i^2
 $$
 
-Code cũng hỗ trợ `loss='hinge'`, khi đó dùng $m_i$ thay cho $m_i^2$. Với `class_weight='balanced'`, $a_i=N/(2N_{y_i})$; nếu không dùng trọng số lớp thì $a_i=1$. Hệ số điều chuẩn là $\lambda=1/\max(10^{-5},CN)$ và không phạt bias.
+Nếu thử hinge, thành phần $m_i^2$ được thay bằng $m_i$. Với trọng số lớp cân bằng, $a_i=N/(2N_{y_i})$; nếu không cân bằng thì $a_i=1$. Nhóm dự kiến dùng $\lambda=1/\max(10^{-5},CN)$ với $C>0$, không điều chuẩn bias. $N$ là số mẫu Train, còn $N_{y_i}$ là số mẫu thuộc lớp của mẫu $i$.
 
 ### Cách tối ưu
 
-Code khởi tạo tham số bằng 0, sau đó gọi `_gradient_descent_backtracking` để cập nhật theo gradient với Armijo và bước học theo độ cong Barzilai-Borwein. Nhánh Hinge dùng subgradient. Số vòng đã thực hiện nằm trong `n_iter_`, các giá trị loss nằm trong `loss_history_`.
+Nhóm dự kiến tối ưu trực tiếp theo trọng số và bias của bài toán primal, bắt đầu từ 0. Mỗi bước cập nhật dùng gradient, giảm bước theo điều kiện Armijo và điều chỉnh bước tiếp theo bằng Barzilai–Borwein. Nếu thử hinge, nhóm sẽ dùng subgradient tại các đoạn tương ứng.
 
-Tham số `tol` được truyền vào hàm tối ưu dưới dạng `min(self.tol, 1e-7)`. Vì vậy `tol` của constructor không được dùng nguyên giá trị làm ngưỡng dừng.
+Nhóm sẽ theo dõi loss và số vòng cập nhật, dừng khi gradient đủ nhỏ hoặc đạt giới hạn số vòng. Ngưỡng gradient dự kiến không lớn hơn $10^{-7}$; nếu chưa hội tụ trong số vòng cho phép, cần ghi rõ khi so sánh.
 
 ### Cấu hình và tiêu chí đánh giá
 
-Trong `main.py`, nhánh Default dùng `C=1.0`, `learning_rate=0.05`, `max_iter=150`, `class_weight='balanced'`, `loss='squared_hinge'`. Nhánh Tuned thử `C` trong `[0.5, 1.0, 2.0]`.
+Cấu hình khởi đầu dự kiến là $C=1$, bước học ban đầu 0,05, tối đa 150 vòng, cân bằng trọng số lớp và squared hinge. Nhóm sẽ thử $C\in\{0.5,1,2\}$ trên cùng split.
 
-Bộ chọn ngưỡng quét mặc định 200 giá trị từ `0.005` đến `1.0` trên sigmoid score của Validation. Trong nhóm đạt Recall 0.85, chọn Accuracy cao nhất rồi xét F1, Precision và FPR thấp hơn. Nếu không ngưỡng nào đạt, ưu tiên Recall, Accuracy rồi F1.
+Với mỗi cấu hình, nhóm dự kiến thử 200 threshold từ 0,005 đến 1,0 trên sigmoid score của Validation. Trong nhóm đạt Recall mục tiêu 0,85, chọn Accuracy cao nhất rồi xét F1, Precision và FPR thấp hơn. Nếu chưa đạt thì xét Recall → Accuracy → F1.
 
-Khi chọn cấu hình và mô hình cuối, code ưu tiên đạt Recall mục tiêu, sau đó Accuracy và F1; nếu chưa đạt thì ưu tiên Recall, Accuracy và F1. Test không tham gia lựa chọn. Các chỉ số báo cáo gồm Accuracy, Precision, Recall, F1, F2, ROC-AUC, FPR và confusion matrix.
+Khi chọn cấu hình và mô hình cuối, nhóm ưu tiên đạt mục tiêu Recall rồi xét Accuracy → F1; nếu chưa đạt thì xét Recall → Accuracy → F1. Test không tham gia lựa chọn. Các chỉ số dự kiến báo cáo gồm Accuracy, Precision, Recall, F1, F2, ROC-AUC, FPR và confusion matrix.
 
-## 5. Phần đã cài đặt và cách kiểm tra
+## 5. Kế hoạch kiểm tra
 
-`LinearSVMFromScratch` tự tính loss, gradient và cập nhật tham số, không gọi `sklearn.svm.LinearSVC`. Đây là cách tối ưu theo trọng số của bài toán primal; code không lưu riêng danh sách support vectors.
+Nhóm sẽ dùng ví dụ nhỏ để kiểm tra dấu của margin, mức vi phạm lề, loss và hướng cập nhật. Cần phân biệt hinge với squared hinge, đồng thời kiểm tra ảnh hưởng của điều chuẩn và trọng số lớp.
 
-`main.py` gọi huấn luyện, còn `src/models/tuning.py` chọn cấu hình và threshold. Các kiểm tra liên quan nằm trong `tests/test_models.py` và `tests/test_model_contracts.py`. Kết quả pass/fail cần được lấy từ lần chạy kiểm thử cụ thể.
+Các trường hợp cần thử gồm dữ liệu không hợp lệ, sai số cột, mẫu nằm đúng ngưỡng và dữ liệu có đặc trưng rất nhỏ. Nhóm cũng sẽ đối chiếu kết quả giữa dạng ma trận đặc và thưa, kiểm tra sự tương ứng giữa ngưỡng margin 0 và sigmoid 0,5.
 
-## 6. Kết quả thực nghiệm và giới hạn
+## 6. Kế hoạch đánh giá và giới hạn
 
-Em đọc kết quả từ [bảng Validation](../../results/metrics/validation_model_selection.csv) và [bảng Test](../../results/metrics/test_models_comparison.csv). Threshold và mô hình được chọn phụ thuộc lần chạy, không được cố định vào thuật toán.
+Nhóm sẽ ghi cấu hình, diễn biến loss, threshold và metrics của từng thí nghiệm. Mô hình và ngưỡng được chọn bằng Validation trước khi đánh giá Test; không đặt trước một mô hình thắng.
 
-Khi phân tích kết quả, em cần xem cả spam bị bỏ sót và ham bị nhận nhầm. Các văn bản viết biến dạng, khác ngôn ngữ hoặc khác dữ liệu huấn luyện có thể làm giảm chất lượng. Recall đạt mục tiêu trên Validation không bảo đảm Test cũng đạt mục tiêu đó.
+Khi phân tích, nhóm cần xem cả spam bị bỏ sót và ham bị nhận nhầm. Email viết biến dạng, khác ngôn ngữ hoặc khác nguồn dữ liệu có thể làm giảm chất lượng. Đạt Recall mục tiêu trên Validation không bảo đảm Test cũng đạt mục tiêu đó.

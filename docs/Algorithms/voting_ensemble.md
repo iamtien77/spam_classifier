@@ -1,71 +1,71 @@
-﻿# Voting Ensemble trong bài lab phân loại spam
+# Voting Ensemble trong bài lab phân loại spam
 
-Sau khi có các mô hình đơn, em thử Voting Ensemble để xem việc kết hợp dự đoán có cải thiện kết quả hay không. Phần cài đặt nằm trong lớp `SpamVotingEnsemble` của [ensemble.py](../../src/models/ensemble.py).
+Sau khi có các mô hình đơn, nhóm dự kiến thử Voting Ensemble để xem việc kết hợp dự đoán có mang lại lợi ích hay không. Đây là phần mở rộng của bài lab, được so sánh bằng cùng dữ liệu và tiêu chí với các mô hình đơn.
 
 ## 1. Mục đích và lý do lựa chọn
 
-Em kết hợp Logistic Regression, Linear SVM và Complement Naive Bayes vì mỗi thuật toán có cách học khác nhau. Việc kết hợp chỉ có ý nghĩa khi kết quả thực nghiệm cho thấy có lợi so với mô hình đơn.
+Nhóm dự kiến kết hợp Logistic Regression, Linear SVM và Complement Naive Bayes vì mỗi phương pháp có cách học khác nhau. Ensemble có thể hữu ích nếu các thành viên bổ sung được cho nhau ở những mẫu khó.
 
-Đánh đổi là cần chạy dự đoán qua nhiều mô hình, tăng thời gian và bộ nhớ. Nếu các mô hình cùng sai trên một nhóm mẫu, ensemble vẫn có thể dự đoán sai.
+Đánh đổi là cần dự đoán qua nhiều mô hình, tăng thời gian và bộ nhớ. Nếu các thành viên cùng sai trên một nhóm mẫu, kết hợp dự đoán chưa chắc giúp cải thiện.
 
 ## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-Constructor nhận:
+Phương án kết hợp cần xác định:
 
-- `models`: dictionary chứa tên và đối tượng mô hình thành viên.
-- `weights`: dictionary trọng số; mặc định mỗi thành viên có trọng số 1.
-- `voting`: chọn `soft` hoặc `hard`.
+- Các mô hình thành viên và cách biểu diễn đặc trưng dùng chung.
+- Trọng số của từng thành viên, dự kiến bắt đầu từ trọng số đều.
+- Cách bỏ phiếu: soft voting hoặc hard voting.
 
-`fit(X, y)` gọi `fit()` của từng thành viên trên cùng dữ liệu. Trong `main.py`, các thành viên đã được huấn luyện trước khi đưa vào ensemble nên không cần gọi lại `ensemble.fit()`.
+Trọng số phải hữu hạn, không âm và có tổng hữu hạn, lớn hơn 0. Một thành viên có thể mang trọng số 0 nếu các thành viên còn lại vẫn có tổng trọng số dương.
 
-`predict_proba(X)` trả hai cột điểm tổng hợp. `predict(X, threshold=0.5)` trả nhãn, nhưng ý nghĩa threshold phụ thuộc cách voting như mô tả bên dưới.
+Mỗi thành viên được huấn luyện trên Train trước khi kết hợp. Đầu ra gồm điểm tổng hợp hoặc tỷ lệ phiếu có trọng số và nhãn ham/spam theo quy tắc tương ứng.
 
 ## 3. Dữ liệu sử dụng
 
-Các thành viên nhận cùng ma trận đặc trưng hybrid sau chọn lọc và được fit bằng Train. Validation dùng so sánh ứng viên và chọn threshold; Test dùng đánh giá sau lựa chọn.
+Các thành viên dự kiến nhận cùng ma trận đặc trưng và cùng split. Bộ biến đổi chỉ học từ Train; Validation dùng so sánh phương án kết hợp và chọn threshold cho soft voting. Test dành cho đánh giá sau lựa chọn.
 
-Trong `main.py`, nhánh Default dùng trọng số LR:SVM:CNB là `1:1:1.2`. Nhánh Tuned ghép các mô hình đơn đã tuning và dùng trọng số đều `1:1:1`. Code hiện tại không tìm kiếm trọng số ensemble; tên Tuned chỉ việc sử dụng các thành viên đã tuning.
+Nhóm dự kiến so sánh tổ hợp từ các mô hình cấu hình ban đầu với tổ hợp từ các mô hình đã chọn tham số trên Validation. Có thể đặt trước tỷ lệ trọng số LR:SVM:CNB là 1:1:1,2 cho tổ hợp ban đầu và 1:1:1 cho tổ hợp sau tuning. Đây là các phương án thử, chưa phải trọng số tối ưu; tuning mô hình thành viên không đồng nghĩa đã tối ưu trọng số ensemble.
 
 ## 4. Cách kết hợp và phương pháp đánh giá
 
 ### Soft voting
 
-Với trọng số dương $v_m$ và điểm spam $s_m(x)$ của từng thành viên:
+Với trọng số $v_m\ge0$, tổng trọng số dương và điểm spam $s_m(x)$ của từng thành viên:
 
 $$
 s(x)=\frac{\sum_m v_m s_m(x)}{\sum_m v_m}
 $$
 
-Code lấy `predict_proba()` của thành viên nếu có. Nếu chỉ có `decision_function()`, code chuyển điểm qua sigmoid; nếu không có cả hai, code dùng nhãn dự đoán làm điểm 0 hoặc 1.
+Nhóm dự kiến dùng điểm sigmoid của LR và SVM, cùng điểm chuẩn hóa của Naive Bayes. Mỗi điểm cần nằm trong khoảng 0–1 và cùng biểu diễn lớp spam trước khi lấy trung bình có trọng số.
 
-`predict()` ở chế độ soft trả spam khi $s(x)$ lớn hơn hoặc bằng threshold. Điểm SVM là sigmoid của margin chưa calibration, nên điểm ensemble cũng chưa được xem là xác suất đã hiệu chỉnh.
+Nhãn dự đoán là spam khi $s(x)$ lớn hơn hoặc bằng threshold. Các điểm thành viên chưa được đánh giá calibration nên điểm ensemble cũng chưa được xem là xác suất đã hiệu chỉnh.
 
 ### Hard voting
 
-Code gọi `predict(X)` mặc định của mỗi thành viên và cộng phiếu có trọng số:
+Mỗi thành viên đưa ra một nhãn $\hat y_m(x)\in\{0,1\}$, rồi nhóm tính tổng phiếu spam có trọng số:
 
 $$
 V(x)=\sum_m v_m\hat y_m(x)
 $$
 
-`predict()` trả spam nếu $V(x)\ge\frac{1}{2}\sum_m v_m$. Vì dùng dấu lớn hơn hoặc bằng, **hòa phiếu được chọn là spam**. Đây là bỏ phiếu có trọng số; công thức mode không đủ mô tả khi trọng số khác nhau.
+Quy tắc dự kiến là chọn spam nếu $V(x)\ge\frac{1}{2}\sum_m v_m$, tức **hòa phiếu được chọn là spam**. Tỷ lệ phiếu spam là $V(x)/\sum_m v_m$, không phải xác suất của mẫu.
 
-Ở chế độ hard, `predict_proba()` trả tỷ lệ phiếu theo trọng số, còn tham số `threshold` của `predict()` không được sử dụng. Code luôn dùng mốc một nửa tổng trọng số. SVM thành viên gọi `predict()` với margin threshold mặc định 0; LR và NB dùng ngưỡng điểm mặc định 0.5. Những ngưỡng này không phải threshold riêng đã chọn từ Validation.
+Nhóm sẽ giữ mốc quyết định hard voting ở một nửa tổng trọng số. Thành viên SVM dùng ngưỡng margin 0; LR và Naive Bayes dùng ngưỡng điểm 0,5. Các ngưỡng thành viên này được đặt trước, khác với threshold riêng được chọn khi đánh giá từng mô hình.
 
 ### Cách đánh giá trong pipeline
 
-`main.py` dùng **soft voting**. Bộ chọn ngưỡng quét mặc định 200 mốc từ `0.005` đến `1.0` trên Validation, ưu tiên ngưỡng đạt Recall 0.85 rồi Accuracy, F1, Precision và FPR thấp hơn. Nếu chưa đạt thì ưu tiên Recall, Accuracy và F1.
+Nhóm dự kiến dùng soft voting làm phương án kết hợp chính và thử thêm hard voting để đối chiếu. Với soft voting, thử 200 threshold từ 0,005 đến 1,0 trên Validation; ưu tiên ngưỡng đạt Recall mục tiêu 0,85 rồi xét Accuracy → F1 → Precision → FPR thấp hơn. Nếu chưa đạt thì xét Recall → Accuracy → F1. Hard voting giữ mốc 0,5 trên tỷ lệ phiếu.
 
-`ModelSelectionWorkflow` so sánh ensemble với các mô hình đơn theo việc đạt Recall mục tiêu, sau đó Accuracy và F1. Nếu chưa đạt, ưu tiên Recall rồi Accuracy và F1. Test không dùng để chọn lại mô hình. Em báo cáo thêm Precision, F2, ROC-AUC và confusion matrix.
+Khi so sánh ensemble với mô hình đơn, nhóm ưu tiên đạt mục tiêu Recall rồi xét Accuracy → F1; nếu chưa đạt thì xét Recall → Accuracy → F1. Test không dùng để chọn lại mô hình. Nhóm sẽ báo cáo thêm Precision, F2, ROC-AUC, FPR, confusion matrix và chi phí dự đoán.
 
-## 5. Phần đã cài đặt và cách kiểm tra
+## 5. Kế hoạch kiểm tra
 
-`SpamVotingEnsemble` tự kết hợp điểm và phiếu bằng NumPy. Module còn có hàm tạo Random Forest và Gradient Boosting bằng scikit-learn, nhưng các mô hình cây này không được gọi trong pipeline so sánh chính đang mô tả.
+Nhóm sẽ dùng ví dụ có thể tính tay để đối chiếu trung bình điểm, tổng phiếu và trường hợp hòa. Cần kiểm tra trọng số đều, trọng số khác nhau và một thành viên có trọng số 0.
 
-Các kiểm tra liên quan nằm trong `tests/test_models.py`. Khi kiểm tra, cần phân biệt soft score, hard vote, trọng số và trường hợp hòa. Tài liệu này không khẳng định toàn bộ tests hiện tại đã pass.
+Các trường hợp không hợp lệ như danh sách thành viên rỗng, trọng số âm, không hữu hạn hoặc tổng bằng 0 cần được phát hiện. Nhóm cũng sẽ kiểm tra nhãn lớp được hiểu thống nhất giữa các thành viên và phân biệt rõ soft score với tỷ lệ phiếu hard voting.
 
-## 6. Kết quả thực nghiệm và giới hạn
+## 6. Kế hoạch đánh giá và giới hạn
 
-Em đọc kết quả từ [bảng Validation](../../results/metrics/validation_model_selection.csv) và [bảng Test](../../results/metrics/test_models_comparison.csv), sau đó so sánh với từng mô hình đơn trên cùng split.
+Nhóm sẽ ghi lại thành viên, cấu hình, trọng số, cách voting và threshold của mỗi phương án. Ensemble được so sánh với từng mô hình đơn trên cùng split trước khi quyết định có chọn hay không.
 
-Ensemble không mặc định tốt hơn mô hình đơn. Sự khác nhau về thang điểm hoặc các lỗi chung giữa thành viên có thể làm giảm lợi ích kết hợp. Code hiện tại chưa kiểm tra đầy đủ mọi trường hợp trọng số không hợp lệ, nên cách dùng được mô tả ở đây áp dụng cho trọng số dương như pipeline chính.
+Ensemble không mặc định tốt hơn mô hình đơn. Khác biệt về thang điểm và các lỗi chung giữa thành viên có thể làm giảm lợi ích kết hợp. Nếu mức cải thiện không đáng kể so với thời gian và bộ nhớ tăng thêm, nhóm sẽ cân nhắc phương án đơn giản hơn trong phạm vi bài lab.

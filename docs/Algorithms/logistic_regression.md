@@ -1,10 +1,10 @@
-﻿# Logistic Regression trong bài lab phân loại spam
+# Logistic Regression trong bài lab phân loại spam
 
-Tài liệu này giải thích cách em sử dụng Logistic Regression trong bài lab và đối chiếu với phần đã cài đặt trong [classifiers.py](../../src/models/classifiers.py), lớp `LogisticRegressionFromScratch`.
+Nhóm dự kiến dùng Logistic Regression để so sánh với baseline Complement Naive Bayes. Tài liệu này trình bày phương án huấn luyện, cách chọn cấu hình và kế hoạch kiểm tra cho bài lab.
 
 ## 1. Mục đích và lý do lựa chọn
 
-Em dùng Logistic Regression để so sánh với baseline Complement Naive Bayes. Mô hình có ranh giới tuyến tính, phù hợp với đặc trưng văn bản dạng ma trận thưa và cho phép xem trọng số của từng đặc trưng.
+Logistic Regression có ranh giới tuyến tính, phù hợp với đặc trưng văn bản dạng ma trận thưa. Nhóm có thể xem trọng số của các đặc trưng để hiểu chúng ảnh hưởng đến dự đoán theo hướng nào.
 
 Với một mẫu có vector đặc trưng $x$, mô hình tính:
 
@@ -12,58 +12,58 @@ $$
 z = w^T x + b, \qquad p = \frac{1}{1+e^{-z}}
 $$
 
-Trong đó, $w$ là trọng số, $b$ là bias và $p$ là điểm sigmoid cho lớp spam. Điểm này chưa được kiểm tra calibration nên em không xem nó là xác suất rủi ro chính xác trong thực tế.
+Trong đó, $w$ là trọng số, $b$ là bias và $p$ là điểm sigmoid cho lớp spam. Nhóm sẽ dùng điểm này để chọn threshold; việc diễn giải thành xác suất thực tế cần có đánh giá calibration riêng.
 
-Hạn chế của mô hình là không tự học được quan hệ phi tuyến phức tạp. Chất lượng dự đoán còn phụ thuộc vào cách tạo đặc trưng.
+Hạn chế của mô hình là không tự học được quan hệ phi tuyến phức tạp. Chất lượng dự đoán còn phụ thuộc vào cách biểu diễn văn bản.
 
 ## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-- `fit(X, y)` nhận ma trận đặc trưng hai chiều và vector nhãn `0` hoặc `1`, có đủ hai lớp.
-- Code hỗ trợ NumPy array, SciPy sparse matrix và `CSRMatrixScratch`. Giá trị đầu vào phải hữu hạn.
-- `predict_proba(X)` trả ma trận hai cột: điểm ham và điểm spam.
-- `predict(X, threshold=0.5)` trả nhãn `1` khi điểm spam lớn hơn hoặc bằng threshold.
-- Sau huấn luyện, `weights_`, `bias_` chứa tham số đã học; `loss_history_` lưu các giá trị loss.
+- Đầu vào gồm ma trận đặc trưng hai chiều, hữu hạn, không rỗng và vector nhãn ham = 0, spam = 1 có đủ hai lớp.
+- Nhóm dự kiến dùng ma trận thưa để tiết kiệm bộ nhớ với dữ liệu văn bản nhiều chiều.
+- Đầu ra gồm điểm spam $p$, điểm ham $1-p$ và nhãn dự đoán theo threshold.
+- Mốc phân loại ban đầu dự kiến là 0,5; mẫu có điểm spam bằng threshold được xếp vào lớp spam.
+- Quá trình huấn luyện cần ghi lại loss để theo dõi mức giảm và dấu hiệu chưa hội tụ.
 
 ## 3. Dữ liệu sử dụng
 
-Em dùng Train để học từ vựng, IDF, các bước biến đổi đặc trưng và tham số mô hình. Validation dùng chọn cấu hình và threshold; Test dùng đánh giá sau khi đã chọn xong.
+Nhóm sẽ dùng Train để học từ vựng, IDF, tham số biến đổi đặc trưng và trọng số mô hình. Validation dùng chọn cấu hình và threshold; Test chỉ dùng sau khi lựa chọn đã hoàn tất.
 
-Trong pipeline chính, đầu vào là các cột đã chọn từ bộ đặc trưng hybrid gồm word TF-IDF, bigram, character n-gram, keyword và numeric features. Số cột phụ thuộc cấu hình và kết quả chọn đặc trưng, không cố định trong thuật toán Logistic Regression.
+Nhóm dự kiến so sánh với Naive Bayes trên cùng bộ đặc trưng. Sau baseline word TF-IDF, có thể thử thêm bigram, character n-gram, từ khóa và đặc trưng số. Số chiều phụ thuộc phương án chọn đặc trưng, không phải một hằng số của Logistic Regression.
 
 ## 4. Phương pháp huấn luyện và đánh giá
 
 ### Hàm mục tiêu
 
-Code sử dụng Binary Cross-Entropy có trọng số mẫu và điều chuẩn L2:
+Nhóm dự kiến dùng Binary Cross-Entropy có trọng số mẫu và điều chuẩn L2:
 
 $$
 J(w,b)=\frac{1}{N}\sum_i a_i[\log(1+e^{z_i})-y_i z_i]+\frac{\lambda}{2}\|w\|^2
 $$
 
-Với `class_weight='balanced'`, $a_i=N/(2N_{y_i})$. Nếu `class_weight=None`, các mẫu có trọng số bằng 1. Hệ số điều chuẩn là $\lambda=1/\max(10^{-5},CN)$. Bias không bị điều chuẩn.
+Ở đây, $N$ là số mẫu Train và $N_{y_i}$ là số mẫu thuộc lớp của mẫu $i$. Khi cân bằng trọng số lớp, $a_i=N/(2N_{y_i})$; nếu không cân bằng thì $a_i=1$. Nhóm dự kiến dùng $\lambda=1/\max(10^{-5},CN)$ với $C>0$, và không điều chuẩn bias.
 
-Code tính BCE bằng `np.logaddexp(0, z) - y*z` để tránh tràn số. Khi tính sigmoid, code giới hạn $z$ trong đoạn `[-30, 30]`.
+Để hạn chế tràn số, biểu thức $\log(1+e^z)$ cần được tính theo dạng ổn định số học. Khi tính sigmoid, nhóm dự kiến giới hạn $z$ trong $[-30,30]$.
 
 ### Cách tối ưu
 
-Hàm `_gradient_descent_backtracking` bắt đầu với trọng số và bias bằng 0. Mỗi vòng lặp cập nhật theo gradient, co bước học theo điều kiện Armijo và điều chỉnh bước tiếp theo dựa trên độ cong theo cách Barzilai-Borwein. Giới hạn số vòng lặp không đồng nghĩa với bảo đảm đã hội tụ.
+Nhóm dự kiến khởi tạo trọng số và bias bằng 0, cập nhật theo gradient rồi giảm bước học nếu chưa thỏa điều kiện Armijo. Bước tiếp theo được điều chỉnh theo độ cong bằng phương pháp Barzilai–Borwein. Việc dừng cần xét gradient và giới hạn số vòng; đạt số vòng tối đa không đồng nghĩa mô hình đã hội tụ.
 
 ### Cấu hình và tiêu chí đánh giá
 
-Trong `main.py`, nhánh Default dùng `C=1.0`, `learning_rate=0.1`, `max_iter=200`, `class_weight='balanced'`. Lưu ý constructor của lớp có `max_iter=300`; pipeline truyền lại giá trị 200. Nhánh Tuned thử `C` trong `[0.5, 1.0, 2.0]`.
+Cấu hình khởi đầu dự kiến là $C=1$, bước học ban đầu 0,1, tối đa 200 vòng và cân bằng trọng số lớp. Nhóm sẽ thử thêm $C\in\{0.5,1,2\}$, giữ các yếu tố khác cố định để dễ so sánh.
 
-`ThresholdOptimizerScratch` quét mặc định 200 threshold từ `0.005` đến `1.0` trên Validation. Trong nhóm đạt Recall mục tiêu 0.85, ngưỡng được chọn theo Accuracy, F1, Precision rồi FPR thấp hơn. Nếu không đạt mục tiêu, ưu tiên Recall, Accuracy rồi F1.
+Với mỗi cấu hình, nhóm dự kiến quét 200 threshold từ 0,005 đến 1,0 trên Validation. Trong nhóm đạt Recall mục tiêu 0,85, chọn ngưỡng theo Accuracy → F1 → Precision → FPR thấp hơn. Nếu chưa đạt thì xét Recall → Accuracy → F1.
 
-Khi so sánh cấu hình và các mô hình cuối, code ưu tiên đạt mục tiêu Recall, sau đó Accuracy và F1; nếu chưa đạt, ưu tiên Recall rồi Accuracy và F1. Em theo dõi thêm Precision, F2, ROC-AUC và confusion matrix để thấy cả lỗi nhận nhầm ham và bỏ sót spam.
+Khi so sánh cấu hình và mô hình cuối, nhóm ưu tiên đạt mục tiêu Recall rồi xét Accuracy → F1; nếu chưa đạt thì xét Recall → Accuracy → F1. Precision, F2, ROC-AUC, FPR và confusion matrix giúp bổ sung góc nhìn về lỗi nhận nhầm ham và bỏ sót spam.
 
-## 5. Phần đã cài đặt và cách kiểm tra
+## 5. Kế hoạch kiểm tra
 
-Thuật toán được tự cài đặt trong `src/models/classifiers.py`, không gọi lớp Logistic Regression của scikit-learn. `main.py` gọi `fit()` để huấn luyện; `src/models/tuning.py` thực hiện tìm cấu hình và ngưỡng trên Validation.
+Nhóm sẽ đối chiếu loss và gradient trên ví dụ nhỏ, kiểm tra hướng cập nhật có làm giảm loss hay không và quan sát quá trình hội tụ. Dữ liệu dạng đặc và thưa cần cho kết quả tương đương trong sai số số học.
 
-Các kiểm tra liên quan nằm trong `tests/test_models.py` và `tests/test_model_contracts.py`. Khi báo cáo kiểm thử, em cần ghi kết quả của lần chạy cụ thể; tài liệu này không khẳng định số tests đã pass ở phiên bản hiện tại.
+Nhóm cũng sẽ kiểm tra dữ liệu không hữu hạn, nhãn không hợp lệ, số cột không khớp và điểm nằm sát threshold. Bộ biến đổi học từ Train cần được giữ nguyên khi đánh giá hoặc dự đoán email mới.
 
-## 6. Kết quả thực nghiệm và giới hạn
+## 6. Kế hoạch đánh giá và giới hạn
 
-Kết quả mỗi lần chạy được đọc từ [bảng lựa chọn Validation](../../results/metrics/validation_model_selection.csv) và [bảng so sánh Test](../../results/metrics/test_models_comparison.csv). Các file này là artifact đã lưu, không thay thế cho việc chạy lại khi code hoặc dữ liệu thay đổi.
+Mỗi thí nghiệm dự kiến ghi lại cấu hình, bộ đặc trưng, threshold, diễn biến loss và metrics. Nhóm sẽ chọn phương án bằng Validation trước khi đánh giá Test, đồng thời dùng cùng split để so sánh với baseline.
 
-Em dùng cùng split và cách tạo đặc trưng khi so sánh với baseline. Các mẫu rất ngắn, chứa từ mới hoặc có ngữ cảnh phức tạp có thể bị dự đoán sai. Một lần chia dữ liệu chưa đủ để kết luận mô hình ổn định trên mọi dữ liệu mới.
+Email rất ngắn, chứa từ mới hoặc có ngữ cảnh phức tạp có thể bị dự đoán sai. Nhóm sẽ đọc các mẫu lỗi để đề xuất thí nghiệm tiếp theo; một split chưa đủ để kết luận mô hình ổn định trên mọi nguồn email.
