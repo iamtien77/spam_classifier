@@ -1,160 +1,69 @@
-# 📈 Logistic Regression (From-Scratch)
+﻿# Logistic Regression trong bài lab phân loại spam
 
-> **Vị trí trong dự án:** Mô hình phân loại tuyến tính xác suất cốt lõi, ứng viên cạnh tranh trực tiếp với Linear SVM.  
-> **Mã nguồn triển khai:** Class [`LogisticRegressionFromScratch`](../../src/models/classifiers.py#L142) trong [`src/models/classifiers.py`](../../src/models/classifiers.py).
-
----
+Tài liệu này giải thích cách em sử dụng Logistic Regression trong bài lab và đối chiếu với phần đã cài đặt trong [classifiers.py](../../src/models/classifiers.py), lớp `LogisticRegressionFromScratch`.
 
 ## 1. Mục đích và lý do lựa chọn
 
-### 1.1. Mục đích bài toán
-Logistic Regression được đưa vào nghiên cứu như một mô hình tuyến tính cho bài toán phân loại văn bản nhị phân (Binary Text Classification).
+Em dùng Logistic Regression để so sánh với baseline Complement Naive Bayes. Mô hình có ranh giới tuyến tính, phù hợp với đặc trưng văn bản dạng ma trận thưa và cho phép xem trọng số của từng đặc trưng.
 
-Mục đích của thuật toán trong dự án:
-- Tạo điểm sigmoid cho lớp Spam từ tổ hợp tuyến tính của đặc trưng văn bản và tín hiệu cấu trúc: $z = w^\top x + b$. Điểm chưa được kiểm tra calibration nên không mặc nhiên là xác suất hậu nghiệm chính xác.
-- Cung cấp một mô hình có tính diễn giải cao (Explainable Model), trong đó mỗi trọng số $w_j$ phản ánh trực tiếp mức độ đóng góp (log-odds) của từ khóa hoặc đặc trưng tương ứng vào việc làm tăng hay giảm nguy cơ là thư rác.
-
-### 1.2. Cơ sở toán học và hàm mục tiêu
-Mô hình ánh xạ điểm tuyến tính qua hàm Logistic (Sigmoid):
+Với một mẫu có vector đặc trưng $x$, mô hình tính:
 
 $$
-p_i = \sigma(z_i) = \frac{1}{1 + \exp\left(-(w^\top x_i + b)\right)}
+z = w^T x + b, \qquad p = \frac{1}{1+e^{-z}}
 $$
 
-Hàm mất mát tối ưu là **Binary Cross-Entropy (BCE) có trọng số lớp và điều chuẩn $L_2$**:
+Trong đó, $w$ là trọng số, $b$ là bias và $p$ là điểm sigmoid cho lớp spam. Điểm này chưa được kiểm tra calibration nên em không xem nó là xác suất rủi ro chính xác trong thực tế.
 
-$$
-J(w, b) = - \frac{1}{N} \sum_{i=1}^{N} a_i \left[ y_i \ln p_i + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^{D} w_j^2
-$$
-
-Trong đó:
-- $`y_i \in \{0, 1\}`$ là nhãn thực tế ($0$: Ham, $1$: Spam).
-- $a_i$ là trọng số mẫu cân bằng lớp (`class_weight='balanced'`): $a_i = \frac{N}{2 \times N_{y_i}}$.
-- Hệ số điều chuẩn $\lambda = \frac{1}{\max(10^{-5}, C \cdot N)}$, tương đương $\lambda = \frac{1}{C \cdot N}$ với cấu hình dự án, nhằm kiểm soát độ lớn trọng số $w$, tránh hiện tượng các từ vựng hiếm bị gán trọng số cực đoan dẫn đến overfitting.
-- Hệ số chặn (bias) $b$ không bị phạt điều chuẩn.
-
-### 1.3. Cơ chế tối ưu hóa số học ổn định
-
-**Ổn định số học (Numerical Stability):** Tránh lỗi tràn số (overflow/underflow) khi tính log xác suất bằng cách sử dụng `np.logaddexp`:
-
-$$
-\ln(1 + \exp(-z)) = \text{logaddexp}(0, -z)
-$$
-
-**Thuật toán tối ưu Spectral Gradient Descent kết hợp Armijo Backtracking:**
-Thay vì dùng bước học giảm cố định dễ dẫn đến kẹt tại điểm khởi tạo trên ma trận TF-IDF thưa, thuật toán ước lượng độ cong địa phương theo phương pháp Barzilai-Borwein:
-
-$$
-\Delta w = w^{(k)} - w^{(k-1)}, \quad \Delta g = g^{(k)} - g^{(k-1)}, \quad \eta^{(k)} = \frac{\Delta w^\top \Delta w}{\Delta w^\top \Delta g}
-$$
-
-Sau đó thực hiện kiểm tra điều kiện suy giảm Armijo để co bước học nếu hàm mục tiêu chưa giảm đủ; hiệu quả hội tụ còn phụ thuộc dữ liệu và cấu hình.
-
-### 1.4. Đánh đổi và các trường hợp dễ dự đoán sai
-- **Đánh đổi:** Dự đoán bằng tích vô hướng và sigmoid nên chi phí suy luận thấp; điểm đầu ra liên tục nhưng chưa được kiểm tra calibration. Ranh giới quyết định tuyến tính trong không gian log-odds không tự học được tương tác phi tuyến phức tạp nếu thiếu đặc trưng hỗ trợ.
-- **Các trường hợp dễ dự đoán sai:**
-  - Nhạy cảm với các mẫu văn bản chứa nhiều từ khóa trung lập xuất hiện dày đặc làm loãng tín hiệu spam.
-  - Token mới ngoài từ điển Word TF-IDF không đóng góp ở khối đó; toàn vector chỉ bằng 0 nếu các khối character n-gram, keyword và numeric cũng không tạo tín hiệu. Khi đó dự đoán phụ thuộc vào bias $b$.
-
----
+Hạn chế của mô hình là không tự học được quan hệ phi tuyến phức tạp. Chất lượng dự đoán còn phụ thuộc vào cách tạo đặc trưng.
 
 ## 2. Dữ liệu đầu vào và kết quả đầu ra
 
-### 2.1. Đầu vào
-- **Ma trận đặc trưng $X$:** Ma trận thưa kích thước $(N,D_{\text{selected}})$ thuộc lớp [`CSRMatrixScratch`](../../src/features/feature_engineering.py#L45) hoặc `scipy.sparse.csr_matrix`; $D_{\text{selected}}=4318$ trong lần chạy tham chiếu.
-- **Vector nhãn $y$:** Vector số nguyên $N$ phần tử, $`y_i \in \{0, 1\}`$.
-
-### 2.2. Đầu ra
-
-**Điểm sigmoid cho Spam ($\hat{p}$):**
-
-$$
-\hat{p}_i = \sigma(w^\top x_i + b) \in [0, 1]
-$$
-
-Giá trị này dùng để xếp hạng và chọn ngưỡng; chưa có đánh giá calibration để diễn giải như tần suất rủi ro thực tế.
-
-**Nhãn phân loại cuối cùng ($\hat{y}$):**
-
-$$
-\hat{y}_i = \begin{cases} 1 & \text{nếu } \hat{p}_i \ge \tau^* \\ 0 & \text{nếu } \hat{p}_i < \tau^* \end{cases}
-$$
-
-Với $\tau^* = 0.415$ là ngưỡng quyết định tối ưu được chọn từ tập Validation.
-
----
+- `fit(X, y)` nhận ma trận đặc trưng hai chiều và vector nhãn `0` hoặc `1`, có đủ hai lớp.
+- Code hỗ trợ NumPy array, SciPy sparse matrix và `CSRMatrixScratch`. Giá trị đầu vào phải hữu hạn.
+- `predict_proba(X)` trả ma trận hai cột: điểm ham và điểm spam.
+- `predict(X, threshold=0.5)` trả nhãn `1` khi điểm spam lớn hơn hoặc bằng threshold.
+- Sau huấn luyện, `weights_`, `bias_` chứa tham số đã học; `loss_history_` lưu các giá trị loss.
 
 ## 3. Dữ liệu sử dụng
 
-### 3.1. Phân bổ dữ liệu phân tầng
-Dữ liệu sạch sau kiểm toán ($29.028$ mẫu) được chia phân tầng theo tỷ lệ $80/10/10$ (seed 42):
-- **Train set:** $23.223$ mẫu ($13.309$ Ham, $9.914$ Spam) - Dùng để fit bộ trích xuất đặc trưng và tối ưu trọng số $w, b$.
-- **Validation set:** $2.903$ mẫu ($1.664$ Ham, $1.239$ Spam) - Dùng để quét lưới siêu tham số $C$ và chọn ngưỡng $\tau^*$.
-- **Test set:** $2.902$ mẫu ($1.663$ Ham, $1.239$ Spam) - Dùng để đánh giá độc lập năng lực tổng quát hóa.
+Em dùng Train để học từ vựng, IDF, các bước biến đổi đặc trưng và tham số mô hình. Validation dùng chọn cấu hình và threshold; Test dùng đánh giá sau khi đã chọn xong.
 
-### 3.2. Cấu trúc ma trận đặc trưng ($4.318$ chiều)
-Lần chạy tham chiếu giữ toàn bộ $4.318$ cột sau Top-K; các cột được ghép nối qua [`HybridFeatureBuilderScratch`](../../src/features/feature_engineering.py#L528):
-- **Word TF-IDF:** $3.000$ chiều (từ vựng đơn phân tích tần suất).
-- **Word Bigram TF-IDF:** $800$ chiều (ngữ cảnh 2 từ liền kề).
-- **Character n-gram TF-IDF:** $500$ chiều (chuỗi con ký tự 3–5).
-- **Keyword Binary:** $10$ chiều (từ khóa spam đặc trưng).
-- **Numeric/Structural:** $8$ chiều chuẩn hóa qua [`MaxAbsScalerScratch`](../../src/features/feature_engineering.py#L239).
+Trong pipeline chính, đầu vào là các cột đã chọn từ bộ đặc trưng hybrid gồm word TF-IDF, bigram, character n-gram, keyword và numeric features. Số cột phụ thuộc cấu hình và kết quả chọn đặc trưng, không cố định trong thuật toán Logistic Regression.
 
----
+## 4. Phương pháp huấn luyện và đánh giá
 
-## 4. Phương pháp và tiêu chí đánh giá
+### Hàm mục tiêu
 
-### 4.1. Tiêu chí lựa chọn trên Validation
-Tương tự Linear SVM, Logistic Regression được đánh giá thông qua bộ dò ngưỡng [`ThresholdOptimizerScratch`](../../src/models/tuning.py#L27):
-1. **Điều kiện lựa chọn:** $\text{Recall} \ge 0.85$ trên tập Validation nhằm ưu tiên phát hiện phần lớn thư rác.
-2. **Tiêu chí tối ưu:** Trong các mốc ngưỡng đạt Recall $\ge 0.85$, chọn ngưỡng mang lại $\text{Accuracy}$ cao nhất, phân xử hòa bằng $\text{F1-score}$, $\text{Precision}$ và tối thiểu hóa $\text{FPR}$.
+Code sử dụng Binary Cross-Entropy có trọng số mẫu và điều chuẩn L2:
 
-### 4.2. Chỉ số theo dõi
-Các chỉ số được sử dụng gồm:
-- $\text{Accuracy}, \text{Precision}, \text{Recall}, \text{F1-score}, \text{F2-score}$
-- $\text{ROC-AUC}$ (Đánh giá khả năng xếp hạng theo điểm dự đoán, không đo calibration)
-- Ma trận nhầm lẫn ($TP, FP, TN, FN$) và Tỷ lệ chặn nhầm thư hợp lệ ($FPR$).
+$$
+J(w,b)=\frac{1}{N}\sum_i a_i[\log(1+e^{z_i})-y_i z_i]+\frac{\lambda}{2}\|w\|^2
+$$
 
----
+Với `class_weight='balanced'`, $a_i=N/(2N_{y_i})$. Nếu `class_weight=None`, các mẫu có trọng số bằng 1. Hệ số điều chuẩn là $\lambda=1/\max(10^{-5},CN)$. Bias không bị điều chuẩn.
 
-## 5. Trạng thái triển khai
+Code tính BCE bằng `np.logaddexp(0, z) - y*z` để tránh tràn số. Khi tính sigmoid, code giới hạn $z$ trong đoạn `[-30, 30]`.
 
-- **Trạng thái cài đặt:** Hoàn thành $100\%$ From-Scratch thuần Python/NumPy, không dùng `sklearn.linear_model.LogisticRegression`.
-- **Kiểm thử tự động:** Vượt qua toàn bộ $51/51$ tests trong thư mục [`tests/`](../../tests), bao gồm các trường hợp kiểm tra tính nhất quán của ma trận thưa và việc tối ưu gradient bằng phần cài đặt của dự án.
-- **Vị trí xếp hạng:** **Xếp hạng 3 trên Validation** (sau Linear SVM Tuned và Linear SVM Default) và đạt **kết quả cao thứ 2 trên Test Set** (F1 đạt $71.42\%$, gần với $71.46\%$ của Linear SVM).
-- **Khả năng ứng dụng:** Có thể làm baseline tuyến tính hoặc mô hình suy luận nhẹ; nếu cần xác suất rủi ro thực tế, phải đánh giá và hiệu chỉnh điểm dự đoán trước.
+### Cách tối ưu
 
----
+Hàm `_gradient_descent_backtracking` bắt đầu với trọng số và bias bằng 0. Mỗi vòng lặp cập nhật theo gradient, co bước học theo điều kiện Armijo và điều chỉnh bước tiếp theo dựa trên độ cong theo cách Barzilai-Borwein. Giới hạn số vòng lặp không đồng nghĩa với bảo đảm đã hội tụ.
 
-## 6. Kết quả thực nghiệm
+### Cấu hình và tiêu chí đánh giá
 
-### 6.1. Cấu hình siêu tham số tối ưu
-- Hệ số điều chuẩn: $C = 0.5$ ($\lambda = \frac{1}{0.5 \times 23223} \approx 8.61 \times 10^{-5}$)
-- Tốc độ học ban đầu: `learning_rate = 0.1`
-- Số vòng lặp tối đa: `max_iter = 200`
-- Trọng số lớp: `class_weight = 'balanced'`
-- Ngưỡng phân loại tối ưu: $\tau^* = 0.415$
+Trong `main.py`, nhánh Default dùng `C=1.0`, `learning_rate=0.1`, `max_iter=200`, `class_weight='balanced'`. Lưu ý constructor của lớp có `max_iter=300`; pipeline truyền lại giá trị 200. Nhánh Tuned thử `C` trong `[0.5, 1.0, 2.0]`.
 
-### 6.2. Kết quả trên tập Validation
-*(Nguồn số liệu: [`results/metrics/validation_model_selection.csv`](../../results/metrics/validation_model_selection.csv))*
-- **Validation Accuracy:** **$69.96\%$** ($0.69962$)
-- **Validation Recall:** **$85.39\%$** ($0.85391$) *(Đạt mục tiêu $\ge 85\%$)*
-- **Validation Precision:** **$60.49\%$** ($0.60492$)
-- **Validation F1-Score:** **$70.82\%$** ($0.70817$)
-- **Validation F2-Score:** **$78.90\%$** ($0.78896$)
-- **Thứ hạng trên Validation:** Hạng 3 / 8 ứng viên.
+`ThresholdOptimizerScratch` quét mặc định 200 threshold từ `0.005` đến `1.0` trên Validation. Trong nhóm đạt Recall mục tiêu 0.85, ngưỡng được chọn theo Accuracy, F1, Precision rồi FPR thấp hơn. Nếu không đạt mục tiêu, ưu tiên Recall, Accuracy rồi F1.
 
-### 6.3. Kết quả trên tập Test
-*(Nguồn số liệu: [`results/metrics/test_models_comparison.csv`](../../results/metrics/test_models_comparison.csv))*
+Khi so sánh cấu hình và các mô hình cuối, code ưu tiên đạt mục tiêu Recall, sau đó Accuracy và F1; nếu chưa đạt, ưu tiên Recall rồi Accuracy và F1. Em theo dõi thêm Precision, F2, ROC-AUC và confusion matrix để thấy cả lỗi nhận nhầm ham và bỏ sót spam.
 
-| Chỉ số đánh giá | Logistic Regression (Tuned) | Logistic Regression (Default: C=1.0) | Mức cải thiện |
-| :--- | :---: | :---: | :---: |
-| **Accuracy** | **$70.74\%$** | $70.33\%$ | $+0.41\%$ |
-| **Precision** | **$61.26\%$** | $60.87\%$ | $+0.39\%$ |
-| **Recall** | **$85.63\%$** | $85.39\%$ | $+0.24\%$ |
-| **F1-Score** | **$71.42\%$** | $71.08\%$ | $+0.34\%$ |
-| **F2-Score** | **$79.32\%$** | $79.03\%$ | $+0.29\%$ |
-| **ROC-AUC** | **$81.38\%$** | $81.32\%$ | $+0.06\%$ |
-| **Ngưỡng sử dụng ($\tau^*$)** | **$0.415$** | $0.410$ | — |
+## 5. Phần đã cài đặt và cách kiểm tra
 
-F1 của LR (Tuned) là $70.82\%$ trên Validation và $71.42\%$ trên Test của lần chia tham chiếu. Chênh lệch nhỏ ở một split chưa đủ để kết luận không overfitting; cần thêm nhiều split hoặc cross-validation để đánh giá độ ổn định.
+Thuật toán được tự cài đặt trong `src/models/classifiers.py`, không gọi lớp Logistic Regression của scikit-learn. `main.py` gọi `fit()` để huấn luyện; `src/models/tuning.py` thực hiện tìm cấu hình và ngưỡng trên Validation.
+
+Các kiểm tra liên quan nằm trong `tests/test_models.py` và `tests/test_model_contracts.py`. Khi báo cáo kiểm thử, em cần ghi kết quả của lần chạy cụ thể; tài liệu này không khẳng định số tests đã pass ở phiên bản hiện tại.
+
+## 6. Kết quả thực nghiệm và giới hạn
+
+Kết quả mỗi lần chạy được đọc từ [bảng lựa chọn Validation](../../results/metrics/validation_model_selection.csv) và [bảng so sánh Test](../../results/metrics/test_models_comparison.csv). Các file này là artifact đã lưu, không thay thế cho việc chạy lại khi code hoặc dữ liệu thay đổi.
+
+Em dùng cùng split và cách tạo đặc trưng khi so sánh với baseline. Các mẫu rất ngắn, chứa từ mới hoặc có ngữ cảnh phức tạp có thể bị dự đoán sai. Một lần chia dữ liệu chưa đủ để kết luận mô hình ổn định trên mọi dữ liệu mới.

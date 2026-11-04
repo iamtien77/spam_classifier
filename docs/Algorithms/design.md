@@ -4,7 +4,7 @@ Trong bài lab này, em dự kiến xây dựng chương trình phân loại vă
 
 Tài liệu này trình bày phương án thiết kế trước khi thực hiện. Các cấu hình bên dưới là lựa chọn dự kiến cho bài lab; kết quả thực nghiệm sẽ được ghi lại trong báo cáo sau khi chạy chương trình.
 
-## 1. What — Cần xây dựng hệ thống gì?
+## 1. What 
 
 ### Bài toán và phạm vi
 
@@ -19,76 +19,76 @@ Phạm vi thực hiện gồm làm sạch dữ liệu, chia tập, tạo đặc 
 
 ### Dữ liệu đầu vào và kết quả đầu ra dự kiến
 
-| Bước | Đầu vào | Đầu ra |
-| :--- | :--- | :--- |
-| Đọc và kiểm tra dữ liệu | File CSV có nội dung và nhãn | Dữ liệu có các trường `source_id`, `raw_text`, `label` |
-| Làm sạch và chia tập | Dữ liệu đã đọc | Các tập Train, Validation và Test; thống kê những dòng bị loại |
-| Tạo đặc trưng | Nội dung văn bản | Ma trận đặc trưng số để đưa vào mô hình |
-| Huấn luyện và lựa chọn | Train và Validation | Mô hình cùng cấu hình và threshold được chọn |
-| Đánh giá | Mô hình đã chọn và Test | Bảng metrics, confusion matrix và một số trường hợp dự đoán sai |
-| Chạy thử | Một văn bản mới | Nhãn dự đoán và score của mô hình |
-| Lưu kết quả | Mô hình và bộ biến đổi đã fit | File để nạp lại và tiếp tục dự đoán |
+| Bước                        | Đầu vào                             | Đầu ra                                                                  |
+| :---------------------------- | :------------------------------------- | :------------------------------------------------------------------------ |
+| Đọc và kiểm tra dữ liệu | File CSV có nội dung và nhãn       | Dữ liệu có các trường `source_id`, `raw_text`, `label`        |
+| Làm sạch và chia tập      | Dữ liệu đã đọc                   | Các tập Train, Validation và Test; thống kê những dòng bị loại   |
+| Tạo đặc trưng             | Nội dung văn bản                    | Ma trận đặc trưng số để đưa vào mô hình                       |
+| Huấn luyện và lựa chọn   | Train và Validation                   | Mô hình cùng cấu hình và threshold được chọn                    |
+| Đánh giá                   | Mô hình đã chọn và Test          | Bảng metrics, confusion matrix và một số trường hợp dự đoán sai |
+| Chạy thử                    | Một văn bản mới                    | Nhãn dự đoán và score của mô hình                                 |
+| Lưu kết quả                | Mô hình và bộ biến đổi đã fit | File để nạp lại và tiếp tục dự đoán                             |
 
-## 2. Why — Vì sao chọn hướng thiết kế này?
+## 2. Why 
 
 Em chọn đề tài phân loại spam vì bài toán có đầu vào và đầu ra rõ ràng, phù hợp để thực hành xử lý văn bản. Qua bài lab, em muốn hiểu cách biến văn bản thành dữ liệu số và cách đánh giá mô hình ngoài việc chỉ nhìn vào Accuracy.
 
 Em dự kiến bắt đầu từ baseline đơn giản, sau đó mới thử các mô hình khác để có cơ sở so sánh.
 
-| Lựa chọn dự kiến | Lý do chọn | Hạn chế |
-| :--- | :--- | :--- |
-| Word TF-IDF + Complement Naive Bayes làm baseline | Dễ triển khai, huấn luyện nhanh, phù hợp đặc trưng không âm | Khả năng thể hiện ngữ cảnh còn hạn chế |
-| Logistic Regression và Linear SVM | Phù hợp dữ liệu văn bản dạng ma trận thưa; có thể xem trọng số đặc trưng | Cần chọn tham số và kiểm tra quá trình hội tụ |
-| Chia riêng Validation và Test | Có dữ liệu để chọn mô hình và dữ liệu để đánh giá cuối | Giảm số mẫu dành cho huấn luyện |
-| Theo dõi cả Recall và Precision | Biết mô hình bỏ sót spam hay nhận nhầm ham ở mức nào | Cần cân nhắc sự đánh đổi giữa hai chỉ số |
-| Lưu mô hình cùng bộ biến đổi | Dùng lại đúng cách tạo đặc trưng khi dự đoán | Cần kiểm tra kết quả sau khi nạp lại |
+| Lựa chọn dự kiến                               | Lý do chọn                                                                             | Hạn chế                                              |
+| :------------------------------------------------- | :--------------------------------------------------------------------------------------- | :----------------------------------------------------- |
+| Word TF-IDF + Complement Naive Bayes làm baseline | Dễ triển khai, huấn luyện nhanh, phù hợp đặc trưng không âm                   | Khả năng thể hiện ngữ cảnh còn hạn chế        |
+| Logistic Regression và Linear SVM                 | Phù hợp dữ liệu văn bản dạng ma trận thưa; có thể xem trọng số đặc trưng | Cần chọn tham số và kiểm tra quá trình hội tụ |
+| Chia riêng Validation và Test                    | Có dữ liệu để chọn mô hình và dữ liệu để đánh giá cuối                  | Giảm số mẫu dành cho huấn luyện                  |
+| Theo dõi cả Recall và Precision                 | Biết mô hình bỏ sót spam hay nhận nhầm ham ở mức nào                           | Cần cân nhắc sự đánh đổi giữa hai chỉ số    |
+| Lưu mô hình cùng bộ biến đổi               | Dùng lại đúng cách tạo đặc trưng khi dự đoán                                 | Cần kiểm tra kết quả sau khi nạp lại             |
 
 Để hiểu thuật toán, em dự kiến tự cài đặt các thành phần cốt lõi bằng Python với NumPy/SciPy. Đây là hướng thực hiện của bài lab, không phải khẳng định về yêu cầu bắt buộc của đề bài.
 
-## 3. Who — Ai sử dụng và chịu trách nhiệm?
+## 3. Who
 
 Bài lab chủ yếu phục vụ việc học và đánh giá môn học.
 
-| Người tham gia | Vai trò |
-| :--- | :--- |
+| Người tham gia       | Vai trò                                                                           |
+| :--------------------- | :--------------------------------------------------------------------------------- |
 | Sinh viên thực hiện | Chuẩn bị dữ liệu, viết chương trình, chạy thử và giải thích kết quả |
-| Giảng viên | Xem cách thiết kế, kiểm tra phương pháp và đánh giá báo cáo |
-| Người chạy demo | Nhập văn bản mới và quan sát dự đoán |
+| Giảng viên           | Xem cách thiết kế, kiểm tra phương pháp và đánh giá báo cáo           |
+| Người chạy demo     | Nhập văn bản mới và quan sát dự đoán                                      |
 
 Em chịu trách nhiệm ghi lại cấu hình, seed và kết quả để có thể chạy lại. Các metrics và quy tắc chọn mô hình sẽ được xác định trước khi huấn luyện so sánh.
 
-## 4. When — Triển khai theo thứ tự nào?
+## 4. When 
 
 Em dự kiến thực hiện theo từng bước, hoàn thành baseline trước khi thử cải tiến.
 
-| Bước | Công việc | Kết quả cần có |
-| :--- | :--- | :--- |
-| 1 | Xác định phạm vi, đầu vào, đầu ra và metrics | Phương án thiết kế cho bài lab |
-| 2 | Kiểm tra, làm sạch và chia dữ liệu | Train, Validation, Test và thống kê dữ liệu |
-| 3 | Tạo TF-IDF và huấn luyện Naive Bayes | Baseline chạy được, có kết quả Validation |
-| 4 | Thử Logistic Regression, Linear SVM và một số đặc trưng bổ sung | Bảng so sánh với baseline |
-| 5 | Chọn mô hình và threshold bằng Validation, sau đó đánh giá Test | Kết quả đánh giá cuối và phân tích lỗi |
-| 6 | Lưu mô hình, chạy demo và viết báo cáo | Chương trình có thể nạp lại để dự đoán |
+| Bước | Công việc                                                               | Kết quả cần có                                 |
+| :----- | :------------------------------------------------------------------------ | :------------------------------------------------- |
+| 1      | Xác định phạm vi, đầu vào, đầu ra và metrics                    | Phương án thiết kế cho bài lab               |
+| 2      | Kiểm tra, làm sạch và chia dữ liệu                                  | Train, Validation, Test và thống kê dữ liệu   |
+| 3      | Tạo TF-IDF và huấn luyện Naive Bayes                                  | Baseline chạy được, có kết quả Validation   |
+| 4      | Thử Logistic Regression, Linear SVM và một số đặc trưng bổ sung   | Bảng so sánh với baseline                       |
+| 5      | Chọn mô hình và threshold bằng Validation, sau đó đánh giá Test | Kết quả đánh giá cuối và phân tích lỗi   |
+| 6      | Lưu mô hình, chạy demo và viết báo cáo                            | Chương trình có thể nạp lại để dự đoán |
 
 Nếu kết quả Test chưa tốt, em sẽ ghi rõ hạn chế trong báo cáo. Việc dùng kết quả đó để điều chỉnh mô hình sẽ cần một lần đánh giá độc lập mới.
 
-## 5. Where — Môi trường chạy và cách tổ chức mã nguồn
+## 5. Where 
 
 Em dự kiến chạy bài lab trên máy cá nhân bằng Python. File `main.py` dùng để chạy các bước chính; notebook dùng để khảo sát dữ liệu và trình bày thử nghiệm.
 
 Để dễ theo dõi, mã nguồn được chia theo công việc của từng bước:
 
-| Vị trí | Nội dung chính |
-| :--- | :--- |
-| `src/data/` | Đọc, làm sạch, chuẩn hóa văn bản và chia tập |
-| `src/features/` | Tạo và chọn đặc trưng; chỉ fit trên Train |
-| `src/models/` | Cài đặt mô hình, tuning và lưu/nạp mô hình |
-| `src/evaluation/` | Tính metrics, vẽ biểu đồ và phân tích lỗi |
-| `src/deployment/` | Nạp mô hình để dự đoán văn bản mới |
-| `data/raw/`, `data/processed/` | Lưu dữ liệu gốc và dữ liệu sau xử lý |
-| `results/`, `logs/` | Lưu bảng kết quả, biểu đồ, mô hình và log chạy |
+| Vị trí                           | Nội dung chính                                          |
+| :--------------------------------- | :-------------------------------------------------------- |
+| `src/data/`                      | Đọc, làm sạch, chuẩn hóa văn bản và chia tập    |
+| `src/features/`                  | Tạo và chọn đặc trưng; chỉ fit trên Train         |
+| `src/models/`                    | Cài đặt mô hình, tuning và lưu/nạp mô hình      |
+| `src/evaluation/`                | Tính metrics, vẽ biểu đồ và phân tích lỗi        |
+| `src/deployment/`                | Nạp mô hình để dự đoán văn bản mới             |
+| `data/raw/`, `data/processed/` | Lưu dữ liệu gốc và dữ liệu sau xử lý             |
+| `results/`, `logs/`            | Lưu bảng kết quả, biểu đồ, mô hình và log chạy |
 
-## 6. How — Xây dựng và kiểm chứng bằng cách nào?
+## 6. How 
 
 ### 6.1. Luồng dữ liệu dự kiến
 
@@ -138,14 +138,14 @@ Các mô hình này vẫn có thể nhầm khi văn bản quá ngắn, chứa t�
 
 Trước khi chạy so sánh, em dự kiến sử dụng các chỉ số sau:
 
-| Chỉ số | Ý nghĩa trong bài lab |
-| :--- | :--- |
-| Recall | Tỷ lệ spam được phát hiện đúng |
-| Precision | Tỷ lệ dự đoán spam thực sự là spam |
-| Accuracy | Tỷ lệ dự đoán đúng trên toàn bộ mẫu |
-| F1, F2 | Kết hợp Precision và Recall; F2 đặt trọng số cao hơn cho Recall |
-| FPR và số FP | Mức độ nhận nhầm ham thành spam |
-| Confusion matrix | Số lượng dự đoán đúng và sai ở từng lớp |
+| Chỉ số         | Ý nghĩa trong bài lab                                                |
+| :--------------- | :---------------------------------------------------------------------- |
+| Recall           | Tỷ lệ spam được phát hiện đúng                                 |
+| Precision        | Tỷ lệ dự đoán spam thực sự là spam                              |
+| Accuracy         | Tỷ lệ dự đoán đúng trên toàn bộ mẫu                          |
+| F1, F2           | Kết hợp Precision và Recall; F2 đặt trọng số cao hơn cho Recall |
+| FPR và số FP   | Mức độ nhận nhầm ham thành spam                                   |
+| Confusion matrix | Số lượng dự đoán đúng và sai ở từng lớp                     |
 
 Nếu cần xem thêm ảnh hưởng của threshold, em sẽ dùng ROC-AUC và PR curve. Thời gian huấn luyện và dự đoán cũng được ghi lại để so sánh chi phí giữa các mô hình.
 
@@ -168,14 +168,14 @@ Báo cáo sẽ ghi cấu hình, seed, metrics và một số mẫu dự đoán s
 
 ### 6.6. Các trường hợp dễ gặp lỗi và giới hạn
 
-| Trường hợp | Cách xem xét trong bài lab |
-| :--- | :--- |
-| Spam viết biến dạng hoặc chứa từ mới | Xem các mẫu bỏ sót và thử character n-gram |
-| Ham chứa từ thường gặp trong quảng cáo | Xem các mẫu FP và sự thay đổi Precision/FPR theo threshold |
-| Số mẫu ham và spam chênh lệch | Kiểm tra phân bố nhãn và đọc nhiều metrics thay vì chỉ Accuracy |
-| Tuning quá nhiều lần trên Validation | Giới hạn số cấu hình và ghi lại các lần thử |
-| Dữ liệu mới khác ngôn ngữ hoặc khác dữ liệu SMS | Ghi rõ giới hạn, cần dữ liệu phù hợp để kiểm chứng thêm |
-| Hiểu score là xác suất chính xác | Ghi rõ ý nghĩa score; SVM margin qua sigmoid chưa phải xác suất đã calibration |
+| Trường hợp                                             | Cách xem xét trong bài lab                                                           |
+| :-------------------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| Spam viết biến dạng hoặc chứa từ mới               | Xem các mẫu bỏ sót và thử character n-gram                                        |
+| Ham chứa từ thường gặp trong quảng cáo             | Xem các mẫu FP và sự thay đổi Precision/FPR theo threshold                        |
+| Số mẫu ham và spam chênh lệch                        | Kiểm tra phân bố nhãn và đọc nhiều metrics thay vì chỉ Accuracy               |
+| Tuning quá nhiều lần trên Validation                  | Giới hạn số cấu hình và ghi lại các lần thử                                   |
+| Dữ liệu mới khác ngôn ngữ hoặc khác dữ liệu SMS | Ghi rõ giới hạn, cần dữ liệu phù hợp để kiểm chứng thêm                    |
+| Hiểu score là xác suất chính xác                    | Ghi rõ ý nghĩa score; SVM margin qua sigmoid chưa phải xác suất đã calibration |
 
 Khi đưa ví dụ vào báo cáo, em sẽ tránh chia sẻ nội dung có thông tin cá nhân. Với quy mô bài lab, kết quả chủ yếu phản ánh khả năng của mô hình trên tập dữ liệu đã sử dụng.
 
