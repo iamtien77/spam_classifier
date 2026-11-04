@@ -26,7 +26,12 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
 # File dữ liệu
-RAW_DATA_FILE = RAW_DATA_DIR / "spam.csv"
+# File dữ liệu: Ưu tiên spam_ham_dataset.csv nếu có trong raw, ngược lại dùng spam.csv
+RAW_DATA_FILE = (
+    RAW_DATA_DIR / "spam_ham_dataset.csv"
+    if (RAW_DATA_DIR / "spam_ham_dataset.csv").is_file()
+    else RAW_DATA_DIR / "spam.csv"
+)
 CLEAN_DATA_FILE = PROCESSED_DATA_DIR / "spam_clean.csv"
 
 # Thư mục kết quả đầu ra chính thức (Pipeline Production - main.py)
@@ -170,6 +175,7 @@ class SpamExperimentConfig:
     test_ratio: float = TEST_RATIO
     keyword_patterns: Dict[str, str] = field(default_factory=lambda: KEYWORD_PATTERNS.copy())
     numeric_feature_config: List[Tuple[str, str]] = field(default_factory=lambda: list(NUMERIC_FEATURE_CONFIG))
+    raw_data_file: str = field(default_factory=lambda: str(RAW_DATA_FILE))
     default_tuning_params: Dict[str, Any] = field(default_factory=dict)
 
     def completed_params(self, params: Dict[str, Any] = None) -> Dict[str, Any]:

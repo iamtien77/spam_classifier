@@ -55,6 +55,7 @@ import pandas as pd
 from src.config import (
     ensure_directories,
     SpamExperimentConfig,
+    RAW_DATA_FILE,
     FIGURES_DIR,
     METRICS_DIR,
     SAVED_MODELS_DIR,
@@ -108,8 +109,9 @@ from src.deployment.predictor import SpamInferenceService
 @log_step("GIAI ĐOẠN 1: TIỀN XỬ LÝ & TRÍCH XUẤT ĐẶC TRƯNG")
 def step_data_preprocessing(logger, config=None):
     config = config or SpamExperimentConfig()
-    logger.info("Nạp dữ liệu thô từ data/raw/spam.csv...")
-    raw_data = load_raw_data()
+    data_file = getattr(config, "raw_data_file", RAW_DATA_FILE)
+    logger.info(f"Nạp dữ liệu thô từ {data_file}...")
+    raw_data = load_raw_data(data_file) if (data_file is not None and str(data_file) != str(RAW_DATA_FILE)) else load_raw_data()
     logger.info(f"Tổng số bản ghi đọc được: {len(raw_data):,} dòng.")
 
     # Lọc chất lượng & khử trùng lặp

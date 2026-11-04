@@ -15,11 +15,14 @@ def resolve_data_path(custom_path: Optional[Path] = None) -> Path:
             raise FileNotFoundError(f"Không tìm thấy tệp dữ liệu: {path}")
         return path
     root = Path(__file__).resolve().parents[2]
-    for path in (root / 'data/raw/spam.csv', root / 'data/spam.csv',
-                 Path('data/raw/spam.csv'), Path('../data/raw/spam.csv')):
-        if path.is_file():
-            return path
-    raise FileNotFoundError('Không tìm thấy spam.csv. Hãy truyền đường dẫn cụ thể.')
+    candidate_names = ('spam_ham_dataset.csv', 'spam.csv')
+    candidate_dirs = (root / 'data/raw', root / 'data', Path('data/raw'), Path('../data/raw'))
+    for name in candidate_names:
+        for folder in candidate_dirs:
+            candidate = folder / name
+            if candidate.is_file():
+                return candidate
+    raise FileNotFoundError('Không tìm thấy file dữ liệu (spam_ham_dataset.csv hoặc spam.csv). Hãy truyền đường dẫn cụ thể.')
 
 
 def load_raw_data(data_path: Optional[Path] = None, as_dataframe: bool = True) -> Union[pd.DataFrame, list[dict[str, Any]]]:
