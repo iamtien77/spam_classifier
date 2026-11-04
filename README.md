@@ -1,12 +1,12 @@
-# 📧 Hệ Thống Phân Loại Email Spam (Spam Email Classifier)
+# 📧 Bài Lab Phân Loại Email Spam (Spam Email Classifier)
 
-Dự án Học Máy (Machine Learning) cho bài **“Practice 1: Classifying Spam Emails”**, xây dựng quy trình phân loại văn bản thành **Spam** (thư rác) hoặc **Ham / Not Spam** (thư hợp lệ). Dự án bao gồm kiểm toán dữ liệu, tiền xử lý văn bản, trích xuất đặc trưng, huấn luyện ba mô hình, lựa chọn trên Validation, đánh giá Test và dự đoán email mới.
+Bài lab **“Practice 1: Classifying Spam Emails”** thực hành phân loại email thành **Spam** (thư rác) hoặc **Ham / Not Spam** (thư hợp lệ). Mục tiêu là hiểu quy trình học máy từ kiểm tra dữ liệu, tiền xử lý, trích xuất đặc trưng đến huấn luyện, so sánh mô hình và thử dự đoán email mới.
 
 > **Cách triển khai:** tự cài đặt các mô hình LR, Linear SVM, Naive Bayes và các chỉ số đánh giá bằng Python, NumPy/SciPy; dùng pandas để xử lý bảng và joblib để lưu model.
 >
-> **Kiểm chứng ngày 19/10/2026:** **51/51 tests pass**, bao gồm kiểm thử tích hợp và kiểm thử hồi quy. Kết quả chạy lại `main.py` được đối chiếu từ artifacts trong `results/`. Chuỗi 5 Jupyter Notebooks đã được đồng bộ hóa cấu hình với `src/`, chạy lại toàn bộ (Restart & Run All) và cập nhật artifacts vào `notebooks/results/`.
+> **Kiểm chứng ngày 04/11/2026:** **57/57 tests pass**, bao gồm kiểm thử tích hợp và hồi quy. Các số liệu bên dưới được đối chiếu với kết quả của `main.py` trong `results/`. Năm Jupyter Notebooks là một luồng thực hành riêng; kết quả của chúng không được dùng thay cho kết quả chính trong README.
 >
-> **Kết quả tham chiếu:** Linear SVM (Tuned), Test Accuracy **70,85%**, Recall **85,47%**, F1 **71,46%**. Tỷ lệ chặn nhầm email hợp lệ còn cao; đây là dự án thực nghiệm phục vụ học tập.
+> **Kết quả chính:** Linear SVM, Test Accuracy **96,52%**, Recall **95,21%**, F1 **94,24%** trên 489 mẫu Test. Đây là kết quả trong phạm vi dataset của bài lab, chưa phải đánh giá trên hộp thư thực tế.
 
 ---
 
@@ -14,7 +14,7 @@ Dự án Học Máy (Machine Learning) cho bài **“Practice 1: Classifying Spa
 
 ### 1.1. Mục tiêu phân loại
 
-Với đầu vào là nội dung một email hoặc tin nhắn, hệ thống trích xuất đặc trưng số và dự đoán một trong hai nhãn:
+Với đầu vào là nội dung một email, chương trình trích xuất đặc trưng số và dự đoán một trong hai nhãn:
 
 | Nhãn văn bản | Nhãn số | Ý nghĩa                                                                  |
 | --------------- | --------: | -------------------------------------------------------------------------- |
@@ -25,7 +25,7 @@ Với đầu vào là nội dung một email hoặc tin nhắn, hệ thống tr�
 
 ### 1.2. Nạp dữ liệu & chuẩn hóa schema
 
-File dữ liệu mặc định là [`data/raw/spam.csv`](data/raw/spam.csv), có nguồn gốc từ tập [SMS Spam Collection Dataset (Kaggle/UCI)](https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset). Hàm `load_raw_data()` trong [`src/data/loader.py`](src/data/loader.py):
+Dataset được lấy từ [Spam Mails Dataset của venky73 trên Kaggle](https://www.kaggle.com/datasets/venky73/spam-mails-dataset), lưu tại [`data/raw/spam_ham_dataset.csv`](data/raw/spam_ham_dataset.csv). Loader ưu tiên tên file này và hỗ trợ `spam.csv` làm tên dự phòng. Hàm `load_raw_data()` trong [`src/data/loader.py`](src/data/loader.py):
 
 - Thử đọc bằng `utf-8-sig`, sau đó dùng `latin-1` nếu gặp lỗi giải mã.
 - Nhận các tên cột nhãn `label`, `category`, `v1`; cột nội dung `text`, `message`, `v2`, `body`.
@@ -33,7 +33,7 @@ File dữ liệu mặc định là [`data/raw/spam.csv`](data/raw/spam.csv), có
 - Giữ nội dung gốc trong `raw_text`; dùng `source_id` để theo dõi bản ghi và thứ tự hàng.
 - Báo lỗi khi CSV thiếu cột bắt buộc, trùng tên cột sau chuẩn hóa hoặc sai số trường. Đường dẫn tùy chỉnh không tồn tại cũng được báo lỗi.
 
-Dữ liệu hiện tại cung cấp **nhãn và nội dung văn bản tin nhắn ngắn (SMS)**. Pipeline chưa khai thác các trường metadata riêng của email chuẩn như địa chỉ người gửi, người nhận, tiêu đề email hoặc mã HTML.
+File hiện tại có **5.171 mẫu**, gồm **3.672 ham** và **1.499 spam**. Các cột gồm một cột index không tên, `label`, `text` và `label_num`. Nội dung `text` bắt đầu bằng `Subject:`; tiêu đề nằm trong văn bản chung, chưa được tách thành feature riêng. Loader dùng `label` và `text`, không đưa index hay `label_num` vào features. Bài lab chưa khai thác sender/recipient thành các trường riêng.
 
 ### 1.3. Kiểm toán chất lượng dữ liệu (Data Quality Audit)
 
@@ -41,12 +41,12 @@ Kết quả dưới đây lấy từ [`results/metrics/data_audit.json`](results
 
 | Hạng mục kiểm toán                              |        Số dòng |
 | --------------------------------------------------- | ---------------: |
-| Dữ liệu thô đọc được                        | **43.849** |
-| Loại do nhãn không hợp lệ                      |            2.195 |
-| Loại do nội dung rỗng sau bước kiểm tra nhãn |            2.192 |
-| Loại do nội dung mâu thuẫn nhãn — 738 nhóm   |            1.480 |
-| Loại bản lặp cùng nội dung, cùng nhãn        |            8.954 |
-| **Dữ liệu giữ lại sau làm sạch**        | **29.028** |
+| Dữ liệu thô đọc được                        | **5.171** |
+| Loại do nhãn không hợp lệ                      |            0 |
+| Loại do nội dung rỗng sau bước kiểm tra nhãn |            0 |
+| Loại do nội dung mâu thuẫn nhãn — 0 nhóm   |            0 |
+| Loại bản lặp cùng nội dung, cùng nhãn        |            277 |
+| **Dữ liệu giữ lại sau làm sạch**        | **4.894** |
 
 Các nhóm loại trừ được tính **không chồng lặp**: kiểm tra nhãn trước, nội dung rỗng sau, rồi mới xét nhóm trùng/mâu thuẫn. Tổng số dòng bị loại cộng số dòng giữ lại bằng số dòng đầu vào.
 
@@ -54,13 +54,13 @@ Các nhóm loại trừ được tính **không chồng lặp**: kiểm tra nhã
 
 ### 1.4. Phân bố nhãn & chia tập phân tầng
 
-Sau làm sạch, dữ liệu gồm **16.636 Ham (~57,31%)** và **12.392 Spam (~42,69%)**.
+Sau làm sạch, dữ liệu gồm **3.432 Ham (~70,13%)** và **1.462 Spam (~29,87%)**.
 
 | Tập dữ liệu | Tỷ lệ cấu hình |   Tổng số mẫu |    Ham |  Spam | Vai trò                                             |
 | -------------- | -----------------: | ---------------: | -----: | ----: | ---------------------------------------------------- |
-| Train          |                80% | **23.223** | 13.309 | 9.914 | Fit đặc trưng và huấn luyện mô hình          |
-| Validation     |                10% |  **2.903** |  1.664 | 1.239 | Chọn Top-K, siêu tham số, ngưỡng và mô hình  |
-| Test           |                10% |  **2.902** |  1.663 | 1.239 | Đánh giá các ứng viên tại ngưỡng đã chốt |
+| Train          |                80% | **3.916** | 2.746 | 1.170 | Fit đặc trưng và huấn luyện mô hình          |
+| Validation     |                10% |  **489** |  343 | 146 | Chọn Top-K, siêu tham số, ngưỡng và mô hình  |
+| Test           |                10% |  **489** |  343 | 146 | Đánh giá các ứng viên tại ngưỡng đã chốt |
 
 Hàm `stratified_split_dataframe()` dùng seed **42**, chia theo từng lớp và làm tròn bằng phần dư lớn nhất để bảo toàn tổng số mẫu. Việc lọc nhóm trùng/mâu thuẫn diễn ra **trước khi chia tập**.
 
@@ -93,9 +93,9 @@ EDA trên toàn bộ dữ liệu chỉ phục vụ mô tả. Các thống kê d�
 
 ### 2.3. Recall mục tiêu là cấu hình của dự án
 
-Dự án đặt `RECALL_TARGET = 0.85` để ưu tiên phát hiện phần lớn spam. Đây là **lựa chọn thực nghiệm của dự án**, không phải ngưỡng bắt buộc trong PDF và không phải chứng nhận an ninh.
+Bài lab đặt `RECALL_TARGET = 0.85` để thực hành lựa chọn mô hình theo mục tiêu Recall. Đây là cấu hình của thí nghiệm, không phải ngưỡng bắt buộc trong đề bài. Khi đọc kết quả, cần xem cả Precision và số email ham bị đoán nhầm.
 
-Đối với lựa chọn mô hình cuối, hệ thống ưu tiên ứng viên đạt Recall mục tiêu trên Validation, sau đó tối đa Accuracy và dùng F1 để phân xử. Nếu không ứng viên nào đạt mục tiêu, hệ thống ưu tiên Recall rồi Accuracy/F1. F1 và F2 vẫn được báo cáo để thấy rõ sự đánh đổi giữa bắt spam và chặn nhầm.
+Khi chọn mô hình cuối, chương trình ưu tiên ứng viên đạt Recall mục tiêu trên Validation, sau đó xét Accuracy và dùng F1 khi hòa điểm. Nếu không ứng viên nào đạt mục tiêu, thứ tự ưu tiên là Recall rồi Accuracy/F1. F1 và F2 vẫn được báo cáo để thấy sự đánh đổi giữa bắt spam và chặn nhầm.
 
 ### 2.4. Tái sử dụng đúng pipeline khi suy luận
 
@@ -115,7 +115,7 @@ File joblib lưu mô hình cùng bộ biến đổi và thứ tự cột đã ch
 4. Loại dấu câu khỏi văn bản dùng cho mô hình và lọc danh sách stop words tiếng Anh cố định.
 5. Giữ các từ phủ định như `not`, `no`, `never` vì chúng có thể thay đổi nghĩa câu.
 
-`raw_text` được giữ để đếm dấu câu, chữ hoa và các tín hiệu cấu trúc trước khi chúng bị mất trong bước chuẩn hóa. Bộ xử lý không cần tải tài nguyên NLP ngoài. Ngưỡng cắt độ dài được học theo phân vị trên Train; trong lần chạy tham chiếu, giới hạn là **1.361 từ sau chuẩn hóa**.
+`raw_text` được giữ để đếm dấu câu, chữ hoa và các tín hiệu cấu trúc trước khi chúng bị mất trong bước chuẩn hóa. Bộ xử lý không cần tải tài nguyên NLP ngoài. Ngưỡng cắt độ dài được học theo phân vị trên Train; trong lần chạy tham chiếu, giới hạn là **791 từ sau chuẩn hóa**.
 
 ### 3.2. TF-IDF tự triển khai
 
@@ -158,13 +158,15 @@ Trong lần chạy tham chiếu, mỗi email được biểu diễn bởi **4.31
 
 Tám đặc trưng số được chọn trong cấu hình là `has_url`, `has_number`, `digit_count`, `special_char_count`, `exclamation_count`, `dollar_count`, `uppercase_ratio`, `model_length`. Các biến đếm được biến đổi theo cấu hình rồi co dãn bằng `MaxAbsScalerScratch`, fit trên Train. Tên mode cũ có chữ `minmax`, nhưng scaler đang sử dụng thực tế là **MaxAbs**.
 
+Scaler kiểm tra số chiều, số cột và giá trị hữu hạn khi nhận dữ liệu. Biểu đồ độ dài dùng khoảng theo dữ liệu hiện tại, bao gồm cả email dài thay vì cố định ở 150 từ.
+
 Hai biểu đồ EDA về tỷ lệ tín hiệu và tương quan dùng chung `URL_PATTERN` với processor: nhận liên kết bắt đầu bằng `http://`, `https://` hoặc `www.` có nội dung theo sau. Địa chỉ email hoặc domain đơn thuần không được tính là URL theo định nghĩa này.
 
 ### 3.4. Chọn đặc trưng Top-K & ablation
 
 `ManualFeatureSelectorScratch` xếp hạng cột từ Train, sau đó thử các giá trị K trên Validation bằng Complement Naive Bayes. `selected_indices` được dùng cùng thứ tự cho Train, Validation, Test và inference.
 
-Lần chạy hiện tại chọn giữ **toàn bộ 4.318 cột**, tương đương **0% giảm số chiều**. Việc có bộ chọn Top-K không đồng nghĩa mỗi lần chạy đều giảm số đặc trưng.
+Lần chạy hiện tại chọn **500 trong 4.318 cột**, giảm **88,42% số chiều**. Bộ chọn ưu tiên các cấu hình đạt Recall mục tiêu rồi xét điểm cân bằng giữa F1, Accuracy, mức giảm số chiều và chênh lệch Accuracy Train–Validation. Vì vậy, K được chọn không nhất thiết là K có F1 cao nhất.
 
 Notebook 02 còn so sánh năm tổ hợp: Word TF-IDF; Word + Character frequency; Word + Character n-grams; Word + Keywords; và Hybrid. Ablation dùng cùng Complement NB và threshold 0,5 để so sánh trên Validation; bảng này không tự thay đổi nhóm đặc trưng của pipeline chính.
 
@@ -196,7 +198,7 @@ $$
 
 Với cấu hình thực nghiệm hiện tại, công thức này tương đương `lambda = 1/(C*N)`.
 
-Loss được tính bằng `np.logaddexp` để ổn định số học. Gradient được cập nhật bằng **spectral gradient descent kết hợp Armijo backtracking**: bước học được điều chỉnh theo độ cong và giảm nếu chưa làm loss giảm đủ. Cách này đã thay vòng cập nhật bước học giảm cố định vốn hội tụ chậm trên tín hiệu TF-IDF nhỏ.
+Loss được tính bằng `np.logaddexp` để ổn định số học. Gradient được cập nhật bằng **spectral gradient descent kết hợp Armijo backtracking**: bước học được điều chỉnh theo độ cong và giảm nếu chưa làm loss giảm đủ.
 
 ### 4.2. Linear Support Vector Machines (SVM)
 
@@ -239,14 +241,16 @@ Khi chọn siêu tham số, các cấu hình đạt Recall mục tiêu được 
 
 `SpamVotingEnsemble` hỗ trợ soft voting và hard voting. `main.py` thử soft voting của ba mô hình mặc định và soft voting của các mô hình đã tuning; notebook 04 thử thêm hard voting. Ensemble tham gia so sánh như các ứng viên khác, không được mặc định chọn làm mô hình cuối.
 
+Trọng số voting phải hữu hạn, không âm và có tổng dương. Một thành viên có thể có trọng số 0 nếu các thành viên còn lại vẫn có tổng trọng số dương.
+
 ---
 
 ## 5. Quy Trình Thực Thi (Workflow 4 Giai Đoạn)
 
 ```mermaid
 flowchart TD
-    A[spam.csv: 43.849 dòng] --> B[Kiểm toán, lọc rỗng, nhóm trùng và mâu thuẫn]
-    B --> C[29.028 mẫu sạch]
+    A[spam_ham_dataset.csv: 5.171 dòng] --> B[Kiểm tra, lọc rỗng, nhóm trùng và mâu thuẫn]
+    B --> C[4.894 mẫu sạch]
     C --> D[Chia phân tầng Train / Validation / Test]
     D --> E[Fit TF-IDF, capping và scaler trên Train]
     E --> F[Transform ba tập; chọn Top-K trên Validation]
@@ -274,7 +278,7 @@ spam_classifier/
 ├── requirements.txt                   # Thư viện chạy dự án
 ├── README.md                          # Thuyết minh và hướng dẫn
 ├── data/
-│   ├── raw/spam.csv                   # Dữ liệu đầu vào
+│   ├── raw/spam_ham_dataset.csv       # Dữ liệu đầu vào từ Kaggle
 │   └── processed/                     # CSV, ma trận, nhãn và marker của notebooks
 ├── docs/                              # Tài liệu kỹ thuật và đặc tả dự án
 │   ├── ML project_ Classifying Spam Emails.pdf  # Đề bài gốc môn học
@@ -306,6 +310,7 @@ spam_classifier/
 │   ├── evaluation/
 │   │   ├── metrics.py                 # Chỉ số và kiểm tra nhất quán kết quả
 │   │   ├── visualization.py           # EDA, confusion matrix, ROC/PR và so sánh
+│   │   ├── experiments.py             # Thử nghiệm trên dữ liệu phát triển
 │   │   └── error_analysis.py          # Trích xuất, phân tích FP/FN
 │   ├── deployment/
 │   │   └── predictor.py               # SpamInferenceService
@@ -321,6 +326,8 @@ spam_classifier/
     ├── test_models.py
     ├── test_evaluation.py
     ├── test_deployment.py
+    ├── test_model_contracts.py         # Kiểm tra đầu vào và hành vi mô hình
+    ├── test_review_regressions.py      # Kiểm thử hồi quy
     └── test_pipeline.py                # Kiểm thử tích hợp qua các giai đoạn
 ```
 
@@ -350,50 +357,53 @@ Sender, recipient, subject line là các **ví dụ đặc trưng** trong đề;
 
 Kết quả trong phần này thuộc luồng **`main.py`**, lấy từ [`run_summary.json`](results/metrics/run_summary.json) và [`validation_model_selection.csv`](results/metrics/validation_model_selection.csv).
 
-Đã đối chiếu artifacts sau lần chạy lại ngày **18/10/2026**: cả **21 hash SHA-256** trong run summary khớp mã nguồn hiện tại. Winner, threshold và các chỉ số chính vẫn giống kết quả tham chiếu trước đó; đợt sửa kiểm tra đầu vào, phân xử hòa, đường dẫn và EDA không làm thay đổi kết quả cuối của lần chạy này.
+Kết quả được tạo ngày **04/11/2026**. Khi cập nhật README, **22/22 hash SHA-256** trong run summary khớp với mã nguồn và fingerprint dữ liệu khớp file raw đang dùng. Các số liệu dưới đây thuộc cùng một lần chạy.
 
 | Thuộc tính               | Giá trị                                                                                                  |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Mô hình được chọn    | **Linear SVM (Tuned)**                                                                               |
-| Tham số                   | `C=2.0`, `learning_rate=0.05`, `max_iter=150`, `loss='squared_hinge'`, `class_weight='balanced'` |
-| Số đặc trưng sau Top-K | **4.318**                                                                                            |
-| Ngưỡng phân loại       | **0,465**                                                                                            |
-| Validation Accuracy        | **70,07%**                                                                                           |
-| Validation Recall          | **85,55%**                                                                                           |
-| Validation F1              | **70,93%**                                                                                           |
+| Mô hình được chọn    | **Linear SVM — cấu hình mặc định trong `main.py`**                                                                               |
+| Tham số                   | `C=1.0`, `learning_rate=0.05`, `max_iter=150`, `loss='squared_hinge'`, `class_weight='balanced'` |
+| Số đặc trưng sau Top-K | **500**                                                                                            |
+| Ngưỡng phân loại       | **0,555**                                                                                            |
+| Validation Accuracy        | **97,14%**                                                                                           |
+| Validation Recall          | **93,84%**                                                                                           |
+| Validation F1              | **95,14%**                                                                                           |
+
+Linear SVM mặc định và bản tuned có cùng các chỉ số dùng để lựa chọn trên Validation; bản mặc định đứng trước trong thứ tự ứng viên và được giữ làm kết quả cuối. Tuning không nhất thiết đem lại mô hình tốt hơn trong mọi lần chạy.
 
 ### 8.2. Chỉ số Test tại ngưỡng đã chốt
 
 | Chỉ số            |        Giá trị | Cách đọc                                                     |
 | ------------------- | ---------------: | --------------------------------------------------------------- |
-| Accuracy            | **70,85%** | Tỷ lệ dự đoán đúng trên toàn bộ Test                  |
-| Precision — Spam   | **61,39%** | Trong các email bị gắn nhãn spam, bao nhiêu là spam thật |
-| Recall — Spam      | **85,47%** | Trong các spam thật, bao nhiêu được phát hiện           |
-| F1                  | **71,46%** | Trung bình điều hòa Precision và Recall                    |
-| F2                  | **79,25%** | Cân bằng hai chỉ số với trọng số nghiêng về Recall     |
-| ROC-AUC             | **81,44%** | Khả năng xếp hạng spam cao hơn ham theo điểm mô hình   |
-| False-positive rate | **40,05%** | Tỷ lệ Ham bị đánh nhầm thành Spam                        |
+| Accuracy            | **96,52%** | Tỷ lệ dự đoán đúng trên toàn bộ Test                  |
+| Precision — Spam   | **93,29%** | Trong các email bị gắn nhãn spam, bao nhiêu là spam thật |
+| Recall — Spam      | **95,21%** | Trong các spam thật, bao nhiêu được phát hiện           |
+| F1                  | **94,24%** | Trung bình điều hòa Precision và Recall                    |
+| F2                  | **94,82%** | Cân bằng hai chỉ số với trọng số nghiêng về Recall     |
+| ROC-AUC             | **99,46%** | Khả năng xếp hạng spam cao hơn ham theo điểm mô hình   |
+| False-positive rate | **2,92%** | Tỷ lệ Ham bị đánh nhầm thành Spam                        |
 
 Ma trận nhầm lẫn có **hàng là nhãn thật, cột là nhãn dự đoán**:
 
 | Nhãn thật \ Nhãn dự đoán |                 Ham |                  Spam |
 | ------------------------------ | ------------------: | --------------------: |
-| Ham                            | **997 — TN** |   **666 — FP** |
-| Spam                           | **180 — FN** | **1.059 — TP** |
+| Ham                            | **333 — TN** |   **10 — FP** |
+| Spam                           | **7 — FN** | **139 — TP** |
 
-Mô hình bắt được phần lớn spam theo mục tiêu cấu hình, nhưng chặn nhầm **666/1.663 email hợp lệ**. Vì vậy, kết quả hiện tại chưa phù hợp để tự động xóa hoặc chặn email trong môi trường thực tế.
+Trên 489 mẫu Test, mô hình dự đoán đúng 472 mẫu, nhầm **10/343 email ham** thành spam và bỏ sót **7/146 email spam**. Các mẫu sai được lưu để đọc và phân tích trong bài lab. ROC/PR được vẽ từ các score thực tế, xử lý các score bằng nhau theo nhóm; marker được tính tại đúng threshold đã chọn.
 
-### 8.3. So sánh với phiên bản trước khi sửa hội tụ
+### 8.3. So sánh kết quả và lưu ý khi diễn giải
 
-| Chỉ số trên cùng split Test | Trước sửa |         Sau sửa |
-| ------------------------------- | -----------: | ---------------: |
-| Accuracy                        |       66,20% | **70,85%** |
-| Precision                       |       56,89% | **61,39%** |
-| Recall                          |       85,96% | **85,47%** |
-| F1                              |       68,47% | **71,46%** |
-| False Positives                 |          807 |    **666** |
+| Mô hình trên cùng split Test | Accuracy | Precision | Recall | F1 |
+| ------------------------------- | -----------: | -----------: | -----------: | -----------: |
+| **Linear SVM — được chọn trên Validation** | **96,52%** | **93,29%** | **95,21%** | **94,24%** |
+| Logistic Regression (Tuned) | 96,73% | 92,21% | 97,26% | 94,67% |
+| Complement Naive Bayes (Tuned) | 93,87% | 88,67% | 91,10% | 89,86% |
+| SpamVotingEnsemble (Tuned) | 95,91% | 90,38% | 96,58% | 93,38% |
 
-Sửa cơ chế cập nhật trọng số giúp tăng chất lượng phân loại và giảm chặn nhầm, trong khi Recall vẫn đạt mục tiêu. Đây là so sánh hai phiên bản trên cùng split, không phải hai phép đánh giá độc lập trên dữ liệu mới.
+Bảng trích từ [`test_models_comparison.csv`](results/metrics/test_models_comparison.csv). Logistic Regression (Tuned) có Accuracy và F1 Test cao hơn một chút, nhưng mô hình cuối vẫn là Linear SVM đã chọn trên Validation; không chọn lại theo Test.
+
+README trước đây ghi kết quả trên dataset khác. Vì dữ liệu và split đã thay đổi, không dùng mức chênh lệch giữa số liệu cũ và mới để kết luận việc sửa thuật toán làm tăng chất lượng. Muốn so sánh hai phiên bản, cần chạy chúng trên cùng dữ liệu và cùng cách chia tập.
 
 ---
 
@@ -414,7 +424,7 @@ Nếu đã chọn đúng interpreter hoặc kích hoạt môi trường ảo, c�
 
 ### 9.2. Chạy pipeline tham chiếu
 
-Đặt `spam.csv` vào `data/raw/`, sau đó chạy:
+Đặt `spam_ham_dataset.csv` từ nguồn Kaggle ở mục 1.2 vào `data/raw/`, sau đó chạy:
 
 ```powershell
 .\.venv\Scripts\python.exe main.py
@@ -428,7 +438,7 @@ Pipeline sẽ thực hiện bốn giai đoạn ở mục 5, ghi log, tạo bản
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Lần kiểm chứng ngày **19/10/2026** có **51/51 tests pass**. Phạm vi gồm dữ liệu/encoding/CSV lỗi; chia tập; TF-IDF/scaler/Top-K; mô hình, voting và threshold; AUC đồng hạng và metrics; lưu/nạp và inference; tích hợp toàn pipeline. Các test mới kiểm tra đầu vào tuning, phân xử hòa/fallback, đường dẫn bundle mặc định và tính nhất quán URL giữa EDA với processor.
+Lần kiểm chứng ngày **04/11/2026** có **57/57 tests pass**. Phạm vi gồm đọc/làm sạch dữ liệu, chia tập, TF-IDF/scaler/Top-K, mô hình, voting, threshold, metrics, lưu/nạp và inference. Các regression tests mới kiểm tra số chiều và giá trị hữu hạn của scaler, trọng số ensemble, hình dạng ROC và marker threshold, histogram email dài, cùng đường dẫn model khi chạy ngoài project root.
 
 Kiểm thử hồi quy còn kiểm tra LR/SVM học được tín hiệu nhỏ trên ma trận thưa, tránh lặp lại lỗi hội tụ hoặc phân kỳ khi thay `C`. Tests xác nhận hành vi phần mềm; chất lượng dự đoán vẫn cần đánh giá trên dữ liệu có nhãn.
 
@@ -453,7 +463,7 @@ batch_results = service.predict_batch([
 print(batch_results[["prediction", "spam_score", "is_calibrated", "threshold_used"]])
 ```
 
-Đường dẫn bundle mặc định là `SAVED_MODELS_DIR / "spam_pipeline.joblib"`, được xác định từ thư mục dự án, không phụ thuộc thư mục làm việc. Python vẫn cần import được package `src`. Có thể truyền `bundle_path` để chọn model khác; đường dẫn tùy chỉnh tương đối được tính từ thư mục làm việc hiện tại.
+Đường dẫn bundle mặc định là `SAVED_MODELS_DIR / "spam_pipeline.joblib"`, được dùng thống nhất khi lưu, nạp và tạo dịch vụ inference. Đường dẫn này được xác định từ thư mục dự án, không phụ thuộc thư mục làm việc. Python vẫn cần import được package `src`. Có thể truyền `bundle_path` để chọn model khác; đường dẫn tùy chỉnh tương đối được tính từ thư mục làm việc hiện tại.
 
 `predict_single()` trả dictionary gồm `raw_text`, `prediction`, `is_spam`, `spam_score`, `threshold_used`, `risk_level`, `detected_signals` và metadata diễn giải điểm. `predict_batch()` trả DataFrame. Trường cũ `spam_probability` được giữ làm alias của `spam_score`; `is_calibrated=False` và `score_note` nêu rõ chưa hiệu chỉnh. `risk_level` là Cao/Thấp theo quyết định tại threshold, không phải xác suất rủi ro; xem `risk_basis`.
 
@@ -467,7 +477,7 @@ Sau khi thay cấu hình đặc trưng hoặc thuật toán, chạy lại thí n
 
 ## 10. Năm Jupyter Notebooks & Quy Tắc Tái Lập
 
-Các notebook dùng mã nguồn chung trong `src/`, nhưng tạo **một chuỗi thực nghiệm riêng** với baseline, lưới tham số và ensemble khác `main.py`. Vì vậy, kết quả và mô hình thắng có thể khác nhau. Báo cáo số liệu cần ghi rõ thuộc luồng nào.
+Các notebook dùng mã nguồn chung trong `src/` và tạo **một chuỗi thực nghiệm riêng**. Baseline và lưới tuning hiện tại đã khớp `main.py`, nhưng các ứng viên ensemble có khác nhau. Vì vậy, cần ghi rõ kết quả thuộc luồng nào khi viết báo cáo.
 
 Các khác biệt hiện tại cần lưu ý:
 
@@ -476,7 +486,7 @@ Các khác biệt hiện tại cần lưu ý:
 | EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                             |
 | Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                              |
 | Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                             |
-| Grid Search                             | Lưới tại mục 4.4           | Lưới riêng trong notebook 04, khác C, learning rate, số vòng và alpha |
+| Grid Search                             | Lưới tại mục 4.4           | Notebook 04 dùng cùng lưới C, learning rate, số vòng và alpha |
 | Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5`  |
 
 Notebook 02 dùng cùng cấu hình chia tập, hybrid builder và dải Top-K với main ở cấu hình mặc định. Notebook 05 giữ winner/ngưỡng đã chốt trên Validation trước khi đánh giá Test. Ngưỡng `0.0` của SVM trong notebook 03 áp dụng trên điểm `decision_function`, tương đương ngưỡng sigmoid `0.5`.
@@ -528,13 +538,15 @@ Model trung gian gồm `feature_artifacts.joblib`, `baseline_models.joblib` và 
 
 | Giới hạn đã biết                                        | Hướng phát triển phù hợp                                                                                          |
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| FPR Test còn **40,05%**                               | Phân tích nguyên nhân FP, cải thiện đặc trưng và đánh giá lại trên tập ngoài                           |
+| Còn **10 FP và 7 FN** trên 489 mẫu Test; FPR **2,92%** | Đọc các mẫu sai để hiểu giới hạn của mô hình và đề xuất thí nghiệm tiếp theo |
 | Một split cố định                                        | Đánh giá độ ổn định qua nhiều seed hoặc cross-validation                                                      |
 | Test đã được quan sát trong vòng phát triển         | Dùng holdout mới hoặc dữ liệu ngoài để đánh giá độc lập các cải tiến tiếp theo                        |
 | Sigmoid SVM và voting chưa được calibration             | Thực nghiệm calibration trên dữ liệu phát triển được tách đúng vai trò                                    |
 | Tuning nhiều lần trên cùng Validation có thể overfit   | Giới hạn việc dò tham số, dùng quy trình đánh giá phù hợp khi mở rộng thí nghiệm                        |
 | Stop words tiếng Anh; chưa có đánh giá theo ngôn ngữ | Bổ sung dữ liệu và quy trình riêng nếu muốn hỗ trợ tiếng Việt                                               |
-| Lệch miền dữ liệu (SMS Spam thay vì Email Spam chuẩn)  | Dữ liệu huấn luyện là tin nhắn SMS ngắn; cần mở rộng kiểm thử trên tập email hoàn chỉnh (headers, HTML) |
+| Chỉ đánh giá trên một dataset email từ Kaggle | Thử trên nguồn email khác để xem mô hình có giữ được chất lượng hay không |
 | Chưa có metadata sender/recipient/subject riêng           | Bổ sung khi có nguồn dữ liệu phù hợp và nhãn đáng tin cậy                                                   |
 
-Dữ liệu mâu thuẫn nhãn đã được xử lý theo nhóm nội dung, nhưng điều đó không chứng minh mọi nhãn còn lại đều đúng. Việc cải thiện chất lượng cần giữ nguyên nguyên tắc đối chiếu dữ liệu: không đổi nhãn hay loại mẫu chỉ vì mô hình dự đoán sai.
+Lần kiểm tra này không phát hiện nhóm nội dung giống nhau nhưng khác nhãn theo khóa chuẩn hóa đang dùng. Điều đó chưa chứng minh mọi nhãn đều đúng hoặc mọi mẫu gần trùng đã được nhận diện. Khi phân tích lỗi, không đổi nhãn hay loại mẫu chỉ vì mô hình dự đoán sai.
+
+Bài lab dừng ở việc xây dựng, đánh giá và thử sử dụng mô hình bằng Python. Kết quả giúp so sánh các phương pháp trên dataset đã chọn; chưa đủ để kết luận mô hình phù hợp cho việc lọc thư tự động ngoài thực tế.
