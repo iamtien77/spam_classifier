@@ -1,6 +1,6 @@
-﻿# Thiết kế bài lab Spam Classifier theo 5W1H
+# Thiết kế bài lab Spam Classifier theo 5W1H
 
-Trong bài lab này, nhóm dự kiến thực hiện bài toán phân loại email thành spam và ham. Mục tiêu chính là thực hành các bước của một bài toán Machine Learning: chuẩn bị dữ liệu, tạo đặc trưng, huấn luyện và đánh giá mô hình.
+Trong bài lab này, nhóm dự kiến thực hiện bài toán phân loại email thành spam và ham. Mục tiêu chính là thực hành các bước của một bài toán Machine Learning chuẩn mực: chia dữ liệu độc lập trước, tiền xử lý và tạo đặc trưng trên tập Train, huấn luyện các mô hình from-scratch và đánh giá độc lập.
 
 Tài liệu trình bày phương án thiết kế trước khi triển khai, gồm phạm vi, cách tổ chức công việc, phương pháp thử nghiệm và tiêu chí đánh giá. Nhóm sẽ thống nhất các lựa chọn này trước khi bắt đầu thực hành.
 
@@ -13,21 +13,21 @@ Nhóm chọn bài toán **phân loại văn bản nhị phân có giám sát**. 
 - `ham = 0`: email hợp lệ.
 - `spam = 1`: email rác.
 
-Dữ liệu đầu vào dự kiến là file CSV chứa nội dung email và nhãn ham/spam. Nhóm sẽ kiểm tra nguồn dữ liệu, phân bố nhãn và chất lượng nội dung trước khi sử dụng. Việc đánh giá được giới hạn trong dataset của bài lab; khả năng áp dụng cho hộp thư thực tế cần được kiểm chứng riêng.
+Dữ liệu đầu vào dự kiến là file CSV chứa nội dung email và nhãn ham/spam. Nhóm sẽ kiểm tra nguồn dữ liệu, phân bố nhãn và cấu trúc trường trước khi sử dụng. Việc đánh giá được giới hạn trong dataset của bài lab; khả năng áp dụng cho hộp thư thực tế cần được kiểm chứng riêng.
 
-Phạm vi thực hiện gồm làm sạch dữ liệu, chia tập, tạo đặc trưng, huấn luyện các mô hình đơn giản, so sánh và thử dự đoán email mới. Nhóm dự kiến thực hành trên máy cá nhân; việc kết nối với hộp thư thật nằm ngoài phạm vi bài lab.
+Phạm vi thực hiện gồm: chia tập dữ liệu phân tầng độc lập ngay từ đầu (Train/Test Split First), sau đó tiền xử lý và làm sạch trên tập Train, tạo đặc trưng số, huấn luyện các mô hình đơn giản, so sánh trên Validation, đánh giá độc lập trên Test và thử dự đoán email mới. Nhóm dự kiến thực hành trên máy cá nhân; việc kết nối với hộp thư thật nằm ngoài phạm vi bài lab.
 
 ### Dữ liệu đầu vào và kết quả đầu ra dự kiến
 
 | Bước                        | Đầu vào                             | Đầu ra                                                                  |
 | :---------------------------- | :------------------------------------- | :------------------------------------------------------------------------ |
-| Đọc và kiểm tra dữ liệu | File CSV có nội dung và nhãn       | Nội dung gốc, nhãn và mã bản ghi để đối chiếu        |
-| Làm sạch và chia tập      | Dữ liệu đã đọc                   | Các tập Train, Validation và Test; thống kê những dòng bị loại   |
-| Tạo đặc trưng             | Nội dung văn bản                    | Ma trận đặc trưng số để đưa vào mô hình                       |
-| Huấn luyện và lựa chọn   | Train và Validation                   | Mô hình cùng cấu hình và threshold được chọn                    |
-| Đánh giá                   | Mô hình đã chọn và Test          | Bảng metrics, confusion matrix và một số trường hợp dự đoán sai |
-| Chạy thử                    | Một văn bản mới                    | Nhãn dự đoán và score của mô hình                                 |
-| Lưu kết quả                | Mô hình và bộ biến đổi đã fit | File để nạp lại và tiếp tục dự đoán                             |
+| 1. Đọc và kiểm tra dữ liệu | File CSV có nội dung và nhãn       | Dữ liệu thô và mã bản ghi để đối chiếu        |
+| 2. Chia tập độc lập ngay từ đầu (Early Split) | Dữ liệu thô đã đọc | Các tập Train, Validation và Test độc lập (Test được cách ly) |
+| 3. Tiền xử lý & Tạo đặc trưng (chỉ fit trên Train) | Dữ liệu thô Train (Val/Test chỉ transform) | Ma trận đặc trưng số, bộ biến đổi đã fit và thống kê làm sạch |
+| 4. Huấn luyện và lựa chọn   | Train và Validation                   | Mô hình cùng cấu hình và threshold được chọn                    |
+| 5. Đánh giá kiểm toán độc lập | Mô hình đã chọn và Test          | Bảng metrics, confusion matrix và một số trường hợp dự đoán sai |
+| 6. Chạy thử                    | Một văn bản mới                    | Nhãn dự đoán và score của mô hình                                 |
+| 7. Lưu kết quả                | Mô hình và bộ biến đổi đã fit | File bundle để nạp lại và tiếp tục dự đoán                        |
 
 ## 2. Why 
 
@@ -37,6 +37,7 @@ Nhóm dự kiến bắt đầu từ baseline đơn giản, sau đó mới thử 
 
 | Lựa chọn dự kiến                               | Lý do chọn                                                                             | Hạn chế                                              |
 | :------------------------------------------------- | :--------------------------------------------------------------------------------------- | :----------------------------------------------------- |
+| Chia tập độc lập trước mọi bước tiền xử lý        | Tuân thủ nguyên tắc vàng của ML, chống rò rỉ dữ liệu (Data Leakage) từ Test sang Train | Cần quản lý chặt chẽ bộ biến đổi fit trên Train      |
 | Word TF-IDF + Complement Naive Bayes làm baseline | Dễ triển khai, huấn luyện nhanh, phù hợp đặc trưng không âm                   | Khả năng thể hiện ngữ cảnh còn hạn chế        |
 | Logistic Regression và Linear SVM                 | Phù hợp dữ liệu văn bản dạng ma trận thưa; có thể xem trọng số đặc trưng | Cần chọn tham số và kiểm tra quá trình hội tụ |
 | Chia riêng Validation và Test                    | Có dữ liệu để chọn mô hình và dữ liệu để đánh giá cuối                  | Giảm số mẫu dành cho huấn luyện                  |
@@ -64,10 +65,10 @@ Nhóm dự kiến thực hiện theo từng bước, hoàn thành baseline trư�
 | Bước | Công việc                                                               | Kết quả cần có                                 |
 | :----- | :------------------------------------------------------------------------ | :------------------------------------------------- |
 | 1      | Xác định phạm vi, đầu vào, đầu ra và metrics                    | Phương án thiết kế cho bài lab               |
-| 2      | Kiểm tra, làm sạch và chia dữ liệu                                  | Train, Validation, Test và thống kê dữ liệu   |
-| 3      | Tạo TF-IDF và huấn luyện Naive Bayes                                  | Baseline chạy được, có kết quả Validation   |
-| 4      | Thử Logistic Regression, Linear SVM và một số đặc trưng bổ sung   | Bảng so sánh với baseline                       |
-| 5      | Chọn mô hình và threshold bằng Validation, sau đó đánh giá Test | Kết quả đánh giá cuối và phân tích lỗi   |
+| 2      | Chia phân tầng Train, Validation, Test độc lập ngay từ đầu      | Dữ liệu thô được chia 3 tập, Test được cách ly |
+| 3      | Tiền xử lý, làm sạch và tạo đặc trưng (fit trên Train, transform Val/Test) | Ma trận đặc trưng và bộ biến đổi đã fit |
+| 4      | Huấn luyện baseline Naive Bayes và thử Logistic Regression, Linear SVM | Bảng so sánh các mô hình trên Validation |
+| 5      | Dò tham số, tối ưu threshold trên Validation, sau đó đánh giá Test | Mô hình chiến thắng, kết quả Test và phân tích lỗi |
 | 6      | Lưu mô hình, chạy demo và viết báo cáo                            | Chương trình có thể nạp lại để dự đoán |
 
 Nếu kết quả Test chưa tốt, nhóm sẽ ghi rõ hạn chế trong báo cáo. Việc dùng kết quả đó để điều chỉnh mô hình sẽ cần một lần đánh giá độc lập mới.
@@ -80,7 +81,7 @@ Không gian làm việc dự kiến được chia theo trách nhiệm của từ
 
 | Vị trí                           | Nội dung chính                                          |
 | :--------------------------------- | :-------------------------------------------------------- |
-| `src/data/`                      | Đọc, làm sạch, chuẩn hóa văn bản và chia tập    |
+| `src/data/`                      | Đọc dữ liệu, chia tập phân tầng và tiền xử lý văn bản    |
 | `src/features/`                  | Tạo và chọn đặc trưng; chỉ fit trên Train         |
 | `src/models/`                    | Huấn luyện, tuning và lưu/nạp mô hình      |
 | `src/evaluation/`                | Tính metrics, vẽ biểu đồ và phân tích lỗi        |
@@ -94,22 +95,27 @@ Không gian làm việc dự kiến được chia theo trách nhiệm của từ
 
 ```mermaid
 flowchart TD
-    A[Kiểm tra và làm sạch dữ liệu] --> B[Chia Train / Validation / Test]
-    B --> C[Train: học đặc trưng và huấn luyện]
-    C --> D[Validation: chọn mô hình và threshold]
-    B --> E[Test giữ riêng]
-    D --> F[Đánh giá cuối trên Test]
-    E --> F
-    F --> G[Lưu mô hình, bộ biến đổi và thử email mới]
+    A[Nạp dữ liệu thô: spam_ham_dataset.csv] --> B[Chia phân tầng Train / Validation / Test TRƯỚC]
+    B --> C[Tập Train: Tiền xử lý, làm sạch, fit TF-IDF & Scaler]
+    B --> D[Tập Validation: Transform qua bộ tiền xử lý của Train]
+    B --> E[Tập Test: Niêm phong cách ly hoàn toàn]
+    C --> F[Huấn luyện LR, Linear SVM, Naive Bayes]
+    D --> G[Chọn Top-K, tuning siêu tham số & chọn threshold trên Val]
+    F --> G
+    G --> H[Chốt mô hình chiến thắng & ngưỡng tối ưu]
+    E --> I[Đánh giá một lần duy nhất trên Test]
+    H --> I
+    I --> J[Lưu pipeline joblib và thử nghiệm suy luận email mới]
 ```
 
-### 6.2. Dữ liệu và chống leakage
+### 6.2. Dữ liệu và nguyên tắc chống leakage (Chia tập trước, Tiền xử lý sau)
 
-1. Kiểm tra nội dung, nhãn, encoding và dòng rỗng; giữ bản gốc để đối chiếu. Không dùng mã bản ghi hoặc nhãn làm đặc trưng.
-2. Xử lý trùng trước khi chia tập: giữ một bản nếu cùng nhãn, loại nhóm mâu thuẫn nhãn và ghi lại số lượng.
-3. Dự kiến chia phân tầng **80% Train / 10% Validation / 10% Test**, **seed 42**, sau khi kiểm tra đủ mẫu mỗi lớp.
-4. Chỉ học từ vựng, IDF, tham số chuẩn hóa và điểm xếp hạng đặc trưng từ Train; áp dụng cùng bộ biến đổi cho Validation/Test.
-5. Dùng Validation chọn số đặc trưng, cấu hình và threshold; giữ Test riêng cho đánh giá cuối để tránh leakage.
+1. **Nguyên tắc vàng của Machine Learning:** Luôn luôn chia dữ liệu (Train/Test Split) TRƯỚC, rồi mới tiến hành xử lý dữ liệu (Preprocessing). Việc này ngăn chặn rò rỉ dữ liệu (Data Leakage) từ tập Test sang tập Train.
+2. **Nạp và xác thực dữ liệu thô:** Kiểm tra định dạng CSV, schema cột, encoding; giữ nguyên dữ liệu gốc để đối chiếu.
+3. **Chia phân tầng độc lập ngay từ đầu (Early Stratified Split):** Chia tập **80% Train / 10% Validation / 10% Test**, **seed 42**, đảm bảo phân bổ nhãn đồng đều giữa các tập. Tập Test được niêm phong cách ly ngay tại bước này.
+4. **Tiền xử lý chỉ fit trên Train:** Toàn bộ quá trình làm sạch (chuẩn hóa chữ thường, lọc stopwords, khử trùng lặp nội bộ, học ngưỡng cắt độ dài 791 từ, học từ vựng TF-IDF 3.000 từ, tính IDF, học tham số scaler) CHỈ ĐƯỢC HỌC (FIT) TRÊN TẬP TRAIN.
+5. **Validation và Test chỉ Transform:** Tập Validation và Test được giữ ở dạng thô ban đầu, chỉ đi qua hàm `transform()` của bộ tiền xử lý đã fit từ Train; tuyệt đối không fit lại bất kỳ tham số nào.
+6. **Thẩm định và đánh giá độc lập:** Dùng Validation chọn số đặc trưng Top-K, dò cấu hình và chọn threshold; giữ Test riêng biệt để đánh giá kiểm toán cuối cùng.
 
 ### 6.3. Chiến lược đặc trưng và mô hình
 
@@ -169,6 +175,8 @@ spam_classifier/
 │   ├── raw/                          # Dữ liệu gốc
 │   └── processed/                    # Dữ liệu sau xử lý
 ├── docs/
+│   ├── reports/
+│   │   └── spam_classifier_lab_report.html # Báo cáo kết quả bài lab
 │   └── Algorithms/
 │       ├── design.md                 # Thiết kế bài lab
 │       ├── README.md                 # Giới thiệu tài liệu thuật toán
@@ -181,7 +189,7 @@ spam_classifier/
 │   ├── config.py                     # Đường dẫn, seed và cấu hình
 │   ├── data/
 │   │   ├── loader.py                 # Đọc dữ liệu
-│   │   └── preprocessing.py          # Làm sạch và chia tập
+│   │   └── preprocessing.py          # Chia tập và tiền xử lý văn bản
 │   ├── features/
 │   │   └── feature_engineering.py    # Tạo và chọn đặc trưng
 │   ├── models/
@@ -205,5 +213,3 @@ spam_classifier/
 │   └── saved_models/                 # Mô hình đã lưu
 └── logs/                             # Log chạy chương trình
 ```
-
-Cây thư mục trên là phương án tổ chức dự kiến. Khi phân công, nhóm sẽ thống nhất đầu vào, đầu ra và người phụ trách từng phần; các thí nghiệm sẽ dùng chung quy tắc xử lý dữ liệu. Nếu cần điều chỉnh cấu trúc, nhóm sẽ ghi lại lý do và cập nhật hướng dẫn để các thành viên cùng theo dõi.

@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Báo Cáo Thực Hành: Phân Loại Email Spam (Practice 1: Classifying Spam Emails)</title>
+    
+    <!-- Cấu hình MathJax hiển thị công thức toán học sắc nét -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --primary: #1e293b;
+            --secondary: #475569;
+            --blue: #0369a1;
+            --green: #047857;
+            --amber: #b45309;
+            --red: #b91c1c;
+            --bg-page: #f8fafc;
+            --bg-paper: #ffffff;
+            --border: #cbd5e1;
+            --border-light: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--primary);
+            font-family: var(--font-main);
+            font-size: 14.5px;
+            line-height: 1.65;
+            padding: 24px 12px;
+        }
+
+        .paper {
+            max-width: 940px;
+            margin: 0 auto;
+            background: var(--bg-paper);
+            padding: 45px 55px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Tiêu đề bài lab chuẩn mực học tập */
+        .lab-title-block {
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 18px;
+            margin-bottom: 28px;
+        }
+
+        .lab-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .lab-desc {
+            font-size: 14px;
+            color: var(--secondary);
+            margin-bottom: 12px;
+        }
+
+        .lab-meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 12.5px;
+            color: var(--secondary);
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-light);
+        }
+
+        .lab-meta-row strong {
+            color: var(--primary);
+        }
+
+        /* Headings */
+        h2 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary);
+            border-bottom: 1.5px solid var(--border);
+            padding-bottom: 5px;
+            margin-top: 36px;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--blue);
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+
+        h4 {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-top: 14px;
+            margin-bottom: 6px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin-left: 24px;
+            margin-bottom: 14px;
+        }
+
+        li {
+            margin-bottom: 5px;
+        }
+
+        /* Bảng dữ liệu */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            margin: 14px 0 18px 0;
+        }
+
+        caption {
+            font-size: 12px;
+            font-weight: 700;
+            text-align: left;
+            margin-bottom: 6px;
+            color: var(--primary);
+        }
+
+        th {
+            background-color: #f8fafc;
+            border-top: 1.5px solid var(--primary);
+            border-bottom: 1.5px solid var(--primary);
+            padding: 7px 10px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        td {
+            border-bottom: 1px solid var(--border-light);
+            padding: 6px 10px;
+            color: var(--primary);
+        }
+
+        tr:last-child td {
+            border-bottom: 1.5px solid var(--primary);
+        }
+
+        .num {
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .highlight-row {
+            background-color: #f0fdf4;
+            font-weight: 600;
+        }
+
+        /* Khối hiển thị công thức toán */
+        .math-block {
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 10px 16px;
+            margin: 12px 0;
+            text-align: center;
+            overflow-x: auto;
+        }
+
+        /* Flow Diagram Cards (Luồng xử lý tường minh) */
+        .flow-container {
+            margin: 18px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .flow-phase {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .flow-phase-header {
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 14px;
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hdr-split { background: #4338ca; }
+        .hdr-train { background: #1e3a8a; }
+        .hdr-val { background: #b45309; }
+        .hdr-test { background: #b91c1c; }
+        .hdr-inf { background: #047857; }
+
+        .flow-steps {
+            padding: 12px 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            background: #fafafa;
+        }
+
+        .step-box {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 9px 11px;
+            font-size: 12px;
+        }
+
+        .step-tag {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--blue);
+            margin-bottom: 3px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .step-io {
+            font-size: 11px;
+            color: var(--secondary);
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px dashed var(--border-light);
+            font-family: var(--font-mono);
+        }
+
+        /* Ghi chú phản biện / phân tích kỹ thuật */
+        .note-box {
+            background: #f8fafc;
+            border-left: 3.5px solid var(--blue);
+            padding: 12px 14px;
+            margin: 14px 0;
+            font-size: 13px;
+            color: var(--secondary);
+        }
+
+        .note-box strong {
+            color: var(--primary);
+        }
+
+        .golden-rule-box {
+            background: #eff6ff;
+            border: 1.5px solid #bfdbfe;
+            border-left: 4px solid #2563eb;
+            padding: 14px 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            font-size: 13.5px;
+        }
+
+        .golden-rule-title {
+            font-weight: 800;
+            color: #1e40af;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Khối mã nguồn minh họa */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 10px 14px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        /* Hình ảnh */
+        .figure-box {
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        .figure-box img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 6px;
+            background: #fff;
+        }
+
+        .figure-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-top: 6px;
+        }
+
+        @media (max-width: 768px) {
+            .paper { padding: 25px 16px; }
+            .flow-steps { grid-template-columns: 1fr; }
+        }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .paper { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+            .flow-phase, .note-box, .math-block, .golden-rule-box { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="paper">
+
+    <!-- Tiêu đề khiêm tốn, đúng chuẩn bài lab môn học -->
+    <div class="lab-title-block">
+        <h1 class="lab-title">Báo Cáo Thực Hành: Phân Loại Email Spam (Spam Email Classifier)</h1>
+        <div class="lab-desc">
+            Bài thực hành môn Học Máy (Practice 1: Classifying Spam Emails). Mục tiêu là thực hành quy trình học máy chuẩn tắc: 
+            Vệ sinh tính toàn vẹn mẫu thô ở tầng nạp (Data Hygiene), <strong>chia dữ liệu độc lập ngay từ đầu (Early Stratified Split First)</strong>, sau đó tiến hành tiền xử lý văn bản và trích xuất đặc trưng (chỉ fit trên Train), tự cài đặt thuật toán From-Scratch đến đánh giá mô hình và chạy thử suy luận email mới.
+        </div>
+        <div class="lab-meta-row">
+            <div><strong>Tập dữ liệu:</strong> Kaggle Spam Mails (5.171 mẫu thô &rarr; 4.894 mẫu sạch)</div>
+            <div><strong>Quy tắc chia:</strong> Phân tầng 80/10/10 trước tiền xử lý (Train 3.916, Val 489, Test 489)</div>
+            <div><strong>Mô hình chọn:</strong> Linear SVM (C=1.0, Ngưỡng 0.555, 500 đặc trưng)</div>
+            <div><strong>Kết quả Test:</strong> Acc 96.52% • Recall 95.21% • F1 94.24%</div>
+            <div><strong>Kiểm thử phần mềm:</strong> 57/57 tests pass</div>
+        </div>
+    </div>
+
+    <!-- 1. TỔNG QUAN BÀI THỰC HÀNH -->
+    <section>
+        <h2>1. Đặt Vấn Đề &amp; Mục Tiêu Bài Lab</h2>
+        <p>
+            Trong bài thực hành này, mục tiêu là xây dựng chương trình nhận vào nội dung văn bản một email và phân loại thành một trong hai lớp:
+        </p>
+        <ul>
+            <li><code>ham = 0</code>: Email bình thường, thư trao đổi công việc hợp lệ.</li>
+            <li><code>spam = 1</code>: Thư rác, quảng cáo hoặc có dấu hiệu lừa đảo.</li>
+        </ul>
+        <p>
+            <strong>Điểm trọng tâm của bài lab:</strong> Thay vì chỉ gọi các thư viện có sẵn (như <code>sklearn.linear_model</code>), bài thực hành tự cài đặt các thành phần cốt lõi bằng Python thuần và NumPy/SciPy: từ ma trận thưa <code>CSRMatrixScratch</code>, bộ chuẩn hóa <code>MaxAbsScalerScratch</code>, bộ tách từ TF-IDF <code>TfidfVectorizerScratch</code>, đến 3 mô hình phân loại (Logistic Regression, Linear SVM, Naive Bayes). Qua đó, sinh viên nắm rõ cơ chế hội tụ, cách tối ưu hàm mất mát và cách xử lý dữ liệu thực tế.
+        </p>
+    </section>
+
+    <!-- 2. NGUYÊN TẮC VÀNG: CHIA TẬP TRƯỚC, TIỀN XỬ LÝ SAU -->
+    <section>
+        <h2>2. Vệ Sinh Dữ Liệu Thô (Data Hygiene) &amp; Phân Tách Tập Độc Lập (Train / Test Split First)</h2>
+        
+        <div class="golden-rule-box">
+            <div class="golden-rule-title">
+                <span>⚡ NGUYÊN TẮC VÀNG TRONG HỌC MÁY (THE GOLDEN RULE OF MACHINE LEARNING)</span>
+            </div>
+            <div>
+                Trong khoa học dữ liệu và học máy, <strong>việc chia tập dữ liệu (Train/Test Split) BẮT BUỘC phải được thực hiện TRƯỚC mọi bước tiền xử lý đặc trưng (ML Preprocessing)</strong>. 
+                Tập Test đóng vai trò là "dữ liệu tương lai ngoài thực tế" (unseen data). Nếu thực hiện các thao tác tiền xử lý (như chuẩn hóa chuỗi, tính IDF, học trần độ dài từ, co dãn scaler) trên toàn bộ tập dữ liệu trước khi chia, thông tin từ tập Test sẽ bị rò rỉ (Data Leakage) sang tập Train, khiến kết quả đánh giá bị sai lệch và không phản ánh đúng năng lực tổng quát hóa.
+            </div>
+        </div>
+
+        <p>
+            Tập dữ liệu đầu vào lấy từ nguồn <em>Spam Mails Dataset</em> (Kaggle), lưu tại <code>data/raw/spam_ham_dataset.csv</code> gồm 5.171 dòng dữ liệu thô. 
+            Để vừa tuân thủ tuyệt đối nguyên tắc chống rò rỉ thông tin, vừa thỏa mãn giả thiết cốt lõi về các mẫu độc lập ($i.i.d$), quy trình phân định rạch ròi 2 tầng kiến trúc:
+        </p>
+        <ul>
+            <li><strong>Tầng Data Ingestion &amp; Hygiene (Hàm <code>load_and_sanitize_raw_data()</code>):</strong> Kiểm toán xác thực schema và khử 277 bản ghi trùng lặp thô (Exact Deduplication). Thao tác này là bắt buộc để triệt tiêu nguy cơ <em>Rò rỉ dữ liệu qua bản ghi lặp chéo tập (Cross-split Duplication Leakage)</em> — nếu không khử trùng lặp trước, các bản ghi giống hệt nhau sẽ rơi ngẫu nhiên vào cả Train và Test, khiến mô hình học thuộc lòng và cho kết quả Test cao ảo.</li>
+            <li><strong>BƯỚC 1 CỦA ML PIPELINE (Hàm <code>stratified_split_dataframe()</code>):</strong> Tiến hành phân tách dữ liệu độc lập (Early Stratified Split 80/10/10) ngay lập tức <strong>TRƯỚC MỌI BƯỚC TIỀN XỬ LÝ</strong>.</li>
+            <li><strong>BƯỚC 2 CỦA ML PIPELINE (Lớp <code>SpamTextProcessor</code> &amp; <code>HybridFeatureBuilder</code>):</strong> Toàn bộ khâu tiền xử lý văn bản và học tham số thống kê chỉ được phép <strong>FIT DUY NHẤT TRÊN TẬP TRAIN</strong>.</li>
+        </ul>
+
+        <table>
+            <caption>Bảng 1: Phân bổ dữ liệu phân tầng Train / Validation / Test (Chia trước tiền xử lý)</caption>
+            <thead>
+                <tr>
+                    <th>Tập dữ liệu</th>
+                    <th class="num">Tỷ lệ</th>
+                    <th class="num">Tổng số mẫu</th>
+                    <th class="num">Số mẫu Ham</th>
+                    <th class="num">Số mẫu Spam</th>
+                    <th>Vai trò và quyền truy cập kỹ thuật</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Train</strong></td>
+                    <td class="num">80%</td>
+                    <td class="num"><strong>3.916</strong></td>
+                    <td class="num">2.746 (70.12%)</td>
+                    <td class="num">1.170 (29.88%)</td>
+                    <td><strong>FIT &amp; TRANSFORM:</strong> Nơi DUY NHẤT được phép học từ vựng, tính IDF, học scaler và huấn luyện trọng số.</td>
+                </tr>
+                <tr>
+                    <td><strong>Validation</strong></td>
+                    <td class="num">10%</td>
+                    <td class="num"><strong>489</strong></td>
+                    <td class="num">343 (70.14%)</td>
+                    <td class="num">146 (29.86%)</td>
+                    <td><strong>TRANSFORM ONLY:</strong> Dùng để chọn số đặc trưng Top-K, dò siêu tham số và tối ưu hóa ngưỡng $\tau$. Không fit lại.</td>
+                </tr>
+                <tr>
+                    <td><strong>Test</strong></td>
+                    <td class="num">10%</td>
+                    <td class="num"><strong>489</strong></td>
+                    <td class="num">343 (70.14%)</td>
+                    <td class="num">146 (29.86%)</td>
+                    <td><strong>NIÊM PHONG TUYỆT ĐỐI:</strong> Bị cách ly hoàn toàn; chỉ mở ra đánh giá 1 lần duy nhất tại ngưỡng đã chốt để kiểm toán lỗi.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table>
+            <caption>Bảng 2: Kết quả kiểm toán dữ liệu từ <code>results/metrics/data_audit.json</code></caption>
+            <thead>
+                <tr>
+                    <th>Hạng mục kiểm toán</th>
+                    <th class="num">Số dòng</th>
+                    <th class="num">Tỷ lệ</th>
+                    <th>Xử lý kỹ thuật</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Dữ liệu thô nạp từ CSV</td>
+                    <td class="num">5.171</td>
+                    <td class="num">100.00%</td>
+                    <td>Đọc mã hóa <code>utf-8-sig</code> (dự phòng <code>latin-1</code>), chuẩn hóa tên cột <code>label</code> và <code>text</code>.</td>
+                </tr>
+                <tr>
+                    <td>Loại do nhãn sai hoặc nội dung rỗng</td>
+                    <td class="num">0</td>
+                    <td class="num">0.00%</td>
+                    <td>Dữ liệu sạch, không có dòng rỗng hoặc nhãn bất thường.</td>
+                </tr>
+                <tr>
+                    <td>Loại do trùng lặp nội dung &amp; nhãn</td>
+                    <td class="num">277</td>
+                    <td class="num">5.36%</td>
+                    <td>Chuẩn hóa Unicode NFKC và khoảng trắng; giữ bản đầu tiên, loại 277 bản ghi trùng lặp.</td>
+                </tr>
+                <tr class="highlight-row">
+                    <td><strong>Tổng dữ liệu sạch phân chia</strong></td>
+                    <td class="num"><strong>4.894</strong></td>
+                    <td class="num"><strong>94.64%</strong></td>
+                    <td><strong>3.432 Ham (70.13%) và 1.462 Spam (29.87%)</strong> chia thành Train/Val/Test.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note-box">
+            <strong>Luận điểm bảo vệ khoa học trước hội đồng phản biện:</strong><br>
+            Nếu giảng viên hỏi: <em>"Tại sao các em bảo chia tập trước rồi mới tiền xử lý, nhưng lại thấy bước khử trùng lặp (deduplication) diễn ra trước khi chia?"</em><br>
+            <strong>Câu trả lời đanh thép:</strong> Dạ thưa Thầy/Cô, nhóm em phân định rạch ròi giữa <strong>Vệ sinh dữ liệu thô (Data Hygiene)</strong> và <strong>Tiền xử lý học máy (ML Preprocessing)</strong>:<br>
+            1. Về <strong>ML Preprocessing</strong>: Nhóm tuân thủ tuyệt đối nguyên tắc chia tập trước. Toàn bộ việc làm sạch văn bản, chuẩn hóa chuỗi, lọc stop words, học trần độ dài 791 từ, xây dựng từ điển 4.318 chiều, tính IDF và fit MaxAbsScaler <strong>chỉ được fit duy nhất trên 3.916 mẫu Train sau khi chia tập</strong>. Tập Val và Test chỉ đi qua hàm <code>transform()</code>.<br>
+            2. Về <strong>Khử trùng lặp thô (Deduplication)</strong>: Bắt buộc phải thực hiện ở tầng nạp dữ liệu thô. Nếu chia tập trước khi khử trùng lặp, 277 bản ghi trùng trong Kaggle sẽ rơi ngẫu nhiên vào cả Train và Test. Khi đó tập Test sẽ chứa các email giống hệt tập Train, dẫn đến <strong>rò rỉ dữ liệu qua bản ghi lặp (Duplicate Leakage)</strong> và vi phạm giả thiết mẫu độc lập $i.i.d$ cơ bản của Machine Learning.
+        </div>
+    </section>
+
+    <!-- 3. TIỀN XỬ LÝ & ĐẶC TRƯNG LAI (CHỈ FIT TRÊN TRAIN) -->
+    <section>
+        <h2>3. Tiền Xử Lý Văn Bản &amp; Trích Xuất Đặc Trưng (Thực Hiện Sau Khi Chia Tập)</h2>
+        <p>
+            Sau khi dữ liệu đã được tách riêng thành 3 tập, toàn bộ chu trình tiền xử lý và trích xuất đặc trưng được khởi tạo và <strong>chỉ fit trên tập Train</strong>:
+        </p>
+
+        <h3>3.1. Tiền xử lý văn bản (Text Preprocessing)</h3>
+        <ul>
+            <li><strong>Giới hạn độ dài từ (Length Capping):</strong> Được học từ phân vị 95% độ dài email trên tập Train = <strong>791 từ</strong>. Các email dài hơn 791 từ sẽ bị cắt đuôi để tránh ngoại lai làm lệch mô hình. Tập Validation và Test áp dụng đúng trần 791 từ này.</li>
+            <li><strong>Chuẩn hóa chuỗi:</strong> Thay thế các liên kết bằng <code>urltoken</code>, số tiền bằng <code>moneytoken</code>, chữ số bằng <code>numbertoken</code>; chuyển về chữ thường và loại bỏ dấu câu.</li>
+            <li><strong>Lọc Stopwords:</strong> Sử dụng danh sách từ dừng tiếng Anh cố định nhưng giữ lại các từ phủ định quan trọng (<code>not, no, never</code>) để bảo toàn ý nghĩa câu.</li>
+        </ul>
+
+        <h3>3.2. Không gian đặc trưng lai 5 khối (4.318 chiều ban đầu)</h3>
+        <p>
+            Đặc trưng được trích xuất bằng lớp <code>HybridFeatureBuilderScratch</code> (fit duy nhất trên Train):
+        </p>
+        <ul>
+            <li><strong>Word TF-IDF (3.000 chiều):</strong> Học từ điển $N=3.000$ từ có tần số tài liệu $\mathrm{df} \ge 2$ trên Train. Sử dụng Sublinear TF: $\mathrm{TF} = 1 + \ln(c)$, Smooth IDF: $\mathrm{IDF} = \ln((1+N)/(1+\mathrm{df})) + 1$, và chuẩn hóa độ dài Euclid $L_2$.</li>
+            <li><strong>Word Bigram TF-IDF (800 chiều):</strong> Các cặp từ liên tiếp bắt ngữ cảnh cụm: <code>act now, credit card, click here</code>.</li>
+            <li><strong>Character n-gram (500 chiều):</strong> Chuỗi ký tự con độ dài 3–5 bắt các từ cố tình lách chữ: <code>w!n, fr3e</code>.</li>
+            <li><strong>Keywords (10 chiều):</strong> Đếm số lần xuất hiện của 10 từ khóa nhạy cảm: <code>free, win, prize, claim, urgent, call, cash, guarantee, offer, click</code>.</li>
+            <li><strong>Structural &amp; Numerics (8 chiều):</strong> Độ dài, tỷ lệ chữ hoa, số chữ số, URL, ký hiệu đặc biệt, dấu <code>!</code>, dấu <code>$</code>. Chuẩn hóa bằng <code>MaxAbsScalerScratch</code> (fit tham số <code>max_abs_</code> trên Train).</li>
+        </ul>
+
+        <h3>3.3. Thực nghiệm chọn lọc Top-K đặc trưng trên Validation</h3>
+        <p>
+            Sau khi biến đổi ma trận gốc 4.318 cột, thuật toán <code>ManualFeatureSelectorScratch</code> xếp hạng tầm quan trọng của đặc trưng trên Train và kiểm thử các mức $K$ trên Validation:
+        </p>
+
+        <table>
+            <caption>Bảng 3: Kết quả thực nghiệm Top-K trên Validation (<code>results/metrics/top_k_sweep.csv</code>)</caption>
+            <thead>
+                <tr>
+                    <th class="num">Giá trị K</th>
+                    <th class="num">Tiết kiệm chiều</th>
+                    <th class="num">Val Acc</th>
+                    <th class="num">Val Recall</th>
+                    <th class="num">Val F1</th>
+                    <th class="num">Train-Val Gap</th>
+                    <th class="num">Balance Score</th>
+                    <th>Kết luận lựa chọn</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="highlight-row">
+                    <td class="num"><strong>500</strong></td>
+                    <td class="num"><strong>88.42%</strong></td>
+                    <td class="num">93.66%</td>
+                    <td class="num">95.21%</td>
+                    <td class="num">89.97%</td>
+                    <td class="num"><strong>0.0000</strong></td>
+                    <td class="num"><strong>0.9095</strong></td>
+                    <td><strong>CHỌN (Cân bằng tối ưu, Gap = 0.0000)</strong></td>
+                </tr>
+                <tr>
+                    <td class="num">1.000</td>
+                    <td class="num">76.84%</td>
+                    <td class="num">92.84%</td>
+                    <td class="num">96.58%</td>
+                    <td class="num">88.96%</td>
+                    <td class="num">0.0075</td>
+                    <td class="num">0.8752</td>
+                    <td>Loại (Acc giảm)</td>
+                </tr>
+                <tr>
+                    <td class="num">1.500</td>
+                    <td class="num">65.26%</td>
+                    <td class="num">93.87%</td>
+                    <td class="num">97.26%</td>
+                    <td class="num">90.45%</td>
+                    <td class="num">0.0000</td>
+                    <td class="num">0.8661</td>
+                    <td>Loại (Score thấp hơn K=500)</td>
+                </tr>
+                <tr>
+                    <td class="num">4.318 (Toàn bộ)</td>
+                    <td class="num">0.00%</td>
+                    <td class="num">93.25%</td>
+                    <td class="num">95.89%</td>
+                    <td class="num">89.46%</td>
+                    <td class="num">0.0085</td>
+                    <td class="num">0.7247</td>
+                    <td>Loại (Nhiều từ nhiễu, số chiều lớn)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note-box">
+            <strong>Căn cứ chọn K = 500:</strong> 
+            Mức $K=500$ giảm được 88.42% số chiều, loại bỏ các từ hiếm gây nhiễu, đưa khoảng cách giữa Train và Validation về <strong>0.0000</strong> (chống quá khớp), đồng thời đạt Balance Score cao nhất (0.9095) và Recall đạt 95.21% trên Validation.
+        </div>
+    </section>
+
+    <!-- 4. NỀN TẢNG TOÁN HỌC FROM-SCRATCH -->
+    <section>
+        <h2>4. Nền Tảng Toán Học Các Thuật Toán Tự Cài Đặt</h2>
+
+        <h3>4.1. Logistic Regression From-Scratch</h3>
+        <p>
+            Mô hình tính điểm tuyến tính $z_i = w^\top x_i + b$ và xác suất qua hàm sigmoid $p_i = \sigma(z_i) = \frac{1}{1 + e^{-z_i}}$. Hàm mục tiêu Binary Cross-Entropy có điều chuẩn $L_2$ và trọng số lớp cân bằng:
+        </p>
+        <div class="math-block">
+            $$J(w, b) = -\frac{1}{N} \sum_{i=1}^N a_i \left[ y_i \ln(p_i) + (1 - y_i) \ln(1 - p_i) \right] + \frac{\lambda}{2} \sum_{j=1}^D w_j^2$$
+        </div>
+        <p>
+            Trong đó trọng số lớp $a_i = \frac{N}{2 \cdot N_{y_i}}$ (Spam được nhân hệ số $\approx 2.35$, Ham $\approx 0.71$). Hệ số $\lambda = \frac{1}{\max(10^{-5}, C \cdot N)}$. Gradient được cập nhật bằng thuật toán giảm độ dốc có kiểm tra bước học Armijo Backtracking.
+        </p>
+
+        <h3>4.2. Linear SVM From-Scratch (Squared Hinge Loss — Mô hình chiến thắng)</h3>
+        <p>
+            Đổi nhãn sang $\widetilde{y}_i = 2y_i - 1 \in \{-1, +1\}$. Mô hình tìm siêu phẳng phân tách thông qua hàm mục tiêu Primal Squared Hinge Loss:
+        </p>
+        <div class="math-block">
+            $$J(w, b) = \frac{\lambda}{2} \|w\|_2^2 + \frac{1}{N} \sum_{i=1}^N a_i \left[ \max\left(0, 1 - \widetilde{y}_i (w^\top x_i + b)\right) \right]^2$$
+        </div>
+        <p>
+            Với mức vi phạm lề $m_i = \max\left(0, 1 - \widetilde{y}_i (w^\top x_i + b)\right)$, khi $m_i > 0$, gradient giải tích được tính:
+        </p>
+        <div class="math-block">
+            $$\nabla_w J = \lambda w - \frac{2}{N} \sum_{i: m_i > 0} a_i m_i \widetilde{y}_i x_i, \qquad \frac{\partial J}{\partial b} = -\frac{2}{N} \sum_{i: m_i > 0} a_i m_i \widetilde{y}_i$$
+        </div>
+        <p>
+            Mô hình sử dụng thuật toán Barzilai-Borwein để tự điều chỉnh bước học và Armijo Backtracking để đảm bảo hàm mất mát luôn giảm qua từng vòng lặp.
+        </p>
+
+        <h3>4.3. Complement Naive Bayes From-Scratch</h3>
+        <p>
+            Để xử lý việc tập dữ liệu có nhiều Ham hơn Spam, mô hình ước lượng tham số từ trên tập phần bù (tất cả tài liệu không thuộc lớp $c$):
+        </p>
+        <div class="math-block">
+            $$\theta_{c, j} = \frac{N_{\bar{c}, j} + \alpha}{\sum_{k} (N_{\bar{c}, k} + \alpha)}, \qquad w_{c, j} = -\frac{\ln \theta_{c, j}}{\sum_k |\ln \theta_{c, k}|}$$
+        </div>
+    </section>
+
+    <!-- 5. LUỒNG HUẤN LUYỆN CHI TIẾT (TRAINING PIPELINE) -->
+    <section>
+        <h2>5. Chi Tiết Luồng Huấn Luyện (Training Pipeline Lifecycle)</h2>
+        <p>
+            Sơ đồ dưới đây thể hiện chính xác, tường minh quy trình 5 giai đoạn từ khi nạp file dữ liệu thô đến khi lưu mô hình hoàn tất. 
+            Mỗi bước đều làm rõ <strong>Đầu vào</strong>, <strong>Thao tác xử lý</strong>, <strong>Kích thước ma trận</strong> và <strong>Hàm/Lớp tương ứng trong mã nguồn</strong>:
+        </p>
+
+        <div class="flow-container">
+            <!-- Giai đoạn 1: TẦNG INGESTION & CHIA TẬP TRƯỚC -->
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-split">
+                    <span>GIAI ĐOẠN 1: TẦNG INGESTION HYGIENE &amp; CHIA PHÂN TẦNG ĐỘC LẬP (EARLY SPLIT FIRST)</span>
+                    <span>BƯỚC KHỞI ĐẦU BẮT BUỘC TRONG ML</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 1.1: TẦNG INGESTION HYGIENE</div>
+                        Nạp CSV bằng <code>load_and_sanitize_raw_data()</code>. Khử 277 bản ghi trùng thô để chống Duplicate Leakage và thỏa $i.i.d$.
+                        <div class="step-io">In: 5.171 dòng thô &rarr; Out: 4.894 mẫu độc lập</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 1.2: CHIA PHÂN TẦNG 80/10/10 TRƯỚC</div>
+                        Gọi <code>stratified_split_dataframe()</code> với seed 42. Tách ngay thành 3 tập độc lập trước mọi bước tiền xử lý.
+                        <div class="step-io">Train: 3.916 | Val: 489 | Test: 489</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 1.3: CÁCH LY TẬP VAL &amp; TEST</div>
+                        Tập Validation và Test được niêm phong dạng chuỗi thô; không tham gia vào bất kỳ bước fit tham số nào.
+                        <div class="step-io">Status: Locked in memory</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giai đoạn 2: TIỀN XỬ LÝ & HỌC ĐẶC TRƯNG CHỈ TRÊN TRAIN -->
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-train">
+                    <span>GIAI ĐOẠN 2: TIỀN XỬ LÝ HỌC MÁY (ML PREPROCESSING) &amp; HỌC ĐẶC TRƯNG CHỈ TRÊN TRAIN (FIT-ONLY)</span>
+                    <span>KHÔNG CHẠM VÀO VAL/TEST</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 2.1: HỌC GIỚI HẠN TỪ</div>
+                        Chỉ dùng Train để tính phân vị 95% độ dài email = <strong>791 từ</strong>. Cắt đuôi email vượt ngưỡng.
+                        <div class="step-io">cap_word_limit_ = 791</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 2.2: HỌC VOCAB VÀ IDF</div>
+                        Học từ điển 3.000 unigrams, 800 bigrams, 500 char n-grams từ 3.916 mẫu Train. Tính vector IDF.
+                        <div class="step-io">Hàm: builder.fit(train_records)</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 2.3: HỌC SCALER SỐ HỌC</div>
+                        Ghi nhận tham số <code>max_abs_</code> của 8 đặc trưng cấu trúc để chuẩn hóa về $[0, 1]$.
+                        <div class="step-io">Lớp: MaxAbsScalerScratch</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 2.4: TẠO MA TRẬN TRAIN</div>
+                        Chuyển đổi tập Train sang ma trận thưa <code>CSRMatrixScratch</code> gồm 4.318 cột.
+                        <div class="step-io">Shape: X_train_raw [3916 x 4318]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giai đoạn 3: TRANSFORM VAL & CHỌN TOP-500 CỘT -->
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-val">
+                    <span>GIAI ĐOẠN 3: BIẾN ĐỔI VALIDATION (TRANSFORM-ONLY) &amp; CẮT LÁT TOP-500 ĐẶC TRƯNG</span>
+                    <span>THẨM ĐỊNH KHÔNG GIAN ĐẶC TRƯNG</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 3.1: TRANSFORM VAL</div>
+                        Đưa 489 mẫu Validation qua <code>builder.transform()</code> đã fit từ Train. Tuyệt đối không fit lại.
+                        <div class="step-io">Shape: X_val_raw [489 x 4318]</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 3.2: QUÉT CHỌN TOP-K</div>
+                        Dùng Complement NB quét $K \in [500, 4318]$. Chốt $K=500$ đạt Balance Score cao nhất (0.9095).
+                        <div class="step-io">selected_indices: tuple 500 cột</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 3.3: CẮT MA TRẬN 500 CỘT</div>
+                        Phương thức <code>select_matrix()</code> cắt ma trận Train và Val lấy đúng 500 cột theo chỉ số đã chọn.
+                        <div class="step-io">X_train [3916 x 500] | X_val [489 x 500]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giai đoạn 4: HUẤN LUYỆN, TUNING & CHỌN MÔ HÌNH TRÊN VAL -->
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-val">
+                    <span>GIAI ĐOẠN 4: HUẤN LUYỆN, DÒ SIÊU THAM SỐ &amp; TỐI ƯU HÓA NGƯỠNG TRÊN VAL</span>
+                    <span>ĐÓNG BĂNG MÔ HÌNH VÀ NGƯỠNG</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 4.1: TRAIN BASELINES</div>
+                        Huấn luyện 3 mô hình From-Scratch (LR, SVM, Complement NB) trên tập Train 500 cột.
+                        <div class="step-io">Hàm: model.fit(X_train, y_train)</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 4.2: GRID SEARCH &amp; THRESHOLD</div>
+                        Thử $C, \alpha \in \{0.5, 1.0, 2.0\}$ và quét 200 ngưỡng $\tau \in [0.005, 1.0]$ trên Val với $\text{Recall} \ge 0.85$.
+                        <div class="step-io">200 mốc ngưỡng phân tích</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 4.3: CHỌN MÔ HÌNH CUỐI</div>
+                        Xếp hạng 8 ứng viên trên Val. <strong>Linear SVM mặc định</strong> thắng thế (Val Acc 97.14%, F1 95.14%, $\tau=0.555$).
+                        <div class="step-io">Khóa băng Winner &amp; Ngưỡng 0.555!</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giai đoạn 5: ĐÁNH GIÁ MỘT LẦN DUY NHẤT TRÊN TEST -->
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-test">
+                    <span>GIAI ĐOẠN 5: ĐÁNH GIÁ MỘT LẦN TRÊN TẬP TEST &amp; ĐÓNG GÓI MÔ HÌNH</span>
+                    <span>KIỂM TOÁN LỖI ĐỘC LẬP</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 5.1: MỞ TẬP TEST</div>
+                        Chỉ mở Test khi Winner và ngưỡng đã chốt. Đưa Test qua builder đã fit và cắt đúng 500 cột.
+                        <div class="step-io">Shape: X_test [489 x 500]</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 5.2: TÍNH TOÁN METRICS</div>
+                        Đánh giá tại ngưỡng 0.555: Acc 96.52%, Recall 95.21%, Precision 93.29%, F1 94.24%, ROC-AUC 99.46%.
+                        <div class="step-io">Hàm: evaluator.evaluate()</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 5.3: BÓC TÁCH MẪU LỖI</div>
+                        Trích xuất 10 ca False Positive và 7 ca False Negative ra file <code>misclassified_samples.csv</code> để phân tích.
+                        <div class="step-io">17 lỗi sai / 489 mẫu (3.48%)</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 5.4: LƯU BUNDLE</div>
+                        Lưu mô hình, builder, selected_indices và ngưỡng 0.555 vào <code>spam_pipeline.joblib</code> (nén mức 3).
+                        <div class="step-io">Saved: results/saved_models/</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. LUỒNG SUY LUẬN CHI TIẾT (INFERENCE PIPELINE) -->
+    <section>
+        <h2>6. Chi Tiết Luồng Suy Luận Email Mới (Inference Service Lifecycle)</h2>
+        <p>
+            Khi nhận vào một chuỗi văn bản email mới, lớp <code>SpamInferenceService</code> trong <code>src/deployment/predictor.py</code> thực thi tuần tự 6 bước sau:
+        </p>
+
+        <div class="flow-container">
+            <div class="flow-phase">
+                <div class="flow-phase-header hdr-inf">
+                    <span>QUY TRÌNH 6 BƯỚC SUY LUẬN CHO 1 EMAIL MỚI (CHẠY TRONG &lt; 1MS)</span>
+                    <span>TỪNG BƯỚC TƯỜNG MINH</span>
+                </div>
+                <div class="flow-steps">
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 1: TIẾP NHẬN &amp; KIỂM TRA</div>
+                        Nhận chuỗi <code>raw_text</code> từ người dùng. Kiểm tra chuỗi hợp lệ, không rỗng; từ chối dữ liệu rỗng.
+                        <div class="step-io">Input: Chuỗi email thô tùy ý</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 2: QUÉT TÍN HIỆU CẢNH BÁO</div>
+                        Chạy các biểu thức chính quy (Regex) quét tìm: từ khóa nhạy cảm, liên kết URL, đếm dấu <code>!</code>, ký hiệu <code>$</code>, chữ in hoa.
+                        <div class="step-io">Hàm: _extract_signals()</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 3: TRÍCH XUẤT ĐẶC TRƯNG GỐC</div>
+                        Đưa email qua <code>feature_builder.transform()</code> đã nạp từ file bundle. Dùng lại IDF và MaxAbs scaler của Train.
+                        <div class="step-io">Output: Ma trận thưa [1 x 4318]</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 4: CẮT ĐÚNG 500 CỘT</div>
+                        Phương thức <code>select_matrix()</code> dùng mảng chỉ số <code>selected_indices</code> để cắt ma trận: <code>matrix[:, indices]</code>.
+                        <div class="step-io">Output: Ma trận thưa [1 x 500]</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 5: TÍNH ĐIỂM DECISION &amp; SIGMOID</div>
+                        Tính decision score khoảng cách tới lề: $z = w^\top x + b$. Ánh xạ qua hàm Sigmoid: $s(x) = \frac{1}{1 + e^{-z}} \in [0, 1]$.
+                        <div class="step-io">z: Điểm khoảng cách | s(x): Điểm sigmoid</div>
+                    </div>
+                    <div class="step-box">
+                        <div class="step-tag">BƯỚC 6: SO SÁNH NGƯỠNG &amp; TRẢ VỀ</div>
+                        So khớp $s(x) \ge 0.555$: Nếu đạt thì kết luận <strong>SPAM</strong>, ngược lại kết luận <strong>NOT SPAM / HAM</strong>. Đóng gói JSON.
+                        <div class="step-io">Ngưỡng: 0.555 cố định</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3>Bảng đối chiếu đảm bảo tính nhất quán (Parity) giữa Huấn luyện và Suy luận</h3>
+        <table>
+            <caption>Bảng 4: Đối chiếu chi tiết cơ chế xử lý Train vs Inference</caption>
+            <thead>
+                <tr>
+                    <th>Thành phần xử lý</th>
+                    <th>Cách làm khi Huấn luyện (Train)</th>
+                    <th>Cách làm khi Suy luận (Inference)</th>
+                    <th>Ngăn chặn rò rỉ dữ liệu (No-Leakage)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Cắt độ dài từ</strong></td>
+                    <td>Học phân vị 95% trên Train = 791 từ</td>
+                    <td>Áp dụng cố định trần 791 từ</td>
+                    <td>Email dài hơn tự động bị cắt đuôi; không tính lại phân vị trên email mới.</td>
+                </tr>
+                <tr>
+                    <td><strong>Từ vựng &amp; IDF</strong></td>
+                    <td>Học bảng từ điển 3.000 từ và vector IDF từ 3.916 mẫu Train</td>
+                    <td>Dùng lại bảng tra cứu và vector IDF đã lưu trong bundle</td>
+                    <td>Từ mới lạ ngoài từ điển (OOV) bị gán tần số 0; không làm thay đổi kích thước vector.</td>
+                </tr>
+                <tr>
+                    <td><strong>Co dãn đặc trưng số</strong></td>
+                    <td>Ghi nhận vector <code>max_abs_</code> trên Train</td>
+                    <td>Chia trực tiếp cho <code>max_abs_</code> đã học</td>
+                    <td>Phân phối số của email mới không làm thay đổi thang đo chuẩn.</td>
+                </tr>
+                <tr>
+                    <td><strong>Thứ tự 500 cột</strong></td>
+                    <td>Chọn 500 cột tối ưu, lưu thành <code>selected_indices</code></td>
+                    <td>Cắt lát ma trận theo đúng tuple <code>selected_indices</code></td>
+                    <td>Bảo đảm thứ tự 500 đặc trưng khớp 100% với vector trọng số $w$ của mô hình.</td>
+                </tr>
+                <tr>
+                    <td><strong>Ngưỡng phân loại</strong></td>
+                    <td>Quét 200 mốc trên Validation để chọn 0.555</td>
+                    <td>So sánh cố định với ngưỡng 0.555</td>
+                    <td>Ngưỡng phân loại được đóng băng, không thay đổi tùy tiện lúc dự đoán.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Ví dụ kết quả dự đoán thực tế từ <code>SpamInferenceService</code></h3>
+        <pre><code># Dự đoán email rác:
+>>> service.predict_single("URGENT! Claim your free cash prize now! http://win.com")
+{
+  'prediction': 'SPAM',
+  'is_spam': True,
+  'spam_score': 0.9842,
+  'is_calibrated': False,
+  'threshold_used': 0.555,
+  'risk_level': 'Cao',
+  'detected_signals': ['Từ khóa nhạy cảm: cash, claim, free, prize, urgent', 'Chứa liên kết web (URL)']
+}
+
+# Dự đoán email công việc:
+>>> service.predict_single("Hi team, please review the attached meeting notes before Monday.")
+{
+  'prediction': 'NOT SPAM / HAM',
+  'is_spam': False,
+  'spam_score': 0.0415,
+  'is_calibrated': False,
+  'threshold_used': 0.555,
+  'risk_level': 'Thấp',
+  'detected_signals': []
+}</code></pre>
+    </section>
+
+    <!-- 7. KẾT QUẢ THỰC NGHIỆM & SO SÁNH MÔ HÌNH -->
+    <section>
+        <h2>7. Kết Quả Thực Nghiệm &amp; Đánh Giá Tập Test</h2>
+
+        <h3>7.1. Bảng so sánh các mô hình trên tập Test</h3>
+        <p>
+            Mỗi mô hình được áp dụng ngưỡng phân loại tối ưu riêng đã được xác định trước đó trên tập Validation:
+        </p>
+
+        <table>
+            <caption>Bảng 5: So sánh hiệu năng các mô hình trên tập Test (<code>results/metrics/test_models_comparison.csv</code>)</caption>
+            <thead>
+                <tr>
+                    <th>Mô hình phân loại</th>
+                    <th class="num">Ngưỡng $\tau$</th>
+                    <th class="num">Accuracy</th>
+                    <th class="num">Precision</th>
+                    <th class="num">Recall</th>
+                    <th class="num">F1-Score</th>
+                    <th class="num">F2-Score</th>
+                    <th class="num">ROC-AUC</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="highlight-row">
+                    <td><strong>Linear SVM (Mặc định) — Đã chọn</strong></td>
+                    <td class="num"><strong>0.555</strong></td>
+                    <td class="num"><strong>96.52%</strong></td>
+                    <td class="num"><strong>93.29%</strong></td>
+                    <td class="num"><strong>95.21%</strong></td>
+                    <td class="num"><strong>94.24%</strong></td>
+                    <td class="num"><strong>94.82%</strong></td>
+                    <td class="num"><strong>99.46%</strong></td>
+                </tr>
+                <tr>
+                    <td>Logistic Regression (Tuned)</td>
+                    <td class="num">0.650</td>
+                    <td class="num">96.73%</td>
+                    <td class="num">92.21%</td>
+                    <td class="num">97.26%</td>
+                    <td class="num">94.67%</td>
+                    <td class="num">96.21%</td>
+                    <td class="num">99.31%</td>
+                </tr>
+                <tr>
+                    <td>SpamVotingEnsemble (Tuned)</td>
+                    <td class="num">0.605</td>
+                    <td class="num">95.91%</td>
+                    <td class="num">90.38%</td>
+                    <td class="num">96.58%</td>
+                    <td class="num">93.38%</td>
+                    <td class="num">95.27%</td>
+                    <td class="num">99.31%</td>
+                </tr>
+                <tr>
+                    <td>Logistic Regression (Mặc định)</td>
+                    <td class="num">0.590</td>
+                    <td class="num">94.48%</td>
+                    <td class="num">86.06%</td>
+                    <td class="num">97.26%</td>
+                    <td class="num">91.32%</td>
+                    <td class="num">94.79%</td>
+                    <td class="num">99.09%</td>
+                </tr>
+                <tr>
+                    <td>Complement Naive Bayes (Tuned)</td>
+                    <td class="num">0.755</td>
+                    <td class="num">93.87%</td>
+                    <td class="num">88.67%</td>
+                    <td class="num">91.10%</td>
+                    <td class="num">89.86%</td>
+                    <td class="num">90.60%</td>
+                    <td class="num">98.04%</td>
+                </tr>
+                <tr>
+                    <td>Complement Naive Bayes (Mặc định)</td>
+                    <td class="num">0.770</td>
+                    <td class="num">93.66%</td>
+                    <td class="num">88.59%</td>
+                    <td class="num">90.41%</td>
+                    <td class="num">89.49%</td>
+                    <td class="num">90.04%</td>
+                    <td class="num">97.89%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note-box">
+            <strong>Lưu ý phản biện: Tại sao Test F1 của LR Tuned (94.67%) cao hơn Linear SVM (94.24%) mà vẫn chọn SVM?</strong><br>
+            Trong quy trình học máy chuẩn tắc, quyết định chọn mô hình <strong>bắt buộc phải thực hiện trên tập Validation</strong> trước khi mở tập Test. Trên tập Validation, Linear SVM đứng đầu với Val Acc 97.14% và Val F1 95.14% (cao hơn LR là 96.73% và 94.48%). Nếu sau khi xem kết quả Test thấy LR cao hơn 0.43% mà quay lại tráo đổi mô hình, chúng ta đã vi phạm nguyên tắc khoa học (Data Snooping), làm tập Test mất đi tính khách quan. Vì vậy, nhóm giữ nguyên Linear SVM làm kết quả báo cáo chính thức.
+        </div>
+
+        <h3>7.2. Ma trận nhầm lẫn của Linear SVM trên 489 mẫu Test</h3>
+        <table>
+            <caption>Bảng 6: Ma trận nhầm lẫn của Linear SVM tại ngưỡng $\tau = 0.555$</caption>
+            <thead>
+                <tr>
+                    <th>Nhãn thực tế \ Nhãn dự đoán</th>
+                    <th class="num">Dự đoán HAM (0)</th>
+                    <th class="num">Dự đoán SPAM (1)</th>
+                    <th>Tổng số mẫu thực tế</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Thực tế là HAM (0)</strong></td>
+                    <td class="num"><strong>333 (True Negative - TN)</strong></td>
+                    <td class="num"><strong>10 (False Positive - FP)</strong></td>
+                    <td class="num">343 mẫu (Tỷ lệ FP = 2.92%)</td>
+                </tr>
+                <tr>
+                    <td><strong>Thực tế là SPAM (1)</strong></td>
+                    <td class="num"><strong>7 (False Negative - FN)</strong></td>
+                    <td class="num"><strong>139 (True Positive - TP)</strong></td>
+                    <td class="num">146 mẫu (Bắt được 95.21% Spam)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="figure-box">
+                <img src="../../results/figures/confusion_matrix.png" alt="Heatmap ma trận nhầm lẫn" onerror="this.parentElement.style.display='none'">
+                <div class="figure-title">Hình 1: Heatmap ma trận nhầm lẫn (333 TN, 10 FP, 7 FN, 139 TP).</div>
+            </div>
+            <div class="figure-box">
+                <img src="../../results/figures/roc_pr_curve.png" alt="Đường cong ROC và PR" onerror="this.parentElement.style.display='none'">
+                <div class="figure-title">Hình 2: Đường cong ROC (AUC = 99.46%) và Precision-Recall với điểm marker $\tau=0.555$.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. PHÂN TÍCH LỖI SAI (ERROR ANALYSIS) -->
+    <section>
+        <h2>8. Phân Tích Lỗi Sai (Error Analysis)</h2>
+        <p>
+            Trên 489 mẫu Test, mô hình chỉ phân loại sai <strong>17 mẫu (chiếm 3.48%)</strong>, gồm 10 ca False Positive và 7 ca False Negative:
+        </p>
+
+        <h4>10 ca False Positive (Ham bị đánh nhầm thành Spam — Nguy cơ chặn nhầm thư)</h4>
+        <ul>
+            <li><strong>Mẫu <code>source_id = 1823</code>:</strong> Thư gửi ảnh sinh hoạt gia đình tại nhà thờ (rất bình thường), nhưng phía chân trang dịch vụ gửi thư (listbot) lại chèn quảng cáo thẻ tín dụng: <em>"get a low apr nextcard visa in 30 seconds! 2.99% intro or 9.99% ongoing apr and no annual fee! http://www.bcentral.com/listbot/nextcard"</em>. Các từ khóa tài chính và link web ở footer đã đánh lừa mô hình.</li>
+            <li><strong>Mẫu <code>source_id = 354</code>:</strong> Email trao đổi nội bộ công ty Enron về giá hợp đồng giao dịch năng lượng có chứa nhiều con số, tỷ lệ phần trăm và đường link hệ thống.</li>
+            <li><strong>Nhận xét:</strong> Mô hình túi từ (Bag-of-Words) xem toàn bộ văn bản là một túi phẳng, do đó quảng cáo chèn ở chân trang dễ làm tăng điểm spam của email bình thường.</li>
+        </ul>
+
+        <h4>7 ca False Negative (Spam bị lọt lưới — Thư rác chưa bị phát hiện)</h4>
+        <ul>
+            <li><strong>Đặc điểm:</strong> Các email này có độ dài rất ngắn (dưới 15 từ), không chứa link web và không có các từ khóa lộ liễu như <code>win, free, cash</code>. Ví dụ: <em>"Did you receive my previous document? Please reply to confirm."</em></li>
+            <li><strong>Nhận xét:</strong> Với email quá ngắn và thiếu tín hiệu văn bản, mô hình NLP dựa vào tần suất từ khó phân biệt nếu không có thêm thông tin về người gửi (địa chỉ IP, tên miền, bản ghi SPF).</li>
+        </ul>
+    </section>
+
+    <!-- 9. TỔNG KẾT & GIỚI HẠN BÀI LAB -->
+    <section>
+        <h2>9. Tổng Kết &amp; Giới Hạn Của Bài Lab</h2>
+        <ul>
+            <li><strong>Hoàn thành mục tiêu:</strong> Bài lab đã thực hành đầy đủ chu trình học máy cơ bản, tự cài đặt các thuật toán From-Scratch đạt kết quả tốt trên tập dữ liệu thực nghiệm (Test Accuracy 96.52%, Recall 95.21%).</li>
+            <li><strong>Hạn chế về dữ liệu:</strong> Dữ liệu chỉ gồm email tiếng Anh từ một nguồn Kaggle cố định; chưa có các trường siêu dữ liệu riêng biệt như tiêu đề (Subject) hay thông tin người gửi (Sender/Recipient).</li>
+            <li><strong>Hạn chế về điểm số xác suất:</strong> Điểm số trả về của Linear SVM qua hàm sigmoid chưa được hiệu chuẩn (Uncalibrated). Do đó, điểm 0.8 chỉ mang tính xếp hạng tương đối so với ngưỡng 0.555 chứ không phải là xác suất toán học 80% spam.</li>
+            <li><strong>Kiểm chứng mã nguồn:</strong> Toàn bộ 57/57 unit tests trong <code>tests/</code> đều pass, bảo đảm mã nguồn không bị lỗi số học, không tràn số và giữ đúng thứ tự đặc trưng khi nạp lại mô hình.</li>
+        </ul>
+    </section>
+
+</div>
+
+</body>
+</html>

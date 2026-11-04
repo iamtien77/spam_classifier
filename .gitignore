@@ -88,7 +88,8 @@ results/archive/
 !docs/ML project_ Classifying Spam Emails.pdf
 !docs/description_for_AI_working/
 !docs/description_for_AI_working/**
-
+!docs/reports/
+!docs/reports/**
 
 # Cho phép theo dõi cấu hình agent
 !docs/agents/

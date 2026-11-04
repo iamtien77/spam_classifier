@@ -39,13 +39,13 @@ File hiện tại có **5.171 mẫu**, gồm **3.672 ham** và **1.499 spam**. C
 
 Kết quả dưới đây lấy từ [`results/metrics/data_audit.json`](results/metrics/data_audit.json):
 
-| Hạng mục kiểm toán                              |        Số dòng |
-| --------------------------------------------------- | ---------------: |
+| Hạng mục kiểm toán                              |       Số dòng |
+| --------------------------------------------------- | --------------: |
 | Dữ liệu thô đọc được                        | **5.171** |
-| Loại do nhãn không hợp lệ                      |            0 |
-| Loại do nội dung rỗng sau bước kiểm tra nhãn |            0 |
-| Loại do nội dung mâu thuẫn nhãn — 0 nhóm   |            0 |
-| Loại bản lặp cùng nội dung, cùng nhãn        |            277 |
+| Loại do nhãn không hợp lệ                      |               0 |
+| Loại do nội dung rỗng sau bước kiểm tra nhãn |               0 |
+| Loại do nội dung mâu thuẫn nhãn — 0 nhóm     |               0 |
+| Loại bản lặp cùng nội dung, cùng nhãn        |             277 |
 | **Dữ liệu giữ lại sau làm sạch**        | **4.894** |
 
 Các nhóm loại trừ được tính **không chồng lặp**: kiểm tra nhãn trước, nội dung rỗng sau, rồi mới xét nhóm trùng/mâu thuẫn. Tổng số dòng bị loại cộng số dòng giữ lại bằng số dòng đầu vào.
@@ -56,13 +56,13 @@ Các nhóm loại trừ được tính **không chồng lặp**: kiểm tra nhã
 
 Sau làm sạch, dữ liệu gồm **3.432 Ham (~70,13%)** và **1.462 Spam (~29,87%)**.
 
-| Tập dữ liệu | Tỷ lệ cấu hình |   Tổng số mẫu |    Ham |  Spam | Vai trò                                             |
-| -------------- | -----------------: | ---------------: | -----: | ----: | ---------------------------------------------------- |
+| Tập dữ liệu | Tỷ lệ cấu hình |  Tổng số mẫu |   Ham |  Spam | Vai trò                                             |
+| -------------- | -----------------: | --------------: | ----: | ----: | ---------------------------------------------------- |
 | Train          |                80% | **3.916** | 2.746 | 1.170 | Fit đặc trưng và huấn luyện mô hình          |
-| Validation     |                10% |  **489** |  343 | 146 | Chọn Top-K, siêu tham số, ngưỡng và mô hình  |
-| Test           |                10% |  **489** |  343 | 146 | Đánh giá các ứng viên tại ngưỡng đã chốt |
+| Validation     |                10% |   **489** |   343 |   146 | Chọn Top-K, siêu tham số, ngưỡng và mô hình  |
+| Test           |                10% |   **489** |   343 |   146 | Đánh giá các ứng viên tại ngưỡng đã chốt |
 
-Hàm `stratified_split_dataframe()` dùng seed **42**, chia theo từng lớp và làm tròn bằng phần dư lớn nhất để bảo toàn tổng số mẫu. Việc lọc nhóm trùng/mâu thuẫn diễn ra **trước khi chia tập**.
+Khử trùng lặp thô (Exact Deduplication) và kiểm toán nhãn thuộc về tầng **Data Ingestion & Hygiene** tại `src/data/loader.py` (với hàm `load_and_sanitize_raw_data()`). Thao tác này bảo đảm giả thiết mẫu độc lập $i.i.d$ và triệt tiêu nguy cơ rò rỉ dữ liệu qua bản ghi lặp chéo tập (Cross-split Duplication Leakage). Sau đó, trong **ML Pipeline**, bước đầu tiên là **Phân tách dữ liệu độc lập ngay từ đầu (Early Stratified Split First)** bằng `stratified_split_dataframe()` (seed **42**) thành Train 80% (3.916 mẫu), Val 10% (489 mẫu), Test 10% (489 mẫu) trước mọi bước tiền xử lý văn bản và học tham số đặc trưng.
 
 ---
 
@@ -263,7 +263,7 @@ flowchart TD
 
 | Giai đoạn trong `main.py` | Hàm điều phối                | Kết quả chính                                                      |
 | ----------------------------- | -------------------------------- | --------------------------------------------------------------------- |
-| 1. Data preprocessing         | `step_data_preprocessing()`    | Audit, EDA, chia tập, builder đã fit, ma trận và thứ tự cột   |
+| 1. Early Stratified Split & Feature Preprocessing | `step_data_preprocessing()` | Ingestion audit, Early Split 80/10/10, builder fit trên Train, ma trận và thứ tự cột |
 | 2. Model training             | `step_model_training()`        | Ba baseline và ba mô hình đã tuning                              |
 | 3. Evaluation & selection     | `step_evaluation_and_tuning()` | Winner chọn trên Validation, metrics Test, bảng/hình và CSV lỗi |
 | 4. Deployment                 | `step_deployment_and_demo()`   | Pipeline joblib, run summary và demo năm email                      |
@@ -282,6 +282,7 @@ spam_classifier/
 │   └── processed/                     # CSV, ma trận, nhãn và marker của notebooks
 ├── docs/                              # Tài liệu kỹ thuật và đặc tả dự án
 │   ├── ML project_ Classifying Spam Emails.pdf  # Đề bài gốc môn học
+│   ├── reports/                       # Báo cáo học thuật chi tiết (spam_classifier_lab_report.html)
 │   ├── Algorithms/                    # Tài liệu chuyên sâu 4 thuật toán From-Scratch
 │   └── description_for_AI_working/    # Kịch bản kỹ thuật theo 4 giai đoạn và 37 bản tiến hóa
 ├── notebooks/
@@ -298,8 +299,8 @@ spam_classifier/
 ├── src/
 │   ├── config.py                      # Đường dẫn, cấu hình đặc trưng và thực nghiệm
 │   ├── data/
-│   │   ├── loader.py                  # Đọc CSV, chuẩn hóa schema, thống kê dữ liệu
-│   │   └── preprocessing.py           # Audit, khử trùng, chia tập và xử lý văn bản
+│   │   ├── loader.py                  # Đọc CSV, chuẩn hóa schema, nạp & vệ sinh dữ liệu thô (Data Hygiene)
+│   │   └── preprocessing.py           # Kiểm toán toàn vẹn, chia phân tầng độc lập và tiền xử lý văn bản học máy
 │   ├── features/
 │   │   └── feature_engineering.py     # CSR, TF-IDF, scaler, hybrid và Top-K
 │   ├── models/
@@ -361,9 +362,9 @@ Kết quả được tạo ngày **04/11/2026**. Khi cập nhật README, **22/2
 
 | Thuộc tính               | Giá trị                                                                                                  |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Mô hình được chọn    | **Linear SVM — cấu hình mặc định trong `main.py`**                                                                               |
+| Mô hình được chọn    | **Linear SVM — cấu hình mặc định trong `main.py`**                                           |
 | Tham số                   | `C=1.0`, `learning_rate=0.05`, `max_iter=150`, `loss='squared_hinge'`, `class_weight='balanced'` |
-| Số đặc trưng sau Top-K | **500**                                                                                            |
+| Số đặc trưng sau Top-K | **500**                                                                                              |
 | Ngưỡng phân loại       | **0,555**                                                                                            |
 | Validation Accuracy        | **97,14%**                                                                                           |
 | Validation Recall          | **93,84%**                                                                                           |
@@ -381,25 +382,25 @@ Linear SVM mặc định và bản tuned có cùng các chỉ số dùng để l
 | F1                  | **94,24%** | Trung bình điều hòa Precision và Recall                    |
 | F2                  | **94,82%** | Cân bằng hai chỉ số với trọng số nghiêng về Recall     |
 | ROC-AUC             | **99,46%** | Khả năng xếp hạng spam cao hơn ham theo điểm mô hình   |
-| False-positive rate | **2,92%** | Tỷ lệ Ham bị đánh nhầm thành Spam                        |
+| False-positive rate |  **2,92%** | Tỷ lệ Ham bị đánh nhầm thành Spam                        |
 
 Ma trận nhầm lẫn có **hàng là nhãn thật, cột là nhãn dự đoán**:
 
-| Nhãn thật \ Nhãn dự đoán |                 Ham |                  Spam |
-| ------------------------------ | ------------------: | --------------------: |
-| Ham                            | **333 — TN** |   **10 — FP** |
-| Spam                           | **7 — FN** | **139 — TP** |
+| Nhãn thật \ Nhãn dự đoán |                 Ham |                Spam |
+| ------------------------------ | ------------------: | ------------------: |
+| Ham                            | **333 — TN** |  **10 — FP** |
+| Spam                           |   **7 — FN** | **139 — TP** |
 
 Trên 489 mẫu Test, mô hình dự đoán đúng 472 mẫu, nhầm **10/343 email ham** thành spam và bỏ sót **7/146 email spam**. Các mẫu sai được lưu để đọc và phân tích trong bài lab. ROC/PR được vẽ từ các score thực tế, xử lý các score bằng nhau theo nhóm; marker được tính tại đúng threshold đã chọn.
 
 ### 8.3. So sánh kết quả và lưu ý khi diễn giải
 
-| Mô hình trên cùng split Test | Accuracy | Precision | Recall | F1 |
-| ------------------------------- | -----------: | -----------: | -----------: | -----------: |
+| Mô hình trên cùng split Test                       |         Accuracy |        Precision |           Recall |               F1 |
+| ------------------------------------------------------ | ---------------: | ---------------: | ---------------: | ---------------: |
 | **Linear SVM — được chọn trên Validation** | **96,52%** | **93,29%** | **95,21%** | **94,24%** |
-| Logistic Regression (Tuned) | 96,73% | 92,21% | 97,26% | 94,67% |
-| Complement Naive Bayes (Tuned) | 93,87% | 88,67% | 91,10% | 89,86% |
-| SpamVotingEnsemble (Tuned) | 95,91% | 90,38% | 96,58% | 93,38% |
+| Logistic Regression (Tuned)                            |           96,73% |           92,21% |           97,26% |           94,67% |
+| Complement Naive Bayes (Tuned)                         |           93,87% |           88,67% |           91,10% |           89,86% |
+| SpamVotingEnsemble (Tuned)                             |           95,91% |           90,38% |           96,58% |           93,38% |
 
 Bảng trích từ [`test_models_comparison.csv`](results/metrics/test_models_comparison.csv). Logistic Regression (Tuned) có Accuracy và F1 Test cao hơn một chút, nhưng mô hình cuối vẫn là Linear SVM đã chọn trên Validation; không chọn lại theo Test.
 
@@ -481,20 +482,20 @@ Các notebook dùng mã nguồn chung trong `src/` và tạo **một chuỗi th�
 
 Các khác biệt hiện tại cần lưu ý:
 
-| Thành phần                            | `main.py`                    | Notebooks                                                                    |
-| --------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
-| EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                             |
-| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                              |
-| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                             |
-| Grid Search                             | Lưới tại mục 4.4           | Notebook 04 dùng cùng lưới C, learning rate, số vòng và alpha |
-| Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5`  |
+| Thành phần                            | `main.py`                    | Notebooks                                                                   |
+| --------------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| EDA độ dài, tín hiệu, tương quan | Dữ liệu đã làm sạch      | Notebook 01 dùng dữ liệu thô                                            |
+| Baseline LR: learning rate / số vòng  | `0.1 / 200`                  | `0.1 / 200` (đã đồng bộ)                                             |
+| Baseline SVM: learning rate / số vòng | `0.05 / 150`                 | `0.05 / 150` (đã đồng bộ)                                            |
+| Grid Search                             | Lưới tại mục 4.4           | Notebook 04 dùng cùng lưới C, learning rate, số vòng và alpha        |
+| Ensemble                                | Soft voting baseline và tuned | Soft/hard voting trên các model tuned; hard voting giữ threshold `0.5` |
 
 Notebook 02 dùng cùng cấu hình chia tập, hybrid builder và dải Top-K với main ở cấu hình mặc định. Notebook 05 giữ winner/ngưỡng đã chốt trên Validation trước khi đánh giá Test. Ngưỡng `0.0` của SVM trong notebook 03 áp dụng trên điểm `decision_function`, tương đương ngưỡng sigmoid `0.5`.
 
 | Thứ tự | Notebook                                                                                      | Nội dung chính                                                              |
 | -------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | 01       | [`01_eda.ipynb`](notebooks/01_eda.ipynb)                                                     | Schema, kiểm toán, nhãn, độ dài, ngoại lai, từ khóa và tương quan |
-| 02       | [`02_preprocessing_and_features.ipynb`](notebooks/02_preprocessing_and_features.ipynb)       | Làm sạch, chia tập, TF-IDF/hybrid, ablation, Top-K và xuất cache         |
+| 02       | [`02_preprocessing_and_features.ipynb`](notebooks/02_preprocessing_and_features.ipynb)       | Vệ sinh dữ liệu thô (Data Hygiene), Early Split First, tiền xử lý và fit đặc trưng trên Train |
 | 03       | [`03_model_baseline_and_training.ipynb`](notebooks/03_model_baseline_and_training.ipynb)     | Huấn luyện ba baseline, đánh giá Validation và xem loss                 |
 | 04       | [`04_tuning_and_ensemble.ipynb`](notebooks/04_tuning_and_ensemble.ipynb)                     | Grid Search, soft/hard voting, chọn threshold và winner trên Validation    |
 | 05       | [`05_error_analysis_and_deployment.ipynb`](notebooks/05_error_analysis_and_deployment.ipynb) | Test, FP/FN, lưu/nạp, kiểm tra inference và demo                          |
@@ -536,16 +537,16 @@ Model trung gian gồm `feature_artifacts.joblib`, `baseline_models.joblib` và 
 
 ## 12. Giới Hạn Hiện Tại & Hướng Phát Triển
 
-| Giới hạn đã biết                                        | Hướng phát triển phù hợp                                                                                          |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Còn **10 FP và 7 FN** trên 489 mẫu Test; FPR **2,92%** | Đọc các mẫu sai để hiểu giới hạn của mô hình và đề xuất thí nghiệm tiếp theo |
-| Một split cố định                                        | Đánh giá độ ổn định qua nhiều seed hoặc cross-validation                                                      |
-| Test đã được quan sát trong vòng phát triển         | Dùng holdout mới hoặc dữ liệu ngoài để đánh giá độc lập các cải tiến tiếp theo                        |
-| Sigmoid SVM và voting chưa được calibration             | Thực nghiệm calibration trên dữ liệu phát triển được tách đúng vai trò                                    |
-| Tuning nhiều lần trên cùng Validation có thể overfit   | Giới hạn việc dò tham số, dùng quy trình đánh giá phù hợp khi mở rộng thí nghiệm                        |
-| Stop words tiếng Anh; chưa có đánh giá theo ngôn ngữ | Bổ sung dữ liệu và quy trình riêng nếu muốn hỗ trợ tiếng Việt                                               |
-| Chỉ đánh giá trên một dataset email từ Kaggle | Thử trên nguồn email khác để xem mô hình có giữ được chất lượng hay không |
-| Chưa có metadata sender/recipient/subject riêng           | Bổ sung khi có nguồn dữ liệu phù hợp và nhãn đáng tin cậy                                                   |
+| Giới hạn đã biết                                                  | Hướng phát triển phù hợp                                                                   |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Còn **10 FP và 7 FN** trên 489 mẫu Test; FPR **2,92%** | Đọc các mẫu sai để hiểu giới hạn của mô hình và đề xuất thí nghiệm tiếp theo  |
+| Một split cố định                                                  | Đánh giá độ ổn định qua nhiều seed hoặc cross-validation                               |
+| Test đã được quan sát trong vòng phát triển                   | Dùng holdout mới hoặc dữ liệu ngoài để đánh giá độc lập các cải tiến tiếp theo |
+| Sigmoid SVM và voting chưa được calibration                       | Thực nghiệm calibration trên dữ liệu phát triển được tách đúng vai trò             |
+| Tuning nhiều lần trên cùng Validation có thể overfit             | Giới hạn việc dò tham số, dùng quy trình đánh giá phù hợp khi mở rộng thí nghiệm |
+| Stop words tiếng Anh; chưa có đánh giá theo ngôn ngữ           | Bổ sung dữ liệu và quy trình riêng nếu muốn hỗ trợ tiếng Việt                        |
+| Chỉ đánh giá trên một dataset email từ Kaggle                   | Thử trên nguồn email khác để xem mô hình có giữ được chất lượng hay không       |
+| Chưa có metadata sender/recipient/subject riêng                     | Bổ sung khi có nguồn dữ liệu phù hợp và nhãn đáng tin cậy                            |
 
 Lần kiểm tra này không phát hiện nhóm nội dung giống nhau nhưng khác nhãn theo khóa chuẩn hóa đang dùng. Điều đó chưa chứng minh mọi nhãn đều đúng hoặc mọi mẫu gần trùng đã được nhận diện. Khi phân tích lỗi, không đổi nhãn hay loại mẫu chỉ vì mô hình dự đoán sai.
 
