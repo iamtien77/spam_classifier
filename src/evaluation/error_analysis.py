@@ -57,12 +57,10 @@ def profile_error_patterns(
     save_csv_path: Optional[Path] = None,
 ) -> pd.DataFrame:
     """Thống kê và phân tích nguyên nhân gây ra các mẫu dự đoán sai."""
-    combined_errors = pd.concat([fp_df, fn_df], ignore_index=True) if not (fp_df.empty and fn_df.empty) else pd.DataFrame()
+    # Giữ schema và ghi CSV cả khi không có lỗi để thay báo cáo lần chạy cũ.
+    combined_errors = pd.concat([fp_df, fn_df], ignore_index=True)
 
-    if combined_errors.empty:
-        return pd.DataFrame()
-
-    text_col = "text" if "text" in combined_errors.columns else ("raw_text" if "raw_text" in combined_errors.columns else combined_errors.columns[0])
+    text_col = "text" if "text" in combined_errors.columns else ("raw_text" if "raw_text" in combined_errors.columns else next(iter(combined_errors.columns), "text"))
 
     suspected_causes = []
     keywords_pattern = re.compile(r"\b(free|win|prize|claim|urgent|cash|call|offer|money|winner)\b", re.IGNORECASE)

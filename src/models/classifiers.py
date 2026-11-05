@@ -300,7 +300,7 @@ class LinearSVMFromScratch:
 
         parameters, self.loss_history_ = _gradient_descent_backtracking(
             objective, np.zeros(n_features + 1), self.learning_rate, self.max_iter,
-            tol=min(self.tol, 1e-7),
+            tol=self.tol,
         )
         self.weights_, self.bias_ = parameters[:-1], float(parameters[-1])
         self.n_iter_ = len(self.loss_history_) - 1

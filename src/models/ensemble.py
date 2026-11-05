@@ -37,6 +37,8 @@ class SpamVotingEnsemble:
         weights: Optional[Dict[str, float]] = None,
         voting: str = "soft",
     ):
+        if not isinstance(voting, str) or voting.lower() not in ("soft", "hard"):
+            raise ValueError("voting phải là 'soft' hoặc 'hard'.")
         self.models = models
         self.weights = weights or {name: 1.0 for name in models}
         self.voting = voting.lower()
@@ -48,6 +50,9 @@ class SpamVotingEnsemble:
         return self
 
     def _validated_weights(self):
+        # Kiểm tra lại cho cấu hình bị thay đổi hoặc bundle được nạp từ file.
+        if self.voting not in ("soft", "hard"):
+            raise ValueError("voting phải là 'soft' hoặc 'hard'.")
         if not self.models:
             raise ValueError("Chưa cấu hình mô hình thành viên nào trong Ensemble.")
         weights = {name: float(self.weights.get(name, 1.0)) for name in self.models}
