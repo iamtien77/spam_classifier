@@ -35,6 +35,7 @@ GIAI ĐOẠN 4: MODEL DEPLOYMENT (TRIỂN KHAI SUY LUẬN EMAIL MỚI)
   - Bước 4.3: Chạy demo phân loại trên các mẫu email thực tế mới (Unseen emails) và in chẩn đoán chi tiết.
 """
 
+from functools import partial
 import sys
 import json
 import hashlib
@@ -87,7 +88,13 @@ from src.models.classifiers import (
 )
 from src.models.ensemble import SpamVotingEnsemble
 from src.models.tuning import ThresholdOptimizerScratch, ModelSelectionWorkflow, tune_model_hyperparameters
-from src.models.persistence import save_spam_pipeline, experiment_metadata, archive_run_outputs
+from src.models.persistence import (
+    save_spam_pipeline,
+    experiment_metadata,
+    archive_run_outputs,
+    build_weights_history_report,
+    save_weights_history_json,
+)
 from src.evaluation.metrics import SpamModelEvaluator
 from src.evaluation.visualization import (
     plot_class_distribution,
@@ -213,15 +220,32 @@ def step_data_preprocessing(logger, config=None):
 def step_model_training(logger, X_train, y_train, X_val=None, y_val=None, config=None):
     config = config or SpamExperimentConfig()
     logger.info("Huấn luyện Mô hình 1: Logistic Regression (Binary Cross-Entropy & L2)...")
-    lr = LogisticRegressionFromScratch(C=1.0, learning_rate=0.1, max_iter=200, class_weight="balanced", random_state=config.random_state)
+    lr = LogisticRegressionFromScratch(
+        C=1.0,
+        learning_rate=0.1,
+        max_iter=200,
+        class_weight="balanced",
+        random_state=config.random_state,
+        record_weight_history=True,
+        snapshot_every=10,
+    )
     lr.fit(X_train, y_train)
 
     logger.info("Huấn luyện Mô hình 2: Support Vector Machines (Linear SVM - Squared Hinge Loss)...")
-    svm = LinearSVMFromScratch(C=1.0, learning_rate=0.05, max_iter=150, class_weight="balanced", loss="squared_hinge", random_state=config.random_state)
+    svm = LinearSVMFromScratch(
+        C=1.0,
+        learning_rate=0.05,
+        max_iter=150,
+        class_weight="balanced",
+        loss="squared_hinge",
+        random_state=config.random_state,
+        record_weight_history=True,
+        snapshot_every=10,
+    )
     svm.fit(X_train, y_train)
 
     logger.info("Huấn luyện Mô hình 3: Complement Naive Bayes (Laplace smoothing)...")
-    nb = NaiveBayesClassifier(alpha=1.0, kind="complement")
+    nb = NaiveBayesClassifier(alpha=1.0, kind="complement", record_weight_history=True)
     nb.fit(X_train, y_train)
 
     logger.info("Đã hoàn tất huấn luyện 3 mô hình cốt lõi.")
@@ -229,15 +253,24 @@ def step_model_training(logger, X_train, y_train, X_val=None, y_val=None, config
     if X_val is not None and y_val is not None:
         optimizer = ThresholdOptimizerScratch(config.recall_target, FBETA_BETA, THRESHOLD_GRID_POINTS)
         grids = {
-            "Logistic Regression": (LogisticRegressionFromScratch, {
-                "C": [0.5, 1.0, 2.0], "learning_rate": [0.1],
-                "max_iter": [200], "class_weight": ["balanced"], "random_state": [config.random_state],
-            }),
-            "Linear SVM": (LinearSVMFromScratch, {
-                "C": [0.5, 1.0, 2.0], "learning_rate": [0.05], "max_iter": [150],
-                "class_weight": ["balanced"], "loss": ["squared_hinge"], "random_state": [config.random_state],
-            }),
-            "Complement Naive Bayes": (NaiveBayesClassifier, {"alpha": [0.5, 1.0, 2.0], "kind": ["complement"]}),
+            "Logistic Regression": (
+                partial(LogisticRegressionFromScratch, record_weight_history=True, snapshot_every=10),
+                {
+                    "C": [0.5, 1.0, 2.0], "learning_rate": [0.1],
+                    "max_iter": [200], "class_weight": ["balanced"], "random_state": [config.random_state],
+                },
+            ),
+            "Linear SVM": (
+                partial(LinearSVMFromScratch, record_weight_history=True, snapshot_every=10),
+                {
+                    "C": [0.5, 1.0, 2.0], "learning_rate": [0.05], "max_iter": [150],
+                    "class_weight": ["balanced"], "loss": ["squared_hinge"], "random_state": [config.random_state],
+                },
+            ),
+            "Complement Naive Bayes": (
+                partial(NaiveBayesClassifier, record_weight_history=True),
+                {"alpha": [0.5, 1.0, 2.0], "kind": ["complement"]},
+            ),
         }
         for name, (model_class, grid) in grids.items():
             tuned, params, _ = tune_model_hyperparameters(
@@ -250,6 +283,22 @@ def step_model_training(logger, X_train, y_train, X_val=None, y_val=None, config
     return models
 
 
+def _build_voting_ensembles(models):
+    """Khởi tạo bộ kết hợp biểu quyết cho nhánh baseline và nhánh tuned."""
+    ensembles = {}
+    baseline_members = {name: model for name, model in models.items() if not name.endswith(" (Tuned)")}
+    if baseline_members:
+        ensembles["SpamVotingEnsemble"] = SpamVotingEnsemble(
+            models=baseline_members,
+            weights={"Logistic Regression": 1.0, "Linear SVM": 1.0, "Complement Naive Bayes": 1.2},
+            voting="soft",
+        )
+    tuned_members = {name: model for name, model in models.items() if name.endswith(" (Tuned)")}
+    if tuned_members:
+        ensembles["SpamVotingEnsemble (Tuned)"] = SpamVotingEnsemble(models=tuned_members, voting="soft")
+    return ensembles
+
+
 @log_step("GIAI ĐOẠN 3: ĐÁNH GIÁ, TUNING, ENSEMBLE & PHÂN TÍCH LỖI")
 def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, test_records, config=None):
     config = config or SpamExperimentConfig()
@@ -257,16 +306,8 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
 
     # 2. Xây dựng SpamVotingEnsemble
     logger.info("Xây dựng bộ kết hợp biểu quyết SpamVotingEnsemble...")
-    ensemble = SpamVotingEnsemble(
-        models={name: model for name, model in models.items() if not name.endswith(" (Tuned)")},
-        weights={"Logistic Regression": 1.0, "Linear SVM": 1.0, "Complement Naive Bayes": 1.2},
-        voting="soft",
-    )
-
-    candidates = {**models, "SpamVotingEnsemble": ensemble}
-    tuned_members = {name: model for name, model in models.items() if name.endswith(" (Tuned)")}
-    if tuned_members:
-        candidates["SpamVotingEnsemble (Tuned)"] = SpamVotingEnsemble(models=tuned_members, voting="soft")
+    ensembles = _build_voting_ensembles(models)
+    candidates = {**models, **ensembles}
     optimizer = ThresholdOptimizerScratch(config.recall_target, FBETA_BETA, THRESHOLD_GRID_POINTS)
     winner_name, best_th_info, comparison, scan_df = ModelSelectionWorkflow(config.recall_target).select_candidates(
         candidates, X_val, y_val, optimizer,
@@ -328,7 +369,17 @@ def step_evaluation_and_tuning(logger, models, X_val, y_val, X_test, y_test, tes
 
 
 @log_step("GIAI ĐOẠN 4: ĐÓNG GÓI PIPELINE & DEMO TRIỂN KHAI SUY LUẬN")
-def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected_indices, best_threshold, best_th_info, final_metrics):
+def step_deployment_and_demo(
+    logger,
+    ensemble,
+    text_processor,
+    builder,
+    selected_indices,
+    best_threshold,
+    best_th_info,
+    final_metrics,
+    trained_models=None,
+):
     pipeline_path = SAVED_MODELS_DIR / "spam_pipeline.joblib"
     logger.info(f"Đóng gói Pipeline Bundle vào: {pipeline_path}...")
     bundle = {
@@ -358,6 +409,36 @@ def step_deployment_and_demo(logger, ensemble, text_processor, builder, selected
     (METRICS_DIR / 'run_summary.json').write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8',
     )
+
+    candidate_key = best_th_info.get("candidate_key", type(ensemble).__name__)
+    if trained_models is not None:
+        models_for_report = trained_models
+        ensembles_for_report = _build_voting_ensembles(trained_models)
+    elif isinstance(ensemble, SpamVotingEnsemble):
+        models_for_report = ensemble.models
+        ensembles_for_report = {candidate_key: ensemble}
+    else:
+        models_for_report = {candidate_key: ensemble}
+        ensembles_for_report = {}
+
+    selected_feature_names = (
+        [builder.feature_names_[idx] for idx in selected_indices]
+        if selected_indices is not None
+        else list(builder.feature_names_)
+    )
+    weights_report = build_weights_history_report(
+        models=models_for_report,
+        ensembles=ensembles_for_report,
+        feature_names=selected_feature_names,
+        selected_winner=candidate_key,
+        best_threshold=best_threshold,
+        run_metadata=getattr(builder, "run_metadata_", None),
+    )
+    weights_json_path = save_weights_history_json(
+        weights_report,
+        save_path=METRICS_DIR / "model_weights_history.json",
+    )
+    logger.info(f"Đã xuất file JSON lưu weights trước/trong/sau train vào: {weights_json_path}")
 
     logger.info("Khởi động dịch vụ suy luận SpamInferenceService từ file đã lưu...")
     service = SpamInferenceService(bundle_path=pipeline_path).load_service()
@@ -419,7 +500,15 @@ def run_pipeline():
 
     # Giai đoạn 4
     step_deployment_and_demo(
-        logger, ensemble, text_processor, builder, selected_indices, best_threshold, best_th_info, final_metrics
+        logger,
+        ensemble,
+        text_processor,
+        builder,
+        selected_indices,
+        best_threshold,
+        best_th_info,
+        final_metrics,
+        trained_models=models,
     )
 
     print_section_header("HOÀN TẤT TOÀN DIỆN DỰ ÁN SPAM CLASSIFIER THÀNH CÔNG")

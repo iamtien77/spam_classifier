@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 from contextlib import redirect_stdout
 
+import numpy as np
 import main as pipeline
 from src.config import SpamExperimentConfig
 from src.data.loader import load_raw_data
@@ -52,6 +53,28 @@ class TestPipeline(unittest.TestCase):
                 self.assertAlmostEqual(selected['F1-Score'], metrics['f1'])
                 with redirect_stdout(io.StringIO()):
                     pipeline.step_deployment_and_demo.__wrapped__(logger, winner, processor, builder, indices, threshold, info, metrics)
+                self.assertTrue((root / "model_weights_history.json").is_file())
+                with redirect_stdout(io.StringIO()):
+                    pipeline.step_deployment_and_demo.__wrapped__(
+                        logger, winner, processor, builder, indices, threshold, info, metrics,
+                        trained_models=models,
+                    )
+                weights_report = json.loads((root / "model_weights_history.json").read_text(encoding="utf-8"))
+                self.assertEqual(weights_report["selected_winner"], info["candidate_key"])
+                self.assertEqual(len(weights_report["feature_names"]), len(indices))
+                self.assertEqual(set(weights_report["models"].keys()), set(models.keys()))
+                self.assertEqual(set(weights_report["ensembles"].keys()), {"SpamVotingEnsemble", "SpamVotingEnsemble (Tuned)"})
+                for model_name, model_obj in models.items():
+                    entry = weights_report["models"][model_name]
+                    if hasattr(model_obj, "weights_") and model_obj.weights_ is not None:
+                        self.assertEqual(entry["before_train"]["weights"], [0.0] * len(indices))
+                        np.testing.assert_allclose(entry["after_train"]["weights"], model_obj.weights_)
+                        self.assertAlmostEqual(entry["after_train"]["bias"], model_obj.bias_)
+                    else:
+                        np.testing.assert_allclose(
+                            entry["after_train"]["feature_log_prob"]["1_spam"],
+                            model_obj.feature_log_prob_[1],
+                        )
                 report = json.loads((root / 'run_summary.json').read_text(encoding='utf-8'))
                 self.assertEqual(report['model'], info['candidate_key'])
                 self.assertEqual(report['test']['confusion_matrix'], metrics['confusion_matrix'].tolist())

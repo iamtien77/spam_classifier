@@ -345,6 +345,82 @@ class TestModelsModule(unittest.TestCase):
     def test_ensemble_case(self):
         test_spam_voting_ensemble()
 
+    def test_weight_history_tracking_before_during_after(self):
+        X = np.array([[2.0, 1.0], [1.5, 0.5], [-1.0, -2.0], [-1.5, -1.0]], dtype=float)
+        y = np.array([1, 1, 0, 0], dtype=int)
+
+        for cls, kwargs in (
+            (LogisticRegressionFromScratch, {"C": 1.0, "learning_rate": 0.1, "max_iter": 10}),
+            (LinearSVMFromScratch, {"C": 1.0, "learning_rate": 0.05, "max_iter": 10, "loss": "squared_hinge"}),
+        ):
+            with self.subTest(model=cls.__name__):
+                plain = cls(**kwargs).fit(X, y)
+                self.assertIsNone(plain.weight_history_)
+                tracked = cls(**kwargs, record_weight_history=True, snapshot_every=2).fit(X, y)
+                np.testing.assert_allclose(tracked.weights_, plain.weights_)
+                self.assertAlmostEqual(tracked.bias_, plain.bias_)
+                wh = tracked.weight_history_
+                self.assertEqual(wh["before_train"]["iteration"], 0)
+                self.assertEqual(wh["before_train"]["weights"], [0.0, 0.0])
+                self.assertEqual(wh["before_train"]["bias"], 0.0)
+                n_iter = wh["n_iter_completed"]
+                self.assertGreater(n_iter, 0)
+                per_iter = wh["during_train"]["per_iteration_metrics"]
+                self.assertEqual([m["iteration"] for m in per_iter], list(range(1, n_iter + 1)))
+                np.testing.assert_allclose([m["loss"] for m in per_iter], tracked.loss_history_[1:])
+                ckpts = wh["during_train"]["checkpoint_snapshots"]
+                expected_ckpts = [i for i in range(2, n_iter, 2)]
+                self.assertEqual([c["iteration"] for c in ckpts], expected_ckpts)
+                np.testing.assert_allclose(wh["after_train"]["weights"], tracked.weights_)
+                self.assertAlmostEqual(wh["after_train"]["bias"], tracked.bias_)
+
+        # Zero-iteration edge case when initial gradient norm <= tol
+        zero_step = LinearSVMFromScratch(tol=4.0, record_weight_history=True, snapshot_every=2).fit(
+            np.array([[-1.0], [-2.0], [1.0], [2.0]]), [0, 0, 1, 1],
+        )
+        self.assertEqual(zero_step.weight_history_["n_iter_completed"], 0)
+        self.assertEqual(zero_step.weight_history_["during_train"]["per_iteration_metrics"], [])
+        self.assertEqual(zero_step.weight_history_["during_train"]["checkpoint_snapshots"], [])
+        self.assertEqual(zero_step.weight_history_["after_train"]["weights"], [0.0])
+
+        # Invalid snapshot_every rejected
+        for bad_step in (0, -1, False, 1.5):
+            with self.subTest(snapshot_every=bad_step), self.assertRaises(ValueError):
+                LogisticRegressionFromScratch(record_weight_history=True, snapshot_every=bad_step).fit(X, y)
+
+        # Closed-form Naive Bayes weight history contract
+        nb = NaiveBayesClassifier(alpha=1.0, kind="complement", record_weight_history=True).fit(
+            np.array([[3.0, 0.0], [2.0, 1.0], [0.0, 3.0], [1.0, 2.0]]), y,
+        )
+        nb_wh = nb.weight_history_
+        self.assertIsNone(nb_wh["before_train"]["class_log_prior"])
+        self.assertEqual(nb_wh["during_train"]["checkpoint_snapshots"], [])
+        np.testing.assert_allclose(nb_wh["after_train"]["feature_log_prob"]["0_ham"], nb.feature_log_prob_[0])
+        np.testing.assert_allclose(nb_wh["after_train"]["feature_log_prob"]["1_spam"], nb.feature_log_prob_[1])
+        np.testing.assert_allclose(
+            nb_wh["after_train"]["effective_linear_weights"],
+            nb.feature_log_prob_[0] - nb.feature_log_prob_[1],
+        )
+
+        # Fallback serialization when record_weight_history=False & validation guards
+        from src.models.persistence import build_weights_history_report
+        plain_lr = LogisticRegressionFromScratch(max_iter=5).fit(X, y)
+        plain_nb = NaiveBayesClassifier(kind="multinomial").fit(
+            np.array([[3.0, 0.0], [2.0, 1.0], [0.0, 3.0], [1.0, 2.0]]), y,
+        )
+        fallback = build_weights_history_report(
+            models={"lr": plain_lr, "nb": plain_nb},
+            feature_names=["f0", "f1"],
+        )
+        self.assertIsNone(fallback["models"]["lr"]["before_train"])
+        np.testing.assert_allclose(fallback["models"]["lr"]["after_train"]["weights"], plain_lr.weights_)
+        np.testing.assert_allclose(
+            fallback["models"]["nb"]["after_train"]["effective_linear_weights"],
+            plain_nb.feature_log_prob_[1] - plain_nb.feature_log_prob_[0],
+        )
+        with self.assertRaises(ValueError):
+            build_weights_history_report(models={})
+
     def test_threshold_optimizer_case(self):
         test_threshold_optimizer_scratch()
 

@@ -89,11 +89,16 @@ def _positive(name, value):
         raise ValueError(f"{name} phải hữu hạn và dương.")
 
 
+def _positive_int(name, value):
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
+        raise ValueError(f"{name} phải là số nguyên dương.")
+
+
 def _validate_linear_parameters(model):
     _positive("C", model.C)
     _positive("learning_rate", model.learning_rate)
-    if isinstance(model.max_iter, bool) or not isinstance(model.max_iter, (int, np.integer)) or model.max_iter < 1:
-        raise ValueError("max_iter phải là số nguyên dương.")
+    _positive_int("max_iter", model.max_iter)
+    _positive_int("snapshot_every", getattr(model, "snapshot_every", 10))
     if model.class_weight not in (None, "balanced"):
         raise ValueError("class_weight phải là None hoặc 'balanced'.")
 
@@ -103,7 +108,47 @@ def _validate_threshold(threshold, probability=True):
         raise ValueError("Ngưỡng phải hữu hạn và thuộc miền điểm dự đoán.")
 
 
-def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, tol=1e-7):
+def _make_iteration_metric(
+    iteration: int,
+    parameters: np.ndarray,
+    value: float,
+    gradient: np.ndarray,
+    step_size: Optional[float] = None,
+) -> Dict[str, Any]:
+    w = parameters[:-1]
+    metric: Dict[str, Any] = {
+        "iteration": int(iteration),
+        "loss": float(value),
+        "grad_norm": float(np.linalg.norm(gradient)),
+        "weight_l2_norm": float(np.linalg.norm(w)),
+        "bias": float(parameters[-1]),
+    }
+    if step_size is not None:
+        metric["step_size"] = float(step_size)
+    return metric
+
+
+def _make_parameter_snapshot(
+    iteration: int,
+    parameters: np.ndarray,
+    value: float,
+    gradient: np.ndarray,
+    step_size: Optional[float] = None,
+) -> Dict[str, Any]:
+    snapshot = _make_iteration_metric(iteration, parameters, value, gradient, step_size=step_size)
+    snapshot["weights"] = [float(v) for v in parameters[:-1]]
+    return snapshot
+
+
+def _gradient_descent_backtracking(
+    objective,
+    initial,
+    learning_rate,
+    max_iter,
+    tol=1e-7,
+    snapshot_every: int = 10,
+    weight_history_out: Optional[Dict[str, Any]] = None,
+):
     """Spectral gradient descent với Armijo; không phụ thuộc sklearn.
 
     Bước học ban đầu được điều chỉnh theo độ cong, tránh đứng gần nghiệm
@@ -112,13 +157,24 @@ def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, 
     """
     if learning_rate <= 0 or max_iter < 1:
         raise ValueError("learning_rate và max_iter phải dương.")
+    _positive_int("snapshot_every", snapshot_every)
     parameters = initial.copy()
     value, gradient = objective(parameters)
     history = [float(value)]
     step = float(learning_rate)
-    for _ in range(max_iter):
+
+    before_train = None
+    per_iteration = []
+    checkpoint_snapshots = []
+    last_used_step = None
+    stop_reason = "max_iter_reached"
+    if weight_history_out is not None:
+        before_train = _make_parameter_snapshot(0, parameters, value, gradient)
+
+    for step_idx in range(1, max_iter + 1):
         norm_sq = float(gradient @ gradient)
         if norm_sq <= tol ** 2:
+            stop_reason = "gradient_tolerance_reached"
             break
         for _ in range(60):
             candidate = parameters - step * gradient
@@ -127,7 +183,9 @@ def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, 
                 break
             step *= .5
         else:
+            stop_reason = "armijo_backtracking_exhausted"
             break
+        used_step = float(step)
         displacement = candidate - parameters
         gradient_change = next_gradient - gradient
         curvature = float(displacement @ gradient_change)
@@ -136,7 +194,49 @@ def _gradient_descent_backtracking(objective, initial, learning_rate, max_iter, 
         parameters, value, gradient = candidate, next_value, next_gradient
         history.append(float(value))
         step = float(np.clip(next_step, 1e-8, 1e8))
+        if weight_history_out is not None:
+            last_used_step = used_step
+            per_iteration.append(
+                _make_iteration_metric(step_idx, parameters, value, gradient, step_size=used_step)
+            )
+            if step_idx % snapshot_every == 0:
+                checkpoint_snapshots.append(
+                    _make_parameter_snapshot(step_idx, parameters, value, gradient, step_size=used_step)
+                )
+
+    if weight_history_out is not None:
+        n_iter_completed = len(history) - 1
+        if checkpoint_snapshots and checkpoint_snapshots[-1]["iteration"] == n_iter_completed:
+            checkpoint_snapshots.pop()
+        weight_history_out.clear()
+        weight_history_out.update({
+            "n_features": int(len(parameters) - 1),
+            "snapshot_every": int(snapshot_every),
+            "n_iter_completed": int(n_iter_completed),
+            "stop_reason": stop_reason,
+            "before_train": before_train,
+            "during_train": {
+                "per_iteration_metrics": per_iteration,
+                "checkpoint_snapshots": checkpoint_snapshots,
+            },
+            "after_train": _make_parameter_snapshot(
+                n_iter_completed, parameters, value, gradient, step_size=last_used_step
+            ),
+        })
     return parameters, history
+
+
+def _format_linear_weight_history(
+    model_class: str,
+    hyperparameters: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "model_class": model_class,
+        "training_mode": "iterative_gradient_descent",
+        "hyperparameters": hyperparameters,
+        **payload,
+    }
 
 
 class LogisticRegressionFromScratch:
@@ -156,15 +256,20 @@ class LogisticRegressionFromScratch:
         C: float = 1.0,
         class_weight: Optional[str] = "balanced",
         random_state: int = 42,
+        record_weight_history: bool = False,
+        snapshot_every: int = 10,
     ):
         self.learning_rate = learning_rate
         self.max_iter = max_iter
         self.C = C
         self.class_weight = class_weight
         self.random_state = random_state
+        self.record_weight_history = bool(record_weight_history)
+        self.snapshot_every = snapshot_every
         self.weights_: Optional[np.ndarray] = None
         self.bias_: float = 0.0
         self.loss_history_: list = []
+        self.weight_history_: Optional[Dict[str, Any]] = None
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "LogisticRegressionFromScratch":
         _validate_linear_parameters(self)
@@ -193,10 +298,31 @@ class LogisticRegressionFromScratch:
             grad_w = reg_lambda * w + _safe_transpose_dot(X, error) / n_samples
             return float(loss), np.r_[grad_w, np.mean(error)]
 
+        history_payload: Optional[Dict[str, Any]] = {} if self.record_weight_history else None
         parameters, self.loss_history_ = _gradient_descent_backtracking(
-            objective, np.zeros(n_features + 1), self.learning_rate, self.max_iter,
+            objective,
+            np.zeros(n_features + 1),
+            self.learning_rate,
+            self.max_iter,
+            snapshot_every=self.snapshot_every,
+            weight_history_out=history_payload,
         )
         self.weights_, self.bias_ = parameters[:-1], float(parameters[-1])
+        self.weight_history_ = (
+            _format_linear_weight_history(
+                "LogisticRegressionFromScratch",
+                {
+                    "C": float(self.C),
+                    "learning_rate": float(self.learning_rate),
+                    "max_iter": int(self.max_iter),
+                    "class_weight": self.class_weight,
+                    "random_state": self.random_state,
+                },
+                history_payload,
+            )
+            if history_payload is not None
+            else None
+        )
         return self
 
     def predict_proba(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
@@ -234,6 +360,8 @@ class LinearSVMFromScratch:
         loss: str = "squared_hinge",
         tol: float = 1e-4,
         random_state: int = 42,
+        record_weight_history: bool = False,
+        snapshot_every: int = 10,
     ):
         self.C = float(C)
         self.learning_rate = float(learning_rate)
@@ -242,11 +370,14 @@ class LinearSVMFromScratch:
         self.loss = loss
         self.tol = float(tol)
         self.random_state = random_state
+        self.record_weight_history = bool(record_weight_history)
+        self.snapshot_every = snapshot_every
         self.weights_: Optional[np.ndarray] = None
         self.bias_: float = 0.0
         self.loss_history_: list = []
         self.n_features_in_: Optional[int] = None
         self.n_iter_: int = 0
+        self.weight_history_: Optional[Dict[str, Any]] = None
 
     @property
     def w_(self) -> Optional[np.ndarray]:
@@ -298,12 +429,35 @@ class LinearSVMFromScratch:
             grad_w = reg_lambda * w + _safe_transpose_dot(X, derivative) / n_samples
             return float(value), np.r_[grad_w, np.mean(derivative)]
 
+        history_payload: Optional[Dict[str, Any]] = {} if self.record_weight_history else None
         parameters, self.loss_history_ = _gradient_descent_backtracking(
-            objective, np.zeros(n_features + 1), self.learning_rate, self.max_iter,
+            objective,
+            np.zeros(n_features + 1),
+            self.learning_rate,
+            self.max_iter,
             tol=self.tol,
+            snapshot_every=self.snapshot_every,
+            weight_history_out=history_payload,
         )
         self.weights_, self.bias_ = parameters[:-1], float(parameters[-1])
         self.n_iter_ = len(self.loss_history_) - 1
+        self.weight_history_ = (
+            _format_linear_weight_history(
+                "LinearSVMFromScratch",
+                {
+                    "C": float(self.C),
+                    "learning_rate": float(self.learning_rate),
+                    "max_iter": int(self.max_iter),
+                    "class_weight": self.class_weight,
+                    "loss": self.loss,
+                    "tol": float(self.tol),
+                    "random_state": self.random_state,
+                },
+                history_payload,
+            )
+            if history_payload is not None
+            else None
+        )
         return self
 
     def decision_function(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
@@ -337,12 +491,25 @@ class NaiveBayesClassifier:
     chuyên trị tập dữ liệu văn bản mất cân bằng nhãn cao.
     """
 
-    def __init__(self, alpha: float = 1.0, kind: str = "complement"):
+    def __init__(self, alpha: float = 1.0, kind: str = "complement", record_weight_history: bool = False):
         self.alpha = float(alpha)
         self.kind = kind.lower()
+        self.record_weight_history = bool(record_weight_history)
         self.classes_: Optional[np.ndarray] = None
         self.class_log_prior_: Optional[np.ndarray] = None
         self.feature_log_prob_: Optional[np.ndarray] = None
+        self.weight_history_: Optional[Dict[str, Any]] = None
+
+    def effective_linear_parameters(self) -> Tuple[np.ndarray, float]:
+        """Return (w, b) yielding logit difference score_spam - score_ham."""
+        if self.feature_log_prob_ is None or self.class_log_prior_ is None:
+            raise RuntimeError("Mô hình chưa được huấn luyện (hãy gọi .fit() trước).")
+        if self.kind == "complement":
+            effective_w = self.feature_log_prob_[0] - self.feature_log_prob_[1]
+        else:
+            effective_w = self.feature_log_prob_[1] - self.feature_log_prob_[0]
+        effective_b = float(self.class_log_prior_[1] - self.class_log_prior_[0])
+        return effective_w, effective_b
 
     def fit(self, X: Union[np.ndarray, csr_matrix], y: np.ndarray) -> "NaiveBayesClassifier":
         _positive("alpha", self.alpha)
@@ -375,6 +542,43 @@ class NaiveBayesClassifier:
                 feature_log_prob.append(np.log(smoothed / total))
 
         self.feature_log_prob_ = np.array(feature_log_prob, dtype=float)
+        if self.record_weight_history:
+            effective_w, effective_b = self.effective_linear_parameters()
+            self.weight_history_ = {
+                "model_class": "NaiveBayesClassifier",
+                "training_mode": "closed_form_probabilistic",
+                "hyperparameters": {"alpha": float(self.alpha), "kind": self.kind},
+                "n_features": int(n_features),
+                "n_iter_completed": 1,
+                "before_train": {
+                    "initialized": False,
+                    "class_log_prior": None,
+                    "feature_log_prob": None,
+                    "effective_linear_weights": None,
+                    "effective_bias": None,
+                    "note": "Closed-form Naive Bayes has no learned weights before fit().",
+                },
+                "during_train": {
+                    "note": "Closed-form frequency estimation in a single pass; no iterative gradient steps.",
+                    "per_iteration_metrics": [],
+                    "checkpoint_snapshots": [],
+                },
+                "after_train": {
+                    "classes": [int(c) for c in self.classes_],
+                    "class_log_prior": {
+                        "0_ham": float(self.class_log_prior_[0]),
+                        "1_spam": float(self.class_log_prior_[1]),
+                    },
+                    "feature_log_prob": {
+                        "0_ham": [float(v) for v in self.feature_log_prob_[0]],
+                        "1_spam": [float(v) for v in self.feature_log_prob_[1]],
+                    },
+                    "effective_linear_weights": [float(v) for v in effective_w],
+                    "effective_bias": effective_b,
+                },
+            }
+        else:
+            self.weight_history_ = None
         return self
 
     def decision_scores(self, X: Union[np.ndarray, csr_matrix]) -> np.ndarray:
